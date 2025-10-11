@@ -1,0 +1,35 @@
+# .goreleaser.yml
+version: 2
+project_name: agon
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+builds:
+  - main: ./cmd/agon/main.go
+    id: "agon"
+    binary: agon
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+release:
+  github:
+    owner: mwiater
+    name: agon
+  draft: false
+  prerelease: false
+  name_template: "{{ .ProjectName }} v{{ .Version }}"
+changelog:
+  use: git
+upx:
+  - enabled: true
+    compress: best
+    lzma: true

@@ -1,0 +1,7 @@
+# Ignore everything in this directory
+*
+# Except these files
+!.gitignore
+!config.example.Authors.json
+!config.example.json
+!config.example.JSONMode.json
