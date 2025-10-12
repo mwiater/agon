@@ -1,6 +1,6 @@
 # agon
 
-Note: This is a personal project. I will do my best to keep the main branch functional and up to date with the time I have available.
+**Note:** This is a personal project. I will do my best to keep the main branch functional and up to date with the time I have available.
 
 `agon` is a terminal-first companion for interacting with large language models that expose the Ollama API. It helps you browse available hosts, launch an immersive chat session, and keep model inventories aligned across machines, whether you are experimenting locally or coordinating a distributed cluster.
 
@@ -171,13 +171,6 @@ goreleaser release --snapshot --clean --skip=publish
 ```
 
 `snapshot` turns on timestamped versions, `--clean` clears `dist/`, and `--skip=publish` prevents any GitHub release/upload steps.
-
-### GitHub release
-Publish binaries, changelog, and tag to `github.com/mwiater/agon`:
-
-```bash
-GITHUB_TOKEN=<repo-token> goreleaser release --clean
-```
 
 Create and push a version tag first (for example `git tag -a v0.1.0 -m "v0.1.0" && git push origin v0.1.0`), then run GoReleaser with a token that has `repo` scope. Keep `--clean` so old artifacts are removed before each run.
 
