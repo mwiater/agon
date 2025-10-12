@@ -1,8 +1,11 @@
 # agon
 
-**Note:** This is a personal project. I will do my best to keep the main branch functional and up to date with the time I have available.
+![Alt text](.screens/gollama.png "gollama")
+
+>**Note:** This is a personal project. I will do my best to keep the main branch functional and up to date with the time I have available.
 
 `agon` is a terminal-first companion for interacting with large language models that expose the Ollama API. It helps you browse available hosts, launch an immersive chat session, and keep model inventories aligned across machines, whether you are experimenting locally or coordinating a distributed cluster.
+
 
 ## Feature Highlights
 - **Multiple host management** – Define any number of Ollama hosts in `config/config.json`, switch between them instantly, and keep connection details in one place.
@@ -11,12 +14,6 @@
 - **Model synchronization** – Use a single command to pull models that are missing from a host and prune those not listed in configuration.
 - **Comprehensive model tooling** – List, pull, delete, unload, and otherwise manage models without leaving the CLI.
 - **Debug instrumentation** – Surface timing, token counts, and other diagnostics whenever you need deeper performance insight.
-
-#### Singlechat Mode
-
-Normal chat mode, displays model information, parameters, and response metrics.
-
-![Alt text](.screens/singlechat_01.png?raw=true "Singlechat Mode")
 
 #### Multichat Mode
 
@@ -28,75 +25,92 @@ Send the same user prompt to up to 4 different Ollama hosts
 
 ![Alt text](.screens/multichat_01.png?raw=true "Multichat Mode")
 
+#### Singlechat Mode
+
+Normal chat mode, displays model information, parameters, and response metrics.
+
+![Alt text](.screens/singlechat_01.png?raw=true "Singlechat Mode")
+
 ## Requirements
 - Go toolchain installed (the project targets recent Go releases).
 - Access to one or more running Ollama instances reachable from your terminal.
 
 ## Installation
+
+1) Install `goreleaser`: https://goreleaser.com/install/
+2) Clone repo: `git clone git@github.com:mwiater/agon.git && cd agon`
+3) `go mod tidy`
+4) Run goreleaser: `goreleaser release --snapshot --clean --skip=publish`
+
+Depending on your architecture, you'll find builds to run in the `dist/` directory.
+
+OR:
+
 Install the command with `go install`:
 
 ```bash
 go install github.com/mwiater/agon/cmd/agon@latest
 ```
 
-The resulting binary will be placed in your Go bin directory (e.g., `$GOPATH/bin`).
+The resulting binary will be placed in your Go bin directory (e.g., `$GOPATH/bin`). You will have to create and point to a config file. See `config/` directory for examples
 
 ## Configuration
 `agon` reads its settings from a JSON document. By default it looks for `config/config.json`; copy `config/config.example.json` to that path and update it with your hosts. Use `--config` to point at another file if needed.
 
 Example with custom config: `agon --config config/config.Authors.json`
 
-### Example `config/config.example.json`
+### Example config structure
+
+See other examples in `configs/`
+
 ```json
 {
   "hosts": [
     {
       "name": "Ollama01",
-      "url": "http://192.168.0.10:11434",
-      "type": "ollama",
-      "models": [
-        "stablelm-zephyr:3b",
-        "granite4:micro",
-        "gemma3n:e2b",
-        "gemma3:270m",
-        "deepseek-r1:1.5b",
-        "llama3.2:1b",
-        "granite3.1-moe:1b",
-        "dolphin-phi:2.7b",
-        "qwen3:1.7b"
-      ]
-    },
-    {
-      "name": "Ollama02",
-      "url": "http://192.168.0.10:11434",
-      "type": "ollama",
-      "models": [
-        "stablelm-zephyr:3b",
-        "granite4:micro",
-        "gemma3n:e2b",
-        "gemma3:270m",
-        "deepseek-r1:1.5b",
-        "llama3.2:1b",
-        "granite3.1-moe:1b",
-        "dolphin-phi:2.7b",
-        "qwen3:1.7b"
-      ],
-      "systemprompt": ""
-    },
-    {
-      "name": "Ollama02",
       "url": "http://192.168.0.11:11434",
       "type": "ollama",
       "models": [
         "stablelm-zephyr:3b",
-        "granite3.3:2b",
-        "gemma3n:e2b"
+        "granite4:micro",
+        "gemma3n:e2b",
+        "gemma3:270m",
+        "deepseek-r1:1.5b",
+        "llama3.2:1b",
+        "granite3.1-moe:1b",
+        "dolphin-phi:2.7b",
+        "qwen3:1.7b"
       ],
-      "systemprompt": ""
+      "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point.",
+      "parameters": {
+        "top_k": 40,
+        "top_p": 0.9,
+        "min_p": 0.05,
+        "tfs_z": 1.0,
+        "typical_p": 0.95,
+        "repeat_last_n": 64,
+        "temperature": 0.7,
+        "repeat_penalty": 1.1,
+        "presence_penalty": 0.6,
+        "frequency_penalty": 0.3
+      }
+    },
+    {
+      "name": "Ollama02",
+      "url": "http://192.168.0.12:11434",
+      "type": "ollama",
+      "models": [
+        "deepseek-r1:1.5b",
+        "dolphin-phi:2.7b",
+        "qwen3:1.7b"
+      ],
+      "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point."
     }
   ],
+  "timeout": 120,
   "debug": true,
-  "multimodel": false
+  "multimodel": true,
+  "json": false
 }
 ```
 
@@ -124,7 +138,7 @@ agon chat
 - If `multimodel` is `true`, the assignment view appears. Map hosts to columns, confirm your selections, and converse with multiple models concurrently.
 
 ### Model Management Commands
-Manage the models across your hosts with dedicated subcommands:
+Manage the models across your hosts with dedicated subcommands as defined in your config. Each host can have different models that serve as a source of truth. Running these commands will configure your hosts by pulling, deleting, syncing, and listing the models on each host.
 
 - List models available on the configured hosts:
   ```bash
@@ -173,16 +187,6 @@ goreleaser release --snapshot --clean --skip=publish
 `snapshot` turns on timestamped versions, `--clean` clears `dist/`, and `--skip=publish` prevents any GitHub release/upload steps.
 
 Create and push a version tag first (for example `git tag -a v0.1.0 -m "v0.1.0" && git push origin v0.1.0`), then run GoReleaser with a token that has `repo` scope. Keep `--clean` so old artifacts are removed before each run.
-
-## Additional Documentation
-Generate API documentation locally using `godoc`:
-
-```bash
-go install -v golang.org/x/tools/cmd/godoc@latest
-godoc -http=:6060
-```
-
-Open <http://localhost:6060> in a browser to explore the documentation.
 
 ## Testing
 Run the entire suite:
