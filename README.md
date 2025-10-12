@@ -1,5 +1,7 @@
 # agon
 
+Note: This is a personal project. I will do my best to keep the main branch functional and up to date with the time I have available.
+
 `agon` is a terminal-first companion for interacting with large language models that expose the Ollama API. It helps you browse available hosts, launch an immersive chat session, and keep model inventories aligned across machines, whether you are experimenting locally or coordinating a distributed cluster.
 
 ## Feature Highlights
@@ -205,8 +207,11 @@ go test ./... -coverprofile=.coverage/coverage.out
 go tool cover -func=.coverage/coverage.out
 ```
 
-## Contributing
-Contributions are welcome. For major changes, open an issue to discuss the proposal before submitting a pull request. Always run the test suite (and applicable coverage checks) prior to sharing your work.
+## To Do
+
+- [ ] Ensure comment coverage for PKG docs
+- [ ] Revisit tests and test coverage
+- [ ] UI: Revise multimodel screen to optimize available console real estate.
 
 ## License
 This project is distributed under the [MIT License](LICENSE).
