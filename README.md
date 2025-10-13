@@ -129,7 +129,7 @@ See other examples in `configs/`
 ## Running the CLI
 
 ### Launch an Interactive Chat
-Start a session with:
+Start a session which will fully configure the application using `config.json` by default:
 
 ```bash
 agon chat
@@ -138,13 +138,13 @@ agon chat
 - If `multimodelMode` is `false`, the app opens in host selection mode. Pick a host, choose a loaded model (or request a load), and begin chatting in a scrollable viewport.
 - If `multimodelMode` is `true`, the assignment view appears. Map hosts to columns, confirm your selections, and converse with multiple models concurrently.
 
-### Available Flags
+#### Available Flags
 
-Use these boolean flags to override the yaml settings in a specific session, e.g.:
+Use one or any combination of these 3 boolean flags to override some general yaml settings for that session, e.g.:
 
-* --debug=false
-* --multimodelMode=false
-* --jsonMode=true
+* `agon chat --debug=false`
+* `agon chat --multimodelMode=false`
+* `agon chat --jsonMode=true`
 
 ### Model Management Commands
 Manage the models across your hosts with dedicated subcommands as defined in your config. Each host can have different models that serve as a source of truth. Running these commands will configure your hosts by pulling, deleting, syncing, and listing the models on each host.
