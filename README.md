@@ -109,8 +109,8 @@ See other examples in `configs/`
   ],
   "timeout": 120,
   "debug": true,
-  "multimodel": true,
-  "json": false
+  "multimodelMode": true,
+  "jsonMode": false
 }
 ```
 
@@ -122,7 +122,8 @@ See other examples in `configs/`
   - `models`: Desired model identifiers to monitor on the host.
   - `systemprompt`: Optional system prompt string. Leave empty to use the model default.
 - `debug`: Boolean flag. When `true`, timing/token metrics are shown and `debug.log` captures detailed traces.
-- `multimodel`: Boolean flag. When `true`, the CLI launches directly into the multimodel chat interface.
+- `multimodelMode`: Boolean flag. When `true`, the CLI launches directly into the multimodel chat interface.
+- `jsonMode`: Boolean flag. When `true`, the CLI forces the LLM to respond in JSON format.
 - `timeout`: Integer (seconds). Sets the request timeout applied to Ollama API calls (default: 120).
 
 ## Running the CLI
@@ -134,8 +135,16 @@ Start a session with:
 agon chat
 ```
 
-- If `multimodel` is `false`, the app opens in host selection mode. Pick a host, choose a loaded model (or request a load), and begin chatting in a scrollable viewport.
-- If `multimodel` is `true`, the assignment view appears. Map hosts to columns, confirm your selections, and converse with multiple models concurrently.
+- If `multimodelMode` is `false`, the app opens in host selection mode. Pick a host, choose a loaded model (or request a load), and begin chatting in a scrollable viewport.
+- If `multimodelMode` is `true`, the assignment view appears. Map hosts to columns, confirm your selections, and converse with multiple models concurrently.
+
+### Available Flags
+
+Use these boolean flags to override the yaml settings in a specific session, e.g.:
+
+* --debug=false
+* --multimodelMode=false
+* --jsonMode=true
 
 ### Model Management Commands
 Manage the models across your hosts with dedicated subcommands as defined in your config. Each host can have different models that serve as a source of truth. Running these commands will configure your hosts by pulling, deleting, syncing, and listing the models on each host.

@@ -220,7 +220,7 @@ func multimodelStreamChatCmd(p *tea.Program, m *multimodelModel) tea.Cmd {
 		for i, assignment := range m.assignments {
 			if assignment.isAssigned {
 				go func(hostIndex int, host Host, model string, history []chatMessage) {
-					if err := streamToColumn(p, hostIndex, host, model, history, host.SystemPrompt, m.config.JSON, host.Parameters, m.client, m.requestTimeout); err != nil {
+					if err := streamToColumn(p, hostIndex, host, model, history, host.SystemPrompt, m.config.JSONMode, host.Parameters, m.client, m.requestTimeout); err != nil {
 						p.Send(multimodelStreamErr{hostIndex: hostIndex, err: err})
 					}
 				}(i, assignment.host, assignment.selectedModel, m.columnResponses[i].chatHistory)
@@ -321,12 +321,12 @@ func (m *multimodelModel) Init() tea.Cmd {
 	return m.spinner.Tick
 }
 
-	// Update handles all message updates for multimodel mode.
-	func (m *multimodelModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-		var (
-			cmd  tea.Cmd
-			cmds []tea.Cmd
-		)
+// Update handles all message updates for multimodel mode.
+func (m *multimodelModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var (
+		cmd  tea.Cmd
+		cmds []tea.Cmd
+	)
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -514,8 +514,8 @@ func (m *multimodelModel) updateAssignment(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // updateChat routes chat-specific messages while the UI is in chat mode.
 func (m *multimodelModel) updateChat(msg tea.Msg) (tea.Model, tea.Cmd) {
-    var cmds []tea.Cmd
-    var cmd tea.Cmd
+	var cmds []tea.Cmd
+	var cmd tea.Cmd
 
 	m.viewport, cmd = m.viewport.Update(msg)
 	cmds = append(cmds, cmd)
@@ -523,33 +523,33 @@ func (m *multimodelModel) updateChat(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.textArea, cmd = m.textArea.Update(msg)
 	cmds = append(cmds, cmd)
 
-    if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == "enter" {
-        userInput := strings.TrimSpace(m.textArea.Value())
-        if userInput != "" {
-            // Record the user message for each assigned column and start timers
-            userMsg := chatMessage{Role: "user", Content: userInput}
-            for i := range m.columnResponses {
-                if m.assignments[i].isAssigned {
-                    m.columnResponses[i].chatHistory = append(m.columnResponses[i].chatHistory, userMsg)
-                    m.columnResponses[i].requestStartTime = time.Now()
-                    m.columnResponses[i].isStreaming = true
-                } else {
-                    m.columnResponses[i].isStreaming = false
-                }
-                m.columnResponses[i].error = nil
-            }
+	if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == "enter" {
+		userInput := strings.TrimSpace(m.textArea.Value())
+		if userInput != "" {
+			// Record the user message for each assigned column and start timers
+			userMsg := chatMessage{Role: "user", Content: userInput}
+			for i := range m.columnResponses {
+				if m.assignments[i].isAssigned {
+					m.columnResponses[i].chatHistory = append(m.columnResponses[i].chatHistory, userMsg)
+					m.columnResponses[i].requestStartTime = time.Now()
+					m.columnResponses[i].isStreaming = true
+				} else {
+					m.columnResponses[i].isStreaming = false
+				}
+				m.columnResponses[i].error = nil
+			}
 
-            // Global UI state for the request
-            m.requestStartTime = time.Now()
-            m.err = nil
-            m.isLoading = true
-            m.textArea.Reset()
-            m.textArea.Blur()
+			// Global UI state for the request
+			m.requestStartTime = time.Now()
+			m.err = nil
+			m.isLoading = true
+			m.textArea.Reset()
+			m.textArea.Blur()
 
-            // Kick off spinner/ticks and start streaming across assigned models
-            cmds = append(cmds, m.spinner.Tick, multimodelStreamChatCmd(m.program, m))
-        }
-    }
+			// Kick off spinner/ticks and start streaming across assigned models
+			cmds = append(cmds, m.spinner.Tick, multimodelStreamChatCmd(m.program, m))
+		}
+	}
 
 	return m, tea.Batch(cmds...)
 }

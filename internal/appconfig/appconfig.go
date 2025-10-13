@@ -27,8 +27,8 @@ const (
 type Config struct {
 	Hosts          []Host `json:"hosts"`
 	Debug          bool   `json:"debug"`
-	Multimodel     bool   `json:"multimodel"`
-	JSON           bool   `json:"json"`
+	MultimodelMode bool   `json:"multimodelMode"`
+	JSONMode       bool   `json:"jsonMode"`
 	TimeoutSeconds int    `json:"timeout,omitempty"`
 }
 

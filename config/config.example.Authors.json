@@ -119,6 +119,6 @@
   ],
   "timeout": 120,
   "debug": true,
-  "multimodel": true,
-  "json": false
+  "multimodelMode": true,
+  "jsonMode": false
 }

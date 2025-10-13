@@ -21,6 +21,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mwiater/agon/internal/appconfig"
 	"github.com/mwiater/agon/internal/models"
+	"github.com/spf13/viper"
 )
 
 // Config represents the shared application configuration for the CLI.
@@ -567,7 +568,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.isLoading = true
 				m.err = nil
 
-				cmds = append(cmds, m.spinner.Tick, streamChatCmd(m.program, m.selectedHost, m.selectedModel, m.chatHistory, m.selectedHost.SystemPrompt, m.config.JSON, m.selectedHost.Parameters, m.client, m.requestTimeout))
+				cmds = append(cmds, m.spinner.Tick, streamChatCmd(m.program, m.selectedHost, m.selectedModel, m.chatHistory, m.selectedHost.SystemPrompt, m.config.JSONMode, m.selectedHost.Parameters, m.client, m.requestTimeout))
 			}
 		}
 	}
@@ -635,7 +636,7 @@ func (m *model) chatView() string {
 	modelInfo := fmt.Sprintf("Model: %s", m.selectedModel)
 
 	var JSONMode string
-	if m.config.JSON == false {
+	if viper.GetBool("debug") {
 		JSONMode = fmt.Sprintf("JSON Mode: %s", "false")
 	} else {
 		JSONMode = fmt.Sprintf("JSON Mode: %s", "true")
@@ -847,7 +848,7 @@ func StartGUI(cfg *appconfig.Config) {
 		log.Fatalf("Failed to start: configuration is not loaded")
 	}
 
-	if cfg.Multimodel {
+	if cfg.MultimodelMode {
 		models.UnloadModels(cfg)
 		if err := StartMultimodelGUI(cfg); err != nil {
 			log.Fatalf("Error running multimodel program: %v", err)

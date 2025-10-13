@@ -1,73 +1,102 @@
-// internal/cli/root.go
+// cmd/agon/root.go
 package agon
 
 import (
 	"fmt"
 	"os"
-	"sync"
+	"strconv"
 
 	"github.com/mwiater/agon/internal/appconfig"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-// rootCmd is the base Cobra command for the agon application.
-// All subcommands are attached to this root to form the complete CLI.
-var rootCmd = &cobra.Command{
-	Use:   "agon",
-	Short: "agon",
-	Long:  `agon`,
-}
-
 var (
-	cfgFile string
-
-	cfgOnce       sync.Once
-	cfgLoadErr    error
+	cfgFile       string
 	currentConfig *appconfig.Config
 )
 
-// Execute runs the root Cobra command and all registered subcommands.
-// It prints any returned error and exits the process with a non-zero
-// status code on failure.
+var rootCmd = &cobra.Command{
+	Use:   "agon",
+	Short: "agon — terminal-first companion for multi-host Ollama workflows",
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// 1) Load config (file or defaults)
+		if err := ensureConfigLoaded(); err != nil {
+			return err
+		}
+
+		// 2) If user did NOT set a flag, copy the config value into the flag so
+		//    both pflags and viper reflect the same, final value.
+		for _, name := range []string{"debug", "multimodelMode", "jsonMode"} {
+			if !cmd.Flags().Changed(name) {
+				val := viper.GetBool(name)
+				_ = cmd.Flags().Set(name, strconv.FormatBool(val))
+			}
+		}
+
+		// 3) Materialize the fully merged configuration into currentConfig
+		//    (flags > config > defaults). This gives other packages a stable snapshot.
+		var cfg appconfig.Config
+		if err := viper.Unmarshal(&cfg); err != nil {
+			return fmt.Errorf("unmarshal config: %w", err)
+		}
+		currentConfig = &cfg
+
+		return nil
+	},
+}
+
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
 		os.Exit(1)
 	}
 }
 
-// init initializes the root command by setting up persistent flags and the
-// PersistentPreRunE function. This ensures that the application configuration
-// is loaded before any subcommand is executed.
 func init() {
-	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-		return ensureConfigLoaded()
+	cobra.OnInitialize(initConfig)
+
+	// --config (defaults to your existing path)
+	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "config/config.json", "config file (e.g., config/config.json)")
+
+	// Persistent flags available to all commands
+	rootCmd.PersistentFlags().Bool("debug", false, "enable debug logging")
+	rootCmd.PersistentFlags().Bool("multimodelMode", false, "enable multi-model mode")
+	rootCmd.PersistentFlags().Bool("jsonMode", false, "enable JSON output mode")
+
+	// Bind flags to Viper keys (flags override config)
+	_ = viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
+	_ = viper.BindPFlag("multimodelMode", rootCmd.PersistentFlags().Lookup("multimodelMode"))
+	_ = viper.BindPFlag("jsonMode", rootCmd.PersistentFlags().Lookup("jsonMode"))
+}
+
+func initConfig() {
+	if cfgFile != "" {
+		viper.SetConfigFile(cfgFile)
 	}
-
-	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", appconfig.DefaultConfigPath, "config file (e.g., config/config.Authors.json)")
-	viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
 }
 
-// ensureConfigLoaded loads the application configuration using a sync.Once to
-// ensure it is loaded only once. It reads the configuration path from Viper,
-// loads the configuration file, and stores it in a global variable. Any errors
-// that occur during loading are stored and returned on subsequent calls.
+// ensureConfigLoaded reads the config and sets safe defaults.
 func ensureConfigLoaded() error {
-	cfgOnce.Do(func() {
-		configPath := viper.GetString("config")
-		cfg, err := appconfig.Load(configPath)
-		if err != nil {
-			cfgLoadErr = err
-			return
+	viper.SetDefault("debug", false)
+	viper.SetDefault("multimodelMode", false)
+	viper.SetDefault("jsonMode", false)
+
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			// No file: fine, we'll use defaults/flags
+			return nil
 		}
-		currentConfig = &cfg
-	})
-	return cfgLoadErr
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+	return nil
 }
 
-// getConfig returns the loaded application configuration. It is a helper
-// function to access the configuration from other parts of the CLI.
+// getConfig returns the loaded application configuration for other packages.
 func getConfig() *appconfig.Config {
 	return currentConfig
 }
+
+// Helper accessors (reflect merged Viper state)
+func DebugEnabled() bool      { return viper.GetBool("debug") }
+func MultiModelEnabled() bool { return viper.GetBool("multimodelMode") }
+func JSONModeEnabled() bool   { return viper.GetBool("jsonMode") }

@@ -4,7 +4,6 @@ package agon
 import (
 	"bytes"
 	"os"
-	"sync"
 	"testing"
 
 	"github.com/mwiater/agon/internal/appconfig"
@@ -52,13 +51,9 @@ func TestChatCmd(t *testing.T) {
 	originalStartGUI := startGUI
 	defer func() { startGUI = originalStartGUI }()
 	defer func() {
-		cfgOnce = sync.Once{}
-		cfgLoadErr = nil
 		currentConfig = nil
 	}()
 
-	cfgOnce = sync.Once{}
-	cfgLoadErr = nil
 	currentConfig = &loadedCfg
 
 	startCalled := false
