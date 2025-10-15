@@ -21,7 +21,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mwiater/agon/internal/appconfig"
 	"github.com/mwiater/agon/internal/models"
-	"github.com/spf13/viper"
 )
 
 // Config represents the shared application configuration for the CLI.
@@ -636,10 +635,10 @@ func (m *model) chatView() string {
 	modelInfo := fmt.Sprintf("Model: %s", m.selectedModel)
 
 	var JSONMode string
-	if viper.GetBool("debug") {
-		JSONMode = fmt.Sprintf("JSON Mode: %s", "false")
-	} else {
+	if m.config.JSONMode {
 		JSONMode = fmt.Sprintf("JSON Mode: %s", "true")
+	} else {
+		JSONMode = fmt.Sprintf("JSON Mode: %s", "false")
 	}
 
 	var modelTopK string
