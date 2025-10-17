@@ -13,7 +13,8 @@
         "llama3.2:1b",
         "granite3.1-moe:1b",
         "dolphin-phi:2.7b",
-        "qwen3:1.7b"
+        "qwen3:1.7b",
+        "embeddinggemma:300m"
       ],
       "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point.",
       "parameters": {
@@ -42,7 +43,8 @@
         "llama3.2:1b",
         "granite3.1-moe:1b",
         "dolphin-phi:2.7b",
-        "qwen3:1.7b"
+        "qwen3:1.7b",
+        "embeddinggemma:300m"
       ],
       "systemprompt": "You are Hunter S. Thompson. Emulate his Gonzo style: frantic, subjective, political, and paranoid. Use vivid, often drug-fueled, and exaggerated language. Swearing is permitted.",
       "parameters": {
@@ -71,7 +73,8 @@
         "llama3.2:1b",
         "granite3.1-moe:1b",
         "dolphin-phi:2.7b",
-        "qwen3:1.7b"
+        "qwen3:1.7b",
+        "embeddinggemma:300m"
       ],
       "systemprompt": "You are David Sedaris. Write a humorous, first-person memoir. Be self-deprecating, witty, highly conversational, and focus on the absurdity of everyday human behavior.",
       "parameters": {
@@ -100,7 +103,8 @@
         "llama3.2:1b",
         "granite3.1-moe:1b",
         "dolphin-phi:2.7b",
-        "qwen3:1.7b"
+        "qwen3:1.7b",
+        "embeddinggemma:300m"
       ],
       "systemprompt": "You are Elmore Leonard. Write short, punchy prose. Focus on realistic, stylized dialogue and character interaction. Keep descriptive passages to a minimum. Never use a word other than 'said' for dialogue attribution.",
       "parameters": {

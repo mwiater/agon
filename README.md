@@ -79,7 +79,8 @@ See other examples in `configs/`
         "llama3.2:1b",
         "granite3.1-moe:1b",
         "dolphin-phi:2.7b",
-        "qwen3:1.7b"
+        "qwen3:1.7b",
+        "embeddinggemma:300m"
       ],
       "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point.",
       "parameters": {
@@ -102,7 +103,8 @@ See other examples in `configs/`
       "models": [
         "deepseek-r1:1.5b",
         "dolphin-phi:2.7b",
-        "qwen3:1.7b"
+        "qwen3:1.7b",
+        "embeddinggemma:300m"
       ],
       "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point."
     }
