@@ -337,7 +337,7 @@ func loadModelCmd(host Host, modelName string, client *http.Client, timeout time
 // streams back the response chunk by chunk. It sends streamChunkMsg for each new
 // chunk and a streamEndMsg when the stream is complete. Errors during streaming
 // are sent as a streamErr message.
-func streamChatCmd(p *tea.Program, host Host, modelName string, history []chatMessage, systemPrompt string, JSONFormat bool, parameters Parameters, client *http.Client, timeout time.Duration) tea.Cmd {
+func streamChatCmd(p *tea.Program, host Host, modelName string, history []chatMessage, systemPrompt string, JSONFormat bool, parameters Parameters, images []string, client *http.Client, timeout time.Duration) tea.Cmd {
 	return func() tea.Msg {
 		messages := history
 		if systemPrompt != "" {
@@ -358,6 +358,16 @@ func streamChatCmd(p *tea.Program, host Host, modelName string, history []chatMe
 				"options":  parameters,
 				"stream":   true,
 				"format":   "json",
+			}
+		}
+
+		if images != nil && len(images) > 0 {
+			payload = map[string]any{
+				"model":    modelName,
+				"messages": messages,
+				"options":  parameters,
+				"stream":   true,
+				"images":   images,
 			}
 		}
 
@@ -567,7 +577,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.isLoading = true
 				m.err = nil
 
-				cmds = append(cmds, m.spinner.Tick, streamChatCmd(m.program, m.selectedHost, m.selectedModel, m.chatHistory, m.selectedHost.SystemPrompt, m.config.JSONMode, m.selectedHost.Parameters, m.client, m.requestTimeout))
+				images := m.selectedHost.Images
+
+				cmds = append(cmds, m.spinner.Tick, streamChatCmd(m.program, m.selectedHost, m.selectedModel, m.chatHistory, m.selectedHost.SystemPrompt, m.config.JSONMode, m.selectedHost.Parameters, images, m.client, m.requestTimeout))
 			}
 		}
 	}

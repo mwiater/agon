@@ -42,6 +42,7 @@ type Host struct {
 	Models       []string   `json:"models"`
 	SystemPrompt string     `json:"systemprompt"`
 	Parameters   Parameters `json:"parameters"`
+	Images       []string   `json:"images"`
 }
 
 // Parameters defines the set of parameters that can be used to control the
