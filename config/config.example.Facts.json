@@ -1,0 +1,124 @@
+{
+  "hosts": [
+    {
+      "name": "Facts: Baseline",
+      "url": "{ollama-api-endpoint-01}",
+      "type": "ollama",
+      "models": [
+        "stablelm-zephyr:3b",
+        "granite4:micro",
+        "gemma3n:e2b",
+        "gemma3:270m",
+        "deepseek-r1:1.5b",
+        "llama3.2:1b",
+        "granite3.1-moe:1b",
+        "dolphin-phi:2.7b",
+        "qwen3:1.7b"
+      ],
+      "systemprompt": "You are a helpful assistant.",
+      "parameters": {
+        "top_k": 40,
+        "top_p": 0.9,
+        "min_p": 0.05,
+        "tfs_z": 1.0,
+        "typical_p": 0.95,
+        "repeat_last_n": 64,
+        "temperature": 0.7,
+        "repeat_penalty": 1.1,
+        "presence_penalty": 0.6,
+        "frequency_penalty": 0.3
+      }
+    },
+    {
+      "name": "Facts: 02",
+      "url": "{ollama-api-endpoint-02}",
+      "type": "ollama",
+      "models": [
+        "stablelm-zephyr:3b",
+        "granite4:micro",
+        "gemma3n:e2b",
+        "gemma3:270m",
+        "deepseek-r1:1.5b",
+        "llama3.2:1b",
+        "granite3.1-moe:1b",
+        "dolphin-phi:2.7b",
+        "qwen3:1.7b"
+      ],
+      "systemprompt": "You are a factual encyclopedia. Respond with only one sentence. Do not invent information. Do not add any extra words.",
+      "parameters": {
+        "top_k": 40,
+        "top_p": 0.9,
+        "min_p": 0.05,
+        "tfs_z": 1.0,
+        "typical_p": 0.95,
+        "repeat_last_n": 64,
+        "temperature": 0.7,
+        "repeat_penalty": 1.1,
+        "presence_penalty": 0.6,
+        "frequency_penalty": 0.3
+      }
+    },
+    {
+      "name": "Facts: 03",
+      "url": "{ollama-api-endpoint-03}",
+      "type": "ollama",
+      "models": [
+        "stablelm-zephyr:3b",
+        "granite4:micro",
+        "gemma3n:e2b",
+        "gemma3:270m",
+        "deepseek-r1:1.5b",
+        "llama3.2:1b",
+        "granite3.1-moe:1b",
+        "dolphin-phi:2.7b",
+        "qwen3:1.7b"
+      ],
+      "systemprompt": "State one verifiable fact. If you are not 100% sure, you must respond with 'I do not know'.",
+      "parameters": {
+        "top_k": 40,
+        "top_p": 0.9,
+        "min_p": 0.05,
+        "tfs_z": 1.0,
+        "typical_p": 0.95,
+        "repeat_last_n": 64,
+        "temperature": 0.7,
+        "repeat_penalty": 1.1,
+        "presence_penalty": 0.6,
+        "frequency_penalty": 0.3
+      }
+    },
+    {
+      "name": "Facts: 04",
+      "url": "{ollama-api-endpoint-04}",
+      "type": "ollama",
+      "models": [
+        "stablelm-zephyr:3b",
+        "granite4:micro",
+        "gemma3n:e2b",
+        "gemma3:270m",
+        "deepseek-r1:1.5b",
+        "llama3.2:1b",
+        "granite3.1-moe:1b",
+        "dolphin-phi:2.7b",
+        "qwen3:1.7b"
+      ],
+      "systemprompt": "You are 'FactBot 3000'. You only speak in single-sentence facts.",
+      "parameters": {
+        "top_k": 40,
+        "top_p": 0.9,
+        "min_p": 0.05,
+        "tfs_z": 1.0,
+        "typical_p": 0.95,
+        "repeat_last_n": 64,
+        "temperature": 0.7,
+        "repeat_penalty": 1.1,
+        "presence_penalty": 0.6,
+        "frequency_penalty": 0.3
+      }
+    }
+  ],
+  "timeout": 120,
+  "debug": true,
+  "multimodelMode": true,
+  "jsonMode": false
+}
