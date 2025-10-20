@@ -23,11 +23,12 @@ const (
 
 // Config represents the top-level configuration for the application. It includes a
 // list of hosts, as well as global settings for debugging, multimodel mode,
-// JSON output, and request timeouts.
+// pipeline mode, JSON output, and request timeouts.
 type Config struct {
 	Hosts          []Host `json:"hosts"`
 	Debug          bool   `json:"debug"`
 	MultimodelMode bool   `json:"multimodelMode"`
+	PipelineMode   bool   `json:"pipelineMode"`
 	JSONMode       bool   `json:"jsonMode"`
 	TimeoutSeconds int    `json:"timeout,omitempty"`
 }

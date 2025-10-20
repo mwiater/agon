@@ -25,6 +25,7 @@ var showConfigCmd = &cobra.Command{
 		fmt.Println("Current configuration:")
 		fmt.Printf("  Debug:           %v\n", viper.GetBool("debug"))
 		fmt.Printf("  Multimodel Mode: %v\n", viper.GetBool("multimodelMode"))
+		fmt.Printf("  Pipeline Mode:   %v\n", viper.GetBool("pipelineMode"))
 		fmt.Printf("  JSON Mode:       %v\n", viper.GetBool("jsonMode"))
 	},
 }

@@ -27,7 +27,7 @@ var rootCmd = &cobra.Command{
 
 		// 2) If user did NOT set a flag, copy the config value into the flag so
 		//    both pflags and viper reflect the same, final value.
-		for _, name := range []string{"debug", "multimodelMode", "jsonMode"} {
+		for _, name := range []string{"debug", "multimodelMode", "pipelineMode", "jsonMode"} {
 			if !cmd.Flags().Changed(name) {
 				val := viper.GetBool(name)
 				_ = cmd.Flags().Set(name, strconv.FormatBool(val))
@@ -39,6 +39,9 @@ var rootCmd = &cobra.Command{
 		var cfg appconfig.Config
 		if err := viper.Unmarshal(&cfg); err != nil {
 			return fmt.Errorf("unmarshal config: %w", err)
+		}
+		if cfg.MultimodelMode && cfg.PipelineMode {
+			return fmt.Errorf("invalid configuration: only one of multimodelMode or pipelineMode can be enabled")
 		}
 		currentConfig = &cfg
 
@@ -61,11 +64,13 @@ func init() {
 	// Persistent flags available to all commands
 	rootCmd.PersistentFlags().Bool("debug", false, "enable debug logging")
 	rootCmd.PersistentFlags().Bool("multimodelMode", false, "enable multi-model mode")
+	rootCmd.PersistentFlags().Bool("pipelineMode", false, "enable pipeline mode")
 	rootCmd.PersistentFlags().Bool("jsonMode", false, "enable JSON output mode")
 
 	// Bind flags to Viper keys (flags override config)
 	_ = viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
 	_ = viper.BindPFlag("multimodelMode", rootCmd.PersistentFlags().Lookup("multimodelMode"))
+	_ = viper.BindPFlag("pipelineMode", rootCmd.PersistentFlags().Lookup("pipelineMode"))
 	_ = viper.BindPFlag("jsonMode", rootCmd.PersistentFlags().Lookup("jsonMode"))
 }
 
@@ -79,6 +84,7 @@ func initConfig() {
 func ensureConfigLoaded() error {
 	viper.SetDefault("debug", false)
 	viper.SetDefault("multimodelMode", false)
+	viper.SetDefault("pipelineMode", false)
 	viper.SetDefault("jsonMode", false)
 
 	if err := viper.ReadInConfig(); err != nil {
@@ -97,6 +103,7 @@ func getConfig() *appconfig.Config {
 }
 
 // Helper accessors (reflect merged Viper state)
-func DebugEnabled() bool      { return viper.GetBool("debug") }
-func MultiModelEnabled() bool { return viper.GetBool("multimodelMode") }
-func JSONModeEnabled() bool   { return viper.GetBool("jsonMode") }
+func DebugEnabled() bool        { return viper.GetBool("debug") }
+func MultiModelEnabled() bool   { return viper.GetBool("multimodelMode") }
+func PipelineModeEnabled() bool { return viper.GetBool("pipelineMode") }
+func JSONModeEnabled() bool     { return viper.GetBool("jsonMode") }

@@ -1,5 +1,6 @@
 .coverage/*
 .RELEASE.md
+CODEX.md
 debug.log
 dist/*
 internal/harness/*
