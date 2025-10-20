@@ -124,5 +124,8 @@
   "timeout": 240,
   "debug": true,
   "multimodelMode": true,
-  "jsonMode": false
+  "pipelineMode": false,
+  "jsonMode": false,
+  "export": "",
+  "exportMarkdown": ""
 }

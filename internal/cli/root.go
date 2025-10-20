@@ -33,6 +33,11 @@ var rootCmd = &cobra.Command{
 				_ = cmd.Flags().Set(name, strconv.FormatBool(val))
 			}
 		}
+		for _, name := range []string{"export", "exportMarkdown"} {
+			if !cmd.Flags().Changed(name) {
+				_ = cmd.Flags().Set(name, viper.GetString(name))
+			}
+		}
 
 		// 3) Materialize the fully merged configuration into currentConfig
 		//    (flags > config > defaults). This gives other packages a stable snapshot.
@@ -66,12 +71,16 @@ func init() {
 	rootCmd.PersistentFlags().Bool("multimodelMode", false, "enable multi-model mode")
 	rootCmd.PersistentFlags().Bool("pipelineMode", false, "enable pipeline mode")
 	rootCmd.PersistentFlags().Bool("jsonMode", false, "enable JSON output mode")
+	rootCmd.PersistentFlags().String("export", "", "write pipeline runs to this JSON file")
+	rootCmd.PersistentFlags().String("exportMarkdown", "", "write pipeline runs to this Markdown file")
 
 	// Bind flags to Viper keys (flags override config)
 	_ = viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
 	_ = viper.BindPFlag("multimodelMode", rootCmd.PersistentFlags().Lookup("multimodelMode"))
 	_ = viper.BindPFlag("pipelineMode", rootCmd.PersistentFlags().Lookup("pipelineMode"))
 	_ = viper.BindPFlag("jsonMode", rootCmd.PersistentFlags().Lookup("jsonMode"))
+	_ = viper.BindPFlag("export", rootCmd.PersistentFlags().Lookup("export"))
+	_ = viper.BindPFlag("exportMarkdown", rootCmd.PersistentFlags().Lookup("exportMarkdown"))
 }
 
 func initConfig() {
@@ -86,6 +95,8 @@ func ensureConfigLoaded() error {
 	viper.SetDefault("multimodelMode", false)
 	viper.SetDefault("pipelineMode", false)
 	viper.SetDefault("jsonMode", false)
+	viper.SetDefault("export", "")
+	viper.SetDefault("exportMarkdown", "")
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {

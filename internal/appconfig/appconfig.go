@@ -25,12 +25,14 @@ const (
 // list of hosts, as well as global settings for debugging, multimodel mode,
 // pipeline mode, JSON output, and request timeouts.
 type Config struct {
-	Hosts          []Host `json:"hosts"`
-	Debug          bool   `json:"debug"`
-	MultimodelMode bool   `json:"multimodelMode"`
-	PipelineMode   bool   `json:"pipelineMode"`
-	JSONMode       bool   `json:"jsonMode"`
-	TimeoutSeconds int    `json:"timeout,omitempty"`
+	Hosts              []Host `json:"hosts"`
+	Debug              bool   `json:"debug"`
+	MultimodelMode     bool   `json:"multimodelMode"`
+	PipelineMode       bool   `json:"pipelineMode"`
+	JSONMode           bool   `json:"jsonMode"`
+	TimeoutSeconds     int    `json:"timeout,omitempty"`
+	ExportPath         string `json:"export,omitempty"`
+	ExportMarkdownPath string `json:"exportMarkdown,omitempty"`
 }
 
 // Host represents a single host that can serve language models. It contains the

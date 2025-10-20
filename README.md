@@ -112,11 +112,21 @@ See other examples in `configs/`
   "timeout": 120,
   "debug": true,
   "multimodelMode": true,
-  "jsonMode": false
+  "pipelineMode": false,
+  "jsonMode": false,
+  "export": "",
+  "exportMarkdown": ""
 }
 ```
 
 ### Configuration Reference
+### Modes Overview
+- **Single**: Default experience when both `multimodelMode` and `pipelineMode` are `false`. Choose a host and model at runtime.
+- **Multimodel**: Enable with `multimodelMode` in config or `--multimodelMode` on the CLI to compare models side-by-side.
+- **Pipeline**: Enable with `pipelineMode` or `--pipelineMode` to orchestrate four sequential stages.
+
+CLI flags take precedence over config; if both modes are set simultaneously the CLI value wins and only one mode is activated.
+
 - `hosts`: Array of host definitions (Ollama is the currently supported type).
   - `name`: A friendly label shown in the UI (e.g., `"Local Ollama"`).
   - `url`: Base URL of the Ollama API endpoint (`http://host:11434`).
@@ -125,7 +135,10 @@ See other examples in `configs/`
   - `systemprompt`: Optional system prompt string. Leave empty to use the model default.
 - `debug`: Boolean flag. When `true`, timing/token metrics are shown and `debug.log` captures detailed traces.
 - `multimodelMode`: Boolean flag. When `true`, the CLI launches directly into the multimodel chat interface.
+- `pipelineMode`: Boolean flag. When `true`, the CLI opens the four-stage pipeline orchestrator. `multimodelMode` and `pipelineMode` are mutually exclusive—only one may be `true` at launch.
 - `jsonMode`: Boolean flag. When `true`, the CLI forces the LLM to respond in JSON format.
+- `export`: Optional path. When set, completed pipeline runs are exported to this JSON file automatically.
+- `exportMarkdown`: Optional path. When set, a Markdown summary is written alongside the JSON export.
 - `timeout`: Integer (seconds). Sets the request timeout applied to Ollama API calls (default: 120).
 
 ## Running the CLI
@@ -142,11 +155,13 @@ agon chat
 
 #### Available Flags
 
-Use one or any combination of these 3 boolean flags to override some general yaml settings for that session, e.g.:
+Use CLI flags to override configuration values per session, for example:
 
 * `agon chat --debug=false`
 * `agon chat --multimodelMode=false`
+* `agon chat --pipelineMode=true`
 * `agon chat --jsonMode=true`
+* `agon chat --export=run.json --exportMarkdown=run.md`
 
 ### Model Management Commands
 Manage the models across your hosts with dedicated subcommands as defined in your config. Each host can have different models that serve as a source of truth. Running these commands will configure your hosts by pulling, deleting, syncing, and listing the models on each host.
@@ -175,6 +190,17 @@ Manage the models across your hosts with dedicated subcommands as defined in you
 ### Keyboard Shortcuts (Chat Interface)
 - `esc` or `Ctrl+c`: Quit the application.
 - `Tab`: Return from the chat view to host/model selection.
+
+### Pipeline Shortcuts
+- `Enter`: Send the current prompt when the editor is focused.
+- `Ctrl+←` / `Ctrl+→`: Move focus between stages (arrow keys also work when the editor is blurred).
+- `Ctrl+Enter`: Expand or collapse the focused stage.
+- `Ctrl+S`: Cycle the focused stage between output, stats, and handoff views.
+- `Ctrl+O`: Toggle the detailed handoff overlay for the focused stage.
+- `Ctrl+P`: Switch to the multimodel UI without restarting the CLI.
+- `Ctrl+E`: Export the latest pipeline run (JSON, plus Markdown if configured).
+- `Ctrl+Q` / `Ctrl+C`: Quit pipeline mode.
+
 
 ## Debug Mode Details
 With `debug` enabled in configuration, the chat interface displays:
