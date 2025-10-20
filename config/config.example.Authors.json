@@ -64,7 +64,7 @@
       "name": "David_Sedaris",
       "url": "{ollama-api-endpoint-03}",
       "type": "ollama",
-      "models": [
+       "models": [
         "stablelm-zephyr:3b",
         "granite4:micro",
         "gemma3n:e2b",

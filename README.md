@@ -71,7 +71,7 @@ See other examples in `configs/`
       "url": "http://192.168.0.11:11434",
       "type": "ollama",
       "models": [
-        "stablelm-zephyr:3b",
+                "stablelm-zephyr:3b",
         "granite4:micro",
         "gemma3n:e2b",
         "gemma3:270m",
@@ -80,6 +80,7 @@ See other examples in `configs/`
         "granite3.1-moe:1b",
         "dolphin-phi:2.7b",
         "qwen3:1.7b",
+        "embeddinggemma:300m",
         "embeddinggemma:300m"
       ],
       "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point.",

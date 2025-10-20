@@ -121,7 +121,7 @@
       }
     }
   ],
-  "timeout": 120,
+  "timeout": 240,
   "debug": true,
   "multimodelMode": true,
   "pipelineMode": false,
