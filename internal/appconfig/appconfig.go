@@ -18,7 +18,7 @@ const (
 	legacyConfigPath = "config.json"
 	// defaultRequestTimeout is the default timeout for HTTP requests made by the
 	// application.
-	defaultRequestTimeout = 120 * time.Second
+	defaultRequestTimeout = 240 * time.Second
 )
 
 // Config represents the top-level configuration for the application. It includes a

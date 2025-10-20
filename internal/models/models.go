@@ -38,7 +38,7 @@ type ModelDetails struct {
 }
 
 // defaultRequestTimeout defines the fallback HTTP timeout for host interactions.
-const defaultRequestTimeout = 120 * time.Second
+const defaultRequestTimeout = 240 * time.Second
 
 // LLMHost defines the model lifecycle and metadata operations a host must support.
 // Implementations should pull, delete, list, and unload models, and expose basic metadata.
@@ -310,7 +310,7 @@ var (
 	// deleteModelsFunc proxies DeleteModels to allow tests to substitute behavior.
 	deleteModelsFunc = DeleteModels
 	// pullModelsFunc proxies PullModels to allow tests to substitute behavior.
-	pullModelsFunc   = PullModels
+	pullModelsFunc = PullModels
 )
 
 // SyncModels deletes any models not in config and then pulls missing models.

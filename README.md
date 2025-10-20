@@ -110,7 +110,7 @@ See other examples in `configs/`
       "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point."
     }
   ],
-  "timeout": 120,
+  "timeout": 240,
   "debug": true,
   "multimodelMode": true,
   "pipelineMode": false,
@@ -140,7 +140,7 @@ CLI flags take precedence over config; if both modes are set simultaneously the 
 - `jsonMode`: Boolean flag. When `true`, the CLI forces the LLM to respond in JSON format.
 - `export`: Optional path. When set, completed pipeline runs are exported to this JSON file automatically.
 - `exportMarkdown`: Optional path. When set, a Markdown summary is written alongside the JSON export.
-- `timeout`: Integer (seconds). Sets the request timeout applied to Ollama API calls (default: 120).
+- `timeout`: Integer (seconds). Sets the request timeout applied to Ollama API calls (default: 240).
 
 ## Running the CLI
 
