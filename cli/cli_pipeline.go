@@ -228,7 +228,12 @@ type pipelineModel struct {
 	runStarted         time.Time
 	runCompleted       time.Time
 
-	switchToMultimodel bool
+    switchToMultimodel bool
+
+    // remember selections to streamline assignment UX
+    nextHostIndex        int
+    defaultModelByHost   map[string]string // key: host URL, value: model name
+    globalDefaultModel   string            // model selected for Stage 1, used as default elsewhere
 }
 
 // initialPipelineModel constructs a model with sensible defaults and four stages.
@@ -287,6 +292,8 @@ func initialPipelineModel(cfg *Config) *pipelineModel {
 		memoCache:          make(map[string]pipelineCacheEntry),
 		exportPath:         cfg.ExportPath,
 		exportMarkdownPath: cfg.ExportMarkdownPath,
+		nextHostIndex:      0,
+		defaultModelByHost: make(map[string]string),
 	}
 }
 
@@ -383,36 +390,53 @@ func (m *pipelineModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // updateAssignment manages the host/model selection workflow.
 func (m *pipelineModel) updateAssignment(msg tea.Msg) tea.Cmd {
-	if m.selectingHost {
+    if m.selectingHost {
 		var cmd tea.Cmd
 		m.hostList, cmd = m.hostList.Update(msg)
 		if km, ok := msg.(tea.KeyMsg); ok {
 			switch km.String() {
 			case "enter":
-				if item, ok := m.hostList.SelectedItem().(hostSelectorItem); ok {
-					stage := &m.stages[m.selectedStage]
-					stage.host = item.host
-					stage.hostIndex = item.index
-					stage.availableModels = append([]string(nil), item.host.Models...)
-					stage.parameters = item.host.Parameters
-					stage.systemPrompt = item.host.SystemPrompt
-					stage.hasAssignment = false
-					stage.selectedModel = ""
-					stage.status = pipelineStageStatusUnassigned
-					stage.statusMessage = ""
+                if item, ok := m.hostList.SelectedItem().(hostSelectorItem); ok {
+                    stage := &m.stages[m.selectedStage]
+                    stage.host = item.host
+                    stage.hostIndex = item.index
+                    stage.availableModels = append([]string(nil), item.host.Models...)
+                    stage.parameters = item.host.Parameters
+                    stage.systemPrompt = item.host.SystemPrompt
+                    stage.hasAssignment = false
+                    stage.selectedModel = ""
+                    stage.status = pipelineStageStatusUnassigned
+                    stage.statusMessage = ""
 
-					m.modelList.SetItems(nil)
-					modelItems := make([]list.Item, len(stage.availableModels))
-					for i, model := range stage.availableModels {
-						modelItems[i] = modelSelectorItem{name: model}
-					}
-					m.modelList.SetItems(modelItems)
-					if len(modelItems) > 0 {
-						m.modelList.Select(0)
-					}
-					m.selectingHost = false
-					m.selectingModel = len(modelItems) > 0
-				}
+                    m.modelList.SetItems(nil)
+                    modelItems := make([]list.Item, len(stage.availableModels))
+                    for i, model := range stage.availableModels {
+                        modelItems[i] = modelSelectorItem{name: model}
+                    }
+                    m.modelList.SetItems(modelItems)
+                    if len(modelItems) > 0 {
+                        // Prefer globally chosen default model (Stage 1), then host-specific default
+                        sel := 0
+                        if m.globalDefaultModel != "" {
+                            for i, it := range stage.availableModels {
+                                if it == m.globalDefaultModel {
+                                    sel = i
+                                    break
+                                }
+                            }
+                        } else if def, ok := m.defaultModelByHost[stage.host.URL]; ok {
+                            for i, it := range stage.availableModels {
+                                if it == def {
+                                    sel = i
+                                    break
+                                }
+                            }
+                        }
+                        m.modelList.Select(sel)
+                    }
+                    m.selectingHost = false
+                    m.selectingModel = len(modelItems) > 0
+                }
 			case "esc":
 				m.selectingHost = false
 			}
@@ -420,23 +444,45 @@ func (m *pipelineModel) updateAssignment(msg tea.Msg) tea.Cmd {
 		return cmd
 	}
 
-	if m.selectingModel {
+    if m.selectingModel {
 		var cmd tea.Cmd
 		m.modelList, cmd = m.modelList.Update(msg)
 		if km, ok := msg.(tea.KeyMsg); ok {
 			switch km.String() {
 			case "enter":
-				if item, ok := m.modelList.SelectedItem().(modelSelectorItem); ok {
-					stage := &m.stages[m.selectedStage]
-					stage.selectedModel = item.name
-					stage.hasAssignment = true
-					stage.status = pipelineStageStatusWaiting
-					stage.statusMessage = "Ready"
-					stage.view = pipelineStageViewOutput
-					stage.outputBuffer.Reset()
-					stage.finalOutput = ""
-					m.selectingModel = false
-				}
+                if item, ok := m.modelList.SelectedItem().(modelSelectorItem); ok {
+                    stage := &m.stages[m.selectedStage]
+                    stage.selectedModel = item.name
+                    stage.hasAssignment = true
+                    stage.status = pipelineStageStatusWaiting
+                    stage.statusMessage = "Ready"
+                    stage.view = pipelineStageViewOutput
+                    stage.outputBuffer.Reset()
+                    stage.finalOutput = ""
+                    m.selectingModel = false
+
+                    // Record default model for this host (first selection becomes default)
+                    if stage.host.URL != "" {
+                        if _, exists := m.defaultModelByHost[stage.host.URL]; !exists {
+                            m.defaultModelByHost[stage.host.URL] = stage.selectedModel
+                        }
+                    }
+
+                    // If this is the first stage and no global default set, remember it
+                    if m.selectedStage == 0 && m.globalDefaultModel == "" {
+                        m.globalDefaultModel = stage.selectedModel
+                    }
+
+                    // Advance default host selection to the next host for convenience
+                    if len(m.config.Hosts) > 0 {
+                        m.nextHostIndex = (stage.hostIndex + 1) % len(m.config.Hosts)
+                    }
+
+                    // Move cursor to next stage to streamline workflow
+                    if m.selectedStage < pipelineStageCount-1 {
+                        m.selectedStage++
+                    }
+                }
 			case "esc":
 				m.selectingModel = false
 			}
@@ -444,8 +490,8 @@ func (m *pipelineModel) updateAssignment(msg tea.Msg) tea.Cmd {
 		return cmd
 	}
 
-	if km, ok := msg.(tea.KeyMsg); ok {
-		switch km.String() {
+    if km, ok := msg.(tea.KeyMsg); ok {
+        switch km.String() {
 		case "ctrl+c", "q":
 			return tea.Quit
 		case "up", "k":
@@ -456,28 +502,53 @@ func (m *pipelineModel) updateAssignment(msg tea.Msg) tea.Cmd {
 			if m.selectedStage < pipelineStageCount-1 {
 				m.selectedStage++
 			}
-		case "enter", "h":
-			if len(m.config.Hosts) == 0 {
-				m.statusBanner = "No hosts configured"
-				return nil
-			}
-			m.selectingHost = true
-			return nil
-		case "m":
-			stage := &m.stages[m.selectedStage]
-			if !stage.hasAssignment {
-				m.statusBanner = "Select a host before choosing a model"
-				return nil
-			}
-			modelItems := make([]list.Item, len(stage.availableModels))
-			for i, model := range stage.availableModels {
-				modelItems[i] = modelSelectorItem{name: model}
-			}
-			m.modelList.SetItems(modelItems)
-			if len(modelItems) > 0 {
-				m.modelList.Select(0)
-				m.selectingModel = true
-			}
+        case "enter", "h":
+            if len(m.config.Hosts) == 0 {
+                m.statusBanner = "No hosts configured"
+                return nil
+            }
+            // Preselect the next host to streamline assignments
+            if len(m.config.Hosts) > 0 {
+                idx := m.nextHostIndex
+                if idx < 0 || idx >= len(m.config.Hosts) {
+                    idx = 0
+                }
+                m.hostList.Select(idx)
+            }
+            m.selectingHost = true
+            return nil
+        case "m":
+            stage := &m.stages[m.selectedStage]
+            if !stage.hasAssignment {
+                m.statusBanner = "Select a host before choosing a model"
+                return nil
+            }
+            modelItems := make([]list.Item, len(stage.availableModels))
+            for i, model := range stage.availableModels {
+                modelItems[i] = modelSelectorItem{name: model}
+            }
+            m.modelList.SetItems(modelItems)
+            if len(modelItems) > 0 {
+                // Prefer global default (from Stage 1) else host-specific default if known
+                sel := 0
+                if m.globalDefaultModel != "" {
+                    for i, it := range stage.availableModels {
+                        if it == m.globalDefaultModel {
+                            sel = i
+                            break
+                        }
+                    }
+                } else if def, ok := m.defaultModelByHost[stage.host.URL]; ok {
+                    for i, it := range stage.availableModels {
+                        if it == def {
+                            sel = i
+                            break
+                        }
+                    }
+                }
+                m.modelList.Select(sel)
+                m.selectingModel = true
+            }
 		case "d":
 			stage := &m.stages[m.selectedStage]
 			stage.host = Host{}
@@ -747,13 +818,30 @@ func (m *pipelineModel) assignmentView() string {
 }
 
 func (m *pipelineModel) pipelineView() string {
-	var parts []string
+    var parts []string
 
-	parts = append(parts, m.renderProgressLine())
-	if m.statusBanner != "" {
-		parts = append(parts, bannerStyle.Render(m.statusBanner))
-	}
-	parts = append(parts, m.renderStageColumns())
+    parts = append(parts, m.renderProgressLine())
+    if m.statusBanner != "" {
+        parts = append(parts, bannerStyle.Render(m.statusBanner))
+    }
+    // Calculate a target height for the stage columns to fill the console
+    partsAbove := 1 // progress line
+    if m.statusBanner != "" {
+        partsAbove++ // banner
+    }
+    partsBelow := 2 // input/spinner + help
+    separators := 3 // blank lines between progress-columns, columns-input, input-help
+    if m.statusBanner != "" {
+        separators++ // progress-banner and banner-columns
+    }
+    marginTop, marginBottom := 1, 1 // outer margin in View()
+    available := m.height - marginTop - marginBottom - partsAbove - partsBelow - separators
+    // Account for borders (top+bottom) added by each column wrapper
+    available -= 2
+    if available < 3 {
+        available = 3
+    }
+    parts = append(parts, m.renderStageColumns(available))
 
 	if m.showHandoffOverlay && m.overlayStageIndex >= 0 && m.overlayStageIndex < len(m.stages) {
 		parts = append(parts, m.renderHandoffOverlay(m.stages[m.overlayStageIndex]))
@@ -769,7 +857,7 @@ func (m *pipelineModel) pipelineView() string {
 	help := "Enter send  Ctrl+←/→ focus  Ctrl+Enter expand  Ctrl+S cycle  Ctrl+O overlay  Ctrl+P multimodel  Ctrl+E export  Ctrl+Q quit"
 	parts = append(parts, lipgloss.NewStyle().Faint(true).Render(help))
 
-	return lipgloss.NewStyle().Margin(1, 2).Render(strings.Join(parts, "\n\n"))
+    return lipgloss.NewStyle().Margin(1, 2).Render(strings.Join(parts, "\n\n"))
 }
 
 func (m *pipelineModel) expandedView() string {
@@ -843,26 +931,26 @@ func (m *pipelineModel) renderProgressLine() string {
 	return fmt.Sprintf("Pipeline: %s | %s | %s | %s | %s", pipelinePath, stageStatus, speed, ttft, jsonMode)
 }
 
-func (m *pipelineModel) renderStageColumns() string {
-	colWidth := max(30, (m.width-8)/pipelineStageCount)
-	var columns []string
+func (m *pipelineModel) renderStageColumns(targetHeight int) string {
+    colWidth := max(30, (m.width-8)/pipelineStageCount)
+    var columns []string
 
-	for i, stage := range m.stages {
-		column := m.renderStageColumn(stage, colWidth)
-		wrapper := normalColumn.Width(colWidth)
-		if i == m.focusIndex {
-			wrapper = focusedColumn.Width(colWidth)
-		}
-		columns = append(columns, wrapper.Render(column))
-	}
+    for i, stage := range m.stages {
+        column := m.renderStageColumn(stage, colWidth, targetHeight)
+        wrapper := normalColumn.Width(colWidth)
+        if i == m.focusIndex {
+            wrapper = focusedColumn.Width(colWidth)
+        }
+        columns = append(columns, wrapper.Render(column))
+    }
 
 	return lipgloss.JoinHorizontal(lipgloss.Top, columns...)
 }
 
-func (m *pipelineModel) renderStageColumn(stage pipelineStage, colWidth int) string {
-	var headerLines []string
-	title := fmt.Sprintf("Stage %d", stage.index+1)
-	headerLines = append(headerLines, stageTitleStyle.Render(title))
+func (m *pipelineModel) renderStageColumn(stage pipelineStage, colWidth int, targetHeight int) string {
+    var headerLines []string
+    title := fmt.Sprintf("Stage %d", stage.index+1)
+    headerLines = append(headerLines, stageTitleStyle.Render(title))
 
 	if stage.hasAssignment {
 		badge := fmt.Sprintf("%s • %s", stage.host.Name, stage.selectedModel)
@@ -879,16 +967,35 @@ func (m *pipelineModel) renderStageColumn(stage pipelineStage, colWidth int) str
 	header := lipgloss.JoinVertical(lipgloss.Left, headerLines...)
 	header = lipgloss.JoinHorizontal(lipgloss.Top, header, lipgloss.NewStyle().Width(colWidth-lipgloss.Width(header)).Align(lipgloss.Right).Render(statusChip))
 
-	body := m.renderStageBody(stage, colWidth)
+    // Render body content constrained to a target number of lines
+    body := m.renderStageBody(stage, colWidth)
+    headerLineCount := 1 // title line
+    // additional header lines based on assignment and status chip line included in header
+    headerRendered := header
+    headerLineCount = strings.Count(headerRendered, "\n") + 1
 
-	return header + "\n" + body
+    bodyLines := strings.Split(body, "\n")
+    maxBodyLines := targetHeight - headerLineCount - 0 // 0 because we add exactly one newline between header and body
+    if maxBodyLines < 0 {
+        maxBodyLines = 0
+    }
+    if len(bodyLines) > maxBodyLines {
+        bodyLines = bodyLines[:maxBodyLines]
+    } else if len(bodyLines) < maxBodyLines {
+        // pad with blank lines to fill remaining space
+        pad := make([]string, maxBodyLines-len(bodyLines))
+        bodyLines = append(bodyLines, pad...)
+    }
+    body = strings.Join(bodyLines, "\n")
+
+    return header + "\n" + body
 }
 
 func (m *pipelineModel) renderStageBody(stage pipelineStage, colWidth int) string {
-	switch stage.view {
-	case pipelineStageViewStats:
-		return m.renderStageStats(stage)
-	case pipelineStageViewHandoff:
+    switch stage.view {
+    case pipelineStageViewStats:
+        return m.renderStageStats(stage)
+    case pipelineStageViewHandoff:
 		if stage.handoff.preview == "" {
 			return stageBadgeStyle.Render("Handoff pending")
 		}
@@ -897,15 +1004,16 @@ func (m *pipelineModel) renderStageBody(stage pipelineStage, colWidth int) strin
 			preview += "\n" + stageBadgeStyle.Render(stage.handoff.truncationSummary)
 		}
 		return preview + "\n" + stageBadgeStyle.Render("Ctrl+O for details")
-	default:
-		if stage.finalOutput != "" {
-			return truncateToWidth(stage.finalOutput, colWidth-4)
-		}
-		if stage.status == pipelineStageStatusWaiting {
-			if stage.index > 0 {
-				return stageBadgeStyle.Render(fmt.Sprintf("Waiting for input from Stage %d", stage.index))
-			}
-			return stageBadgeStyle.Render("Waiting for prompt")
+    default:
+        if stage.finalOutput != "" {
+            // Wrap long lines so content stays within the column
+            return wrapToWidth(stage.finalOutput, colWidth-4)
+        }
+        if stage.status == pipelineStageStatusWaiting {
+            if stage.index > 0 {
+                return stageBadgeStyle.Render(fmt.Sprintf("Waiting for input from Stage %d", stage.index))
+            }
+            return stageBadgeStyle.Render("Waiting for prompt")
 		}
 		if stage.status == pipelineStageStatusRunning {
 			return stageBadgeStyle.Render("Streaming response...")
@@ -1586,13 +1694,76 @@ func truncateRunes(text string, maxRunes int) string {
 }
 
 func truncateToWidth(text string, width int) string {
-	lines := strings.Split(text, "\n")
-	for i, line := range lines {
-		if utf8.RuneCountInString(line) > width {
-			lines[i] = truncateRunes(line, width)
-		}
-	}
-	return strings.Join(lines, "\n")
+    lines := strings.Split(text, "\n")
+    for i, line := range lines {
+        if utf8.RuneCountInString(line) > width {
+            lines[i] = truncateRunes(line, width)
+        }
+    }
+    return strings.Join(lines, "\n")
+}
+
+// wrapToWidth wraps text to the provided width. It breaks lines at spaces when
+// possible, and hard-breaks long tokens when necessary, so the full response is
+// visible within the column width.
+func wrapToWidth(text string, width int) string {
+    if width <= 0 {
+        return text
+    }
+    var out []string
+    for _, line := range strings.Split(text, "\n") {
+        if line == "" {
+            out = append(out, "")
+            continue
+        }
+        var cur strings.Builder
+        runeCount := 0
+        // Split by spaces but keep them when rebuilding
+        words := strings.Fields(line)
+        for wi, w := range words {
+            // If adding a space between words
+            space := 0
+            if wi > 0 {
+                space = 1
+            }
+            wLen := utf8.RuneCountInString(w)
+            if runeCount+space+wLen <= width {
+                if wi > 0 {
+                    cur.WriteByte(' ')
+                    runeCount++
+                }
+                cur.WriteString(w)
+                runeCount += wLen
+                continue
+            }
+            // If current buffer has content, flush it
+            if runeCount > 0 {
+                out = append(out, cur.String())
+                cur.Reset()
+                runeCount = 0
+            }
+            // Now the word itself may be longer than width; hard-break it
+            if wLen <= width {
+                cur.WriteString(w)
+                runeCount = wLen
+            } else {
+                r := []rune(w)
+                for start := 0; start < len(r); start += width {
+                    end := start + width
+                    if end > len(r) {
+                        end = len(r)
+                    }
+                    out = append(out, string(r[start:end]))
+                }
+            }
+        }
+        if cur.Len() > 0 {
+            out = append(out, cur.String())
+        } else if len(words) == 0 {
+            out = append(out, "")
+        }
+    }
+    return strings.Join(out, "\n")
 }
 
 func min(a, b int) int {
