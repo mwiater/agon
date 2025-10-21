@@ -2,7 +2,7 @@
   "hosts": [
     {
       "name": "Ollama01",
-      "url": "{ollama-api-endpoint-01}",
+      "url": "{ollama-api-endpoint-04}",
       "type": "ollama",
       "models": [
         "stablelm-zephyr:3b",
@@ -16,24 +16,12 @@
         "qwen3:1.7b",
         "embeddinggemma:300m"
       ],
-      "systemprompt": "PIPELINE STAGE 1 — GENERATE MEASURABLE FACTS + OBJECT TYPE:\\nYou will receive a short input (often just a name, e.g., 'Honda S2000'). First, infer the object type from {vehicle, building, device, location, person, event, other}. Output the first line exactly as 'object_type: <type>'. Then output 3–6 concise, quantitative facts likely relevant to that type (e.g., for vehicle: power, torque, mass, dimensions, acceleration, top speed, displacement). Prefer explicit units (SI if you know them). If unsure, write 'unknown' but keep the intended unit (e.g., 'power: unknown kW'). Output ONLY:\\n- Line 1: 'object_type: <type>'\\n- Lines 2..N: numbered facts like '1) power: 177 kW'\\nNo commentary or sources.",
-      "parameters": {
-        "top_k": 30,
-        "top_p": 0.85,
-        "min_p": 0.05,
-        "tfs_z": 1.0,
-        "typical_p": 0.90,
-        "repeat_last_n": 64,
-        "temperature": 0.25,
-        "repeat_penalty": 1.05,
-        "presence_penalty": 0.2,
-        "frequency_penalty": 0.3,
-        "num_predict": 96
-      }
+      "systemprompt": "Take user input as subject; return valid JSON: {\"subject\":\"{subject}\"} only.",
+      "parameters": {}
     },
     {
       "name": "Ollama02",
-      "url": "{ollama-api-endpoint-02}",
+      "url": "{ollama-api-endpoint-04}",
       "type": "ollama",
       "models": [
         "stablelm-zephyr:3b",
@@ -47,24 +35,12 @@
         "qwen3:1.7b",
         "embeddinggemma:300m"
       ],
-      "systemprompt": "PIPELINE STAGE 2 — VALIDATE, NORMALIZE, AND FILTER BY TYPE:\\nInput starts with 'object_type: <type>' followed by a numbered list of quantitative facts. Tasks:\\n1) Keep the first line unchanged.\\n2) For each fact: correct obvious numeric/unit errors; convert to SI where sensible (m, mm, km/h, kW, N·m, kg, s, L, °C).\\n3) Validate appropriateness by object_type. Examples:\\n  - vehicle → allowed: power, torque, mass, length, width, height, wheelbase, top_speed, 0_60, displacement, cylinders, seats, doors, redline, drivetrain, gears. Not allowed: floors, visitors/year, building area.\\n  - building → allowed: floors, height, area, occupancy, elevators, year_built.\\n4) If a fact is not appropriate to the type, replace the entire line content with 'irrelevant'.\\n5) Preserve 'unknown' values (do not fabricate).\\nOutput ONLY:\\n- Original first line 'object_type: <type>'\\n- Then the same number of lines as input, each either a corrected fact like '1) power: 177 kW' or the token 'irrelevant'.",
-      "parameters": {
-        "top_k": 30,
-        "top_p": 0.85,
-        "min_p": 0.05,
-        "tfs_z": 1.0,
-        "typical_p": 0.90,
-        "repeat_last_n": 64,
-        "temperature": 0.2,
-        "repeat_penalty": 1.05,
-        "presence_penalty": 0.2,
-        "frequency_penalty": 0.3,
-        "num_predict": 96
-      }
+      "systemprompt": "Return one measurable property/value as JSON: {\"subject\":\"{subject}\",\"{property}\":\"{value}\"}.",
+      "parameters": {}
     },
     {
       "name": "Ollama03",
-      "url": "{ollama-api-endpoint-03}",
+      "url": "{ollama-api-endpoint-04}",
       "type": "ollama",
       "models": [
         "stablelm-zephyr:3b",
@@ -78,20 +54,8 @@
         "qwen3:1.7b",
         "embeddinggemma:300m"
       ],
-      "systemprompt": "PIPELINE STAGE 3 — EMIT KEY:VALUE WITH TYPE-AWARE SCHEMA (DROP IRRELEVANT):\\nInput begins with 'object_type: <type>' and validated lines. Ignore any line that is exactly 'irrelevant'. Convert remaining facts to key:value pairs with lowercase keys. Include unit suffixes in keys when applicable.\\nIf object_type=vehicle, map to these preferred keys when possible:\\n  power_kw, torque_nm, mass_kg, length_mm, width_mm, height_mm, wheelbase_mm, top_speed_kmh, acceleration_0_60_s, displacement_l, cylinders_count, seats_count, doors_count, redline_rpm, drivetrain, transmission_gears_count.\\nIf a value is unknown, emit the string 'unknown'. Keep values numeric when known. Output ONLY 'key: value' lines. No numbering or extra text.",
-      "parameters": {
-        "top_k": 30,
-        "top_p": 0.85,
-        "min_p": 0.05,
-        "tfs_z": 1.0,
-        "typical_p": 0.90,
-        "repeat_last_n": 64,
-        "temperature": 0.2,
-        "repeat_penalty": 1.05,
-        "presence_penalty": 0.2,
-        "frequency_penalty": 0.3,
-        "num_predict": 96
-      }
+      "systemprompt": "Ensure clean keys/values, no extras; return valid JSON: {\"subject\":\"{subject}\",\"{property}\":\"{value}\"}.",
+      "parameters": {}
     },
     {
       "name": "Ollama04",
@@ -109,20 +73,8 @@
         "qwen3:1.7b",
         "embeddinggemma:300m"
       ],
-      "systemprompt": "PIPELINE STAGE 4 — STRICT JSON ONLY (FLAT OBJECT):\\nYou will receive several 'key: value' lines. Convert to a single JSON object. Keys are used as given. Values: numbers remain numeric; the literal 'unknown' becomes the JSON string \"unknown\". Ensure strict JSON (double-quoted keys/strings, no trailing commas). Output ONLY the JSON object, nothing else.",
-      "parameters": {
-        "top_k": 30,
-        "top_p": 0.85,
-        "min_p": 0.05,
-        "tfs_z": 1.0,
-        "typical_p": 0.90,
-        "repeat_last_n": 64,
-        "temperature": 0.15,
-        "repeat_penalty": 1.05,
-        "presence_penalty": 0.2,
-        "frequency_penalty": 0.3,
-        "num_predict": 128
-      }
+      "systemprompt": "Validate fact; return full JSON with added key 'validated': true or false, nothing else.",
+      "parameters": {}
     }
   ],
   "timeout": 240,

@@ -472,11 +472,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.GotoBottom()
 		return m, nil
 
-	case chatReadyErr:
-		m.isLoading = false
-		m.err = msg
-		return m, nil
-
 	case modelsReadyMsg:
 		m.isLoading = false
 		m.modelList.SetItems(msg.models)
@@ -486,11 +481,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(m.loadedModels) > 0 {
 			m.modelList.Select(0)
 		}
-		return m, nil
-
-	case modelsLoadErr:
-		m.isLoading = false
-		m.err = msg
 		return m, nil
 
 	case streamChunkMsg:
@@ -512,10 +502,21 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.GotoBottom()
 		return m, nil
 
+	case modelsLoadErr:
+		m.isLoading = false
+		m.err = msg
+		return m, nil
+
+	case chatReadyErr:
+		m.isLoading = false
+		m.err = msg
+		return m, nil
+
 	case streamErr:
 		m.isLoading = false
 		m.err = msg
 		return m, nil
+
 	case tickMsg:
 		if m.isLoading {
 			return m, tickCmd()
