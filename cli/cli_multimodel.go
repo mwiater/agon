@@ -2,12 +2,8 @@
 package cli
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 	"time"
 
@@ -17,6 +13,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mwiater/agon/internal/providers"
 )
 
 // multimodelViewState represents the current state of the multimodel application's view.
@@ -54,10 +51,8 @@ type multimodelColumnResponse struct {
 type multimodelModel struct {
 	// config stores the shared application configuration.
 	config *Config
-	// client issues HTTP requests to the configured hosts.
-	client *http.Client
-	// requestTimeout defines the HTTP timeout applied to remote operations.
-	requestTimeout time.Duration
+	// provider issues chat interactions on behalf of the UI.
+	provider providers.ChatProvider
 	// state tracks which multimodel view is currently active.
 	state multimodelViewState
 	// isLoading reports whether a background operation is still running.
@@ -151,8 +146,7 @@ type multimodelStreamErr struct {
 }
 
 // initialMultimodelModel creates a new multimodel Bubble Tea model with defaults.
-func initialMultimodelModel(cfg *Config) *multimodelModel {
-	timeout := cfg.RequestTimeout()
+func initialMultimodelModel(cfg *Config, provider providers.ChatProvider) *multimodelModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
@@ -187,14 +181,8 @@ func initialMultimodelModel(cfg *Config) *multimodelModel {
 	modelList := list.New(nil, list.NewDefaultDelegate(), 0, 0)
 
 	return &multimodelModel{
-		config: cfg,
-		client: &http.Client{
-			Transport: &http.Transport{
-				ForceAttemptHTTP2: false,
-			},
-			Timeout: timeout,
-		},
-		requestTimeout:    timeout,
+		config:            cfg,
+		provider:          provider,
 		state:             multimodelViewAssignment,
 		assignments:       assignments,
 		selectedHostIndex: 0,
@@ -220,7 +208,7 @@ func multimodelStreamChatCmd(p *tea.Program, m *multimodelModel) tea.Cmd {
 		for i, assignment := range m.assignments {
 			if assignment.isAssigned {
 				go func(hostIndex int, host Host, model string, history []chatMessage) {
-					if err := streamToColumn(p, hostIndex, host, model, history, host.SystemPrompt, m.config.JSONMode, host.Parameters, m.client, m.requestTimeout); err != nil {
+					if err := streamToColumn(p, m.provider, hostIndex, host, model, history, host.SystemPrompt, m.config.JSONMode, host.Parameters); err != nil {
 						p.Send(multimodelStreamErr{hostIndex: hostIndex, err: err})
 					}
 				}(i, assignment.host, assignment.selectedModel, m.columnResponses[i].chatHistory)
@@ -231,89 +219,26 @@ func multimodelStreamChatCmd(p *tea.Program, m *multimodelModel) tea.Cmd {
 }
 
 // streamToColumn streams chat responses for a single assigned column.
-func streamToColumn(p *tea.Program, hostIndex int, host Host, modelName string, history []chatMessage, systemPrompt string, JSONFormat bool, parameters Parameters, client *http.Client, timeout time.Duration) error {
-	messages := history
-	if systemPrompt != "" {
-		messages = append([]chatMessage{{Role: "system", Content: systemPrompt}}, messages...)
+func streamToColumn(p *tea.Program, provider providers.ChatProvider, hostIndex int, host Host, modelName string, history []chatMessage, systemPrompt string, JSONFormat bool, parameters Parameters) error {
+	req := providers.StreamRequest{
+		Host:         host,
+		Model:        modelName,
+		History:      history,
+		SystemPrompt: systemPrompt,
+		Parameters:   parameters,
+		JSONMode:     JSONFormat,
 	}
 
-	payload := map[string]any{
-		"model":    modelName,
-		"messages": messages,
-		"options":  parameters,
-		"stream":   true,
-	}
-
-	if JSONFormat {
-		payload = map[string]any{
-			"model":    modelName,
-			"messages": messages,
-			"options":  parameters,
-			"stream":   true,
-			"format":   "json",
-		}
-	}
-
-	body, _ := json.Marshal(payload)
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, "POST", host.URL+"/api/chat", bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("API returned non-200 status: %s. Body: %s", resp.Status, string(bodyBytes))
-	}
-
-	decoder := json.NewDecoder(resp.Body)
-	var finalChunk streamChunk
-	for {
-		var chunk streamChunk
-		if err := decoder.Decode(&chunk); err != nil {
-			if err != io.EOF {
-				return err
-			}
-			break
-		}
-		p.Send(multimodelStreamChunkMsg{
-			hostIndex: hostIndex,
-			message: chatMessage{
-				Role:    chunk.Message.Role,
-				Content: chunk.Message.Content,
-			},
-		})
-		if chunk.Done {
-			finalChunk = chunk
-			break
-		}
-	}
-
-	p.Send(multimodelStreamEndMsg{
-		hostIndex: hostIndex,
-		meta: LLMResponseMeta{
-			Model:              finalChunk.Model,
-			CreatedAt:          time.Now(),
-			Done:               finalChunk.Done,
-			TotalDuration:      finalChunk.TotalDuration,
-			LoadDuration:       finalChunk.LoadDuration,
-			PromptEvalCount:    finalChunk.PromptEvalCount,
-			PromptEvalDuration: finalChunk.PromptEvalDuration,
-			EvalCount:          finalChunk.EvalCount,
-			EvalDuration:       finalChunk.EvalDuration,
+	return provider.Stream(context.Background(), req, providers.StreamCallbacks{
+		OnChunk: func(msg providers.ChatMessage) error {
+			p.Send(multimodelStreamChunkMsg{hostIndex: hostIndex, message: msg})
+			return nil
+		},
+		OnComplete: func(meta providers.StreamMetadata) error {
+			p.Send(multimodelStreamEndMsg{hostIndex: hostIndex, meta: meta})
+			return nil
 		},
 	})
-	return nil
 }
 
 // Init initializes the multimodel Bubble Tea model.
@@ -745,16 +670,10 @@ func (m *multimodelModel) multimodelChatView() string {
 }
 
 // StartMultimodelGUI initializes and runs the four-column multimodel chat UI.
-// It accepts a parsed Config, sets up the Bubble Tea program, and blocks until
+// It accepts a parsed Config and provider, sets up the Bubble Tea program, and blocks until
 // the UI exits. StartMultimodelGUI returns an error if the TUI cannot be run.
-func StartMultimodelGUI(cfg *Config) error {
-	m := initialMultimodelModel(cfg)
-	m.client = &http.Client{
-		Transport: &http.Transport{
-			ForceAttemptHTTP2: false,
-		},
-		Timeout: m.requestTimeout,
-	}
+func StartMultimodelGUI(cfg *Config, provider providers.ChatProvider) error {
+	m := initialMultimodelModel(cfg, provider)
 
 	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	m.program = p

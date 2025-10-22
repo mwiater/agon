@@ -27,6 +27,9 @@ var showConfigCmd = &cobra.Command{
 		fmt.Printf("  Multimodel Mode: %v\n", viper.GetBool("multimodelMode"))
 		fmt.Printf("  Pipeline Mode:   %v\n", viper.GetBool("pipelineMode"))
 		fmt.Printf("  JSON Mode:       %v\n", viper.GetBool("jsonMode"))
+		fmt.Printf("  MCP Mode:        %v\n", viper.GetBool("mcpMode"))
+		fmt.Printf("  MCP Binary:      %s\n", viper.GetString("mcpBinary"))
+		fmt.Printf("  MCP Init Timeout: %d seconds\n", viper.GetInt("mcpInitTimeout"))
 		fmt.Printf("  Export JSON:     %s\n", viper.GetString("export"))
 		fmt.Printf("  Export Markdown: %s\n", viper.GetString("exportMarkdown"))
 	},

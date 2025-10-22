@@ -25,7 +25,8 @@ func TestInitialMultimodelModel(t *testing.T) {
 			},
 		},
 	}
-	m := initialMultimodelModel(cfg)
+	provider := newTestProvider()
+	m := initialMultimodelModel(cfg, provider)
 
 	if m.state != multimodelViewAssignment {
 		t.Errorf("Expected initial state to be multimodelViewAssignment, got %v", m.state)
@@ -47,7 +48,7 @@ func TestMultimodelUpdate(t *testing.T) {
 			},
 		},
 	}
-	m := initialMultimodelModel(cfg)
+	m := initialMultimodelModel(cfg, newTestProvider())
 
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	if cmd == nil {
@@ -101,7 +102,7 @@ func TestMultimodelView(t *testing.T) {
 			},
 		},
 	}
-	m := initialMultimodelModel(cfg)
+	m := initialMultimodelModel(cfg, newTestProvider())
 
 	m.width = 0
 	view := m.View()

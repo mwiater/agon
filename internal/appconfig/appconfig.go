@@ -30,6 +30,9 @@ type Config struct {
 	MultimodelMode     bool   `json:"multimodelMode"`
 	PipelineMode       bool   `json:"pipelineMode"`
 	JSONMode           bool   `json:"jsonMode"`
+	MCPMode            bool   `json:"mcpMode"`
+	MCPBinary          string `json:"mcpBinary,omitempty"`
+	MCPInitTimeout     int    `json:"mcpInitTimeout,omitempty"`
 	TimeoutSeconds     int    `json:"timeout,omitempty"`
 	ExportPath         string `json:"export,omitempty"`
 	ExportMarkdownPath string `json:"exportMarkdown,omitempty"`
@@ -71,6 +74,17 @@ func (c Config) RequestTimeout() time.Duration {
 		return defaultRequestTimeout
 	}
 	return time.Duration(c.TimeoutSeconds) * time.Second
+}
+
+// defaultMCPInitTimeout defines the fallback timeout used while initializing the MCP server.
+const defaultMCPInitTimeout = 10 * time.Second
+
+// MCPInitTimeoutDuration returns the timeout duration for MCP initialization.
+func (c Config) MCPInitTimeoutDuration() time.Duration {
+	if c.MCPInitTimeout <= 0 {
+		return defaultMCPInitTimeout
+	}
+	return time.Duration(c.MCPInitTimeout) * time.Second
 }
 
 // Load reads the application configuration from the specified path. If the path

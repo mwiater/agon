@@ -3,13 +3,9 @@
 package cli
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"strings"
 	"time"
 
@@ -21,6 +17,9 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mwiater/agon/internal/appconfig"
 	"github.com/mwiater/agon/internal/models"
+	"github.com/mwiater/agon/internal/providerfactory"
+	"github.com/mwiater/agon/internal/providers"
+	"github.com/mwiater/agon/internal/providers/ollama"
 )
 
 // Config represents the shared application configuration for the CLI.
@@ -33,59 +32,11 @@ type Host = appconfig.Host
 type Parameters = appconfig.Parameters
 
 // LLMResponseMeta holds timing and tokenization metrics for a model response.
-// This metadata is typically received in the final chunk of a streaming response
-// and is displayed when debug mode is enabled.
-type LLMResponseMeta struct {
-	Model              string    `json:"model"`
-	CreatedAt          time.Time `json:"created_at"`
-	Done               bool      `json:"done"`
-	TotalDuration      int64     `json:"total_duration"`
-	LoadDuration       int64     `json:"load_duration"`
-	PromptEvalCount    int       `json:"prompt_eval_count"`
-	PromptEvalDuration int64     `json:"prompt_eval_duration"`
-	EvalCount          int       `json:"eval_count"`
-	EvalDuration       int64     `json:"eval_duration"`
-}
+// This metadata mirrors providers.StreamMetadata for UI presentation.
+type LLMResponseMeta = providers.StreamMetadata
 
-// chatMessage represents a single message in a chat conversation, containing the
-// sender's role (e.g., "user", "assistant") and the message content.
-type chatMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-// streamChunk represents a single chunk of a streaming language model response.
-// It contains a portion of the message content and updated metadata.
-type streamChunk struct {
-	Model   string `json:"model"`
-	Message struct {
-		Role    string `json:"role"`
-		Content string `json:"content"`
-	} `json:"message"`
-	Done               bool  `json:"done"`
-	TotalDuration      int64 `json:"total_duration"`
-	LoadDuration       int64 `json:"load_duration"`
-	PromptEvalCount    int   `json:"prompt_eval_count"`
-	PromptEvalDuration int64 `json:"prompt_eval_duration"`
-	EvalCount          int   `json:"eval_count"`
-	EvalDuration       int64 `json:"eval_duration"`
-}
-
-// ollamaTagsResponse represents the structure of the response from the Ollama
-// /api/tags endpoint, which provides a list of available models.
-type ollamaTagsResponse struct {
-	Models []struct {
-		Name string `json:"name"`
-	} `json:"models"`
-}
-
-// ollamaPsResponse represents the structure of the response from the Ollama
-// /api/ps endpoint, which lists the models that are currently loaded in memory.
-type ollamaPsResponse struct {
-	Models []struct {
-		Name string `json:"name"`
-	} `json:"models"`
-}
+// chatMessage represents a single message exchanged with the model.
+type chatMessage = providers.ChatMessage
 
 // viewState represents the current view or screen of the application.
 type viewState int
@@ -101,8 +52,7 @@ const (
 // state necessary for the chat application to function.
 type model struct {
 	config           *Config
-	client           *http.Client
-	requestTimeout   time.Duration
+	provider         providers.ChatProvider
 	state            viewState
 	isLoading        bool
 	err              error
@@ -125,8 +75,7 @@ type model struct {
 // initialModel creates and initializes a new model with default values. It sets
 // up the necessary Bubble Tea components, such as the spinner, textarea, and lists,
 // and configures the HTTP client with the appropriate timeout.
-func initialModel(cfg *Config) *model {
-	timeout := cfg.RequestTimeout()
+func initialModel(cfg *Config, provider providers.ChatProvider) *model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
@@ -151,20 +100,14 @@ func initialModel(cfg *Config) *model {
 	vp := viewport.New(100, 5)
 
 	return &model{
-		config: cfg,
-		client: &http.Client{
-			Transport: &http.Transport{
-				ForceAttemptHTTP2: false,
-			},
-			Timeout: timeout,
-		},
-		requestTimeout: timeout,
-		state:          viewHostSelector,
-		spinner:        s,
-		textArea:       ta,
-		hostList:       hostList,
-		modelList:      list.New(nil, list.NewDefaultDelegate(), 0, 0),
-		viewport:       vp,
+		config:    cfg,
+		provider:  provider,
+		state:     viewHostSelector,
+		spinner:   s,
+		textArea:  ta,
+		hostList:  hostList,
+		modelList: list.New(nil, list.NewDefaultDelegate(), 0, 0),
+		viewport:  vp,
 	}
 }
 
@@ -223,9 +166,9 @@ type tickMsg time.Time
 // fetchAndSelectModelsCmd creates a Bubble Tea command that fetches the list of
 // loaded models and then all available models for a given host. It prepares the
 // model list for selection, prioritizing loaded models by placing them at the top.
-func fetchAndSelectModelsCmd(host Host, client *http.Client, timeout time.Duration) tea.Cmd {
+func fetchAndSelectModelsCmd(host Host, provider providers.ChatProvider) tea.Cmd {
 	return func() tea.Msg {
-		loadedModels, err := getLoadedModels(host, client, timeout)
+		loadedModels, err := provider.LoadedModels(context.Background(), host)
 		if err != nil {
 			return modelsLoadErr(err)
 		}
@@ -258,163 +201,46 @@ func fetchAndSelectModelsCmd(host Host, client *http.Client, timeout time.Durati
 	}
 }
 
-// getLoadedModels fetches the names of the models that are currently loaded into
-// memory on the specified host by making a request to the /api/ps endpoint.
-func getLoadedModels(host Host, client *http.Client, timeout time.Duration) ([]string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, "GET", host.URL+"/api/ps", nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API returned non-200 status: %s", resp.Status)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var psResp ollamaPsResponse
-	if err := json.Unmarshal(body, &psResp); err != nil {
-		return nil, err
-	}
-
-	loadedModels := make([]string, len(psResp.Models))
-	for i, m := range psResp.Models {
-		loadedModels[i] = m.Name
-	}
-	return loadedModels, nil
-}
-
 // loadModelCmd creates a Bubble Tea command that attempts to load a specified
-// model onto the given host. It does this by sending a minimal generate request
-// to the /api/generate endpoint. This is typically used to ensure a model is
-// ready for chat. It returns a tea.Msg indicating success (chatReadyMsg) or
-// failure (chatReadyErr).
-func loadModelCmd(host Host, modelName string, client *http.Client, timeout time.Duration) tea.Cmd {
+// model onto the given host by delegating to the active chat provider. It
+// returns a tea.Msg indicating success (chatReadyMsg) or failure (chatReadyErr).
+func loadModelCmd(host Host, modelName string, provider providers.ChatProvider) tea.Cmd {
 	return func() tea.Msg {
-		payload := map[string]any{
-			"model":  modelName,
-			"prompt": ".",
-			"stream": false,
-		}
-		body, _ := json.Marshal(payload)
-
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		defer cancel()
-
-		req, err := http.NewRequestWithContext(ctx, "POST", host.URL+"/api/generate", bytes.NewReader(body))
-		if err != nil {
+		if err := provider.EnsureModelReady(context.Background(), host, modelName); err != nil {
 			return chatReadyErr(err)
 		}
-		req.Header.Set("Content-Type", "application/json")
-
-		resp, err := client.Do(req)
-		if err != nil {
-			return chatReadyErr(err)
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			bodyBytes, _ := io.ReadAll(resp.Body)
-			return chatReadyErr(fmt.Errorf("API returned non-200 status: %s. Body: %s", resp.Status, string(bodyBytes)))
-		}
-
 		return chatReadyMsg{}
 	}
 }
 
 // streamChatCmd creates a Bubble Tea command that initiates a streaming chat
-// conversation with the selected language model. It sends the chat history and
-// streams back the response chunk by chunk. It sends streamChunkMsg for each new
-// chunk and a streamEndMsg when the stream is complete. Errors during streaming
-// are sent as a streamErr message.
-func streamChatCmd(p *tea.Program, host Host, modelName string, history []chatMessage, systemPrompt string, JSONFormat bool, parameters Parameters, client *http.Client, timeout time.Duration) tea.Cmd {
+// conversation with the selected language model. It delegates streaming to the
+// configured provider and relays chunk and completion events back to the UI.
+func streamChatCmd(p *tea.Program, provider providers.ChatProvider, host Host, modelName string, history []chatMessage, systemPrompt string, JSONFormat bool, parameters Parameters) tea.Cmd {
 	return func() tea.Msg {
-		messages := history
-		if systemPrompt != "" {
-			messages = append([]chatMessage{{Role: "system", Content: systemPrompt}}, messages...)
-		}
-
-		payload := map[string]any{
-			"model":    modelName,
-			"messages": messages,
-			"options":  parameters,
-			"stream":   true,
-		}
-
-		if JSONFormat {
-			payload = map[string]any{
-				"model":    modelName,
-				"messages": messages,
-				"options":  parameters,
-				"stream":   true,
-				"format":   "json",
-			}
-		}
-
-		body, _ := json.Marshal(payload)
-
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-
-		req, err := http.NewRequestWithContext(ctx, "POST", host.URL+"/api/chat", bytes.NewReader(body))
-		if err != nil {
-			cancel()
-			return streamErr(err)
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		resp, err := client.Do(req)
-		if err != nil {
-			cancel()
-			return streamErr(err)
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			bodyBytes, _ := io.ReadAll(resp.Body)
-			resp.Body.Close()
-			cancel()
-			return streamErr(fmt.Errorf("API returned non-200 status: %s. Body: %s", resp.Status, string(bodyBytes)))
+		req := providers.StreamRequest{
+			Host:         host,
+			Model:        modelName,
+			History:      history,
+			SystemPrompt: systemPrompt,
+			Parameters:   parameters,
+			JSONMode:     JSONFormat,
 		}
 
 		go func() {
-			defer cancel()
-			defer resp.Body.Close()
-			decoder := json.NewDecoder(resp.Body)
-			var finalChunk streamChunk
-			for {
-				var chunk streamChunk
-				if err := decoder.Decode(&chunk); err != nil {
-					if err != io.EOF {
-						p.Send(streamErr(err))
-					}
-					break
-				}
-				p.Send(streamChunkMsg(chunk.Message.Content))
-				if chunk.Done {
-					finalChunk = chunk
-					break
-				}
+			err := provider.Stream(context.Background(), req, providers.StreamCallbacks{
+				OnChunk: func(msg providers.ChatMessage) error {
+					p.Send(streamChunkMsg(msg.Content))
+					return nil
+				},
+				OnComplete: func(meta providers.StreamMetadata) error {
+					p.Send(streamEndMsg{meta: meta})
+					return nil
+				},
+			})
+			if err != nil {
+				p.Send(streamErr(err))
 			}
-			p.Send(streamEndMsg{meta: LLMResponseMeta{
-				Model:              finalChunk.Model,
-				CreatedAt:          time.Now(),
-				Done:               finalChunk.Done,
-				TotalDuration:      finalChunk.TotalDuration,
-				LoadDuration:       finalChunk.LoadDuration,
-				PromptEvalCount:    finalChunk.PromptEvalCount,
-				PromptEvalDuration: finalChunk.PromptEvalDuration,
-				EvalCount:          finalChunk.EvalCount,
-				EvalDuration:       finalChunk.EvalDuration,
-			}})
 		}()
 
 		return nil
@@ -533,7 +359,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selectedHost = m.config.Hosts[m.hostList.Index()]
 				m.isLoading = true
 				m.requestStartTime = time.Now()
-				cmds = append(cmds, m.spinner.Tick, fetchAndSelectModelsCmd(m.selectedHost, m.client, m.requestTimeout), tickCmd())
+				cmds = append(cmds, m.spinner.Tick, fetchAndSelectModelsCmd(m.selectedHost, m.provider), tickCmd())
 			}
 		}
 
@@ -547,7 +373,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.isLoading = true
 				m.requestStartTime = time.Now()
 				m.err = nil
-				cmds = append(cmds, m.spinner.Tick, loadModelCmd(m.selectedHost, m.selectedModel, m.client, m.requestTimeout), tickCmd())
+				cmds = append(cmds, m.spinner.Tick, loadModelCmd(m.selectedHost, m.selectedModel, m.provider), tickCmd())
 			}
 		}
 
@@ -568,7 +394,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.isLoading = true
 				m.err = nil
 
-				cmds = append(cmds, m.spinner.Tick, streamChatCmd(m.program, m.selectedHost, m.selectedModel, m.chatHistory, m.selectedHost.SystemPrompt, m.config.JSONMode, m.selectedHost.Parameters, m.client, m.requestTimeout))
+				cmds = append(cmds, m.spinner.Tick, streamChatCmd(m.program, m.provider, m.selectedHost, m.selectedModel, m.chatHistory, m.selectedHost.SystemPrompt, m.config.JSONMode, m.selectedHost.Parameters))
 			}
 		}
 	}
@@ -848,15 +674,30 @@ func StartGUI(cfg *appconfig.Config) {
 		log.Fatalf("Failed to start: configuration is not loaded")
 	}
 
+	provider, err := providerfactory.NewChatProvider(cfg)
+	if err != nil {
+		if cfg.MCPMode {
+			log.Printf("MCP provider unavailable: %v — falling back to direct Ollama access", err)
+			provider = ollama.New(cfg)
+		} else {
+			log.Fatalf("Failed to initialize provider: %v", err)
+		}
+	}
+	defer func() {
+		if err := provider.Close(); err != nil {
+			log.Printf("provider shutdown error: %v", err)
+		}
+	}()
+
 	if cfg.MultimodelMode {
 		models.UnloadModels(cfg)
-		if err := StartMultimodelGUI(cfg); err != nil {
+		if err := StartMultimodelGUI(cfg, provider); err != nil {
 			log.Fatalf("Error running multimodel program: %v", err)
 		}
 		return
 	}
 
-	m := initialModel(cfg)
+	m := initialModel(cfg, provider)
 
 	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	m.program = p

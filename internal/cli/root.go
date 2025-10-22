@@ -27,16 +27,19 @@ var rootCmd = &cobra.Command{
 
 		// 2) If user did NOT set a flag, copy the config value into the flag so
 		//    both pflags and viper reflect the same, final value.
-		for _, name := range []string{"debug", "multimodelMode", "pipelineMode", "jsonMode"} {
+		for _, name := range []string{"debug", "multimodelMode", "pipelineMode", "jsonMode", "mcpMode"} {
 			if !cmd.Flags().Changed(name) {
 				val := viper.GetBool(name)
 				_ = cmd.Flags().Set(name, strconv.FormatBool(val))
 			}
 		}
-		for _, name := range []string{"export", "exportMarkdown"} {
+		for _, name := range []string{"export", "exportMarkdown", "mcpBinary"} {
 			if !cmd.Flags().Changed(name) {
 				_ = cmd.Flags().Set(name, viper.GetString(name))
 			}
+		}
+		if !cmd.Flags().Changed("mcpInitTimeout") {
+			_ = cmd.Flags().Set("mcpInitTimeout", strconv.Itoa(viper.GetInt("mcpInitTimeout")))
 		}
 
 		// 3) Materialize the fully merged configuration into currentConfig
@@ -71,6 +74,9 @@ func init() {
 	rootCmd.PersistentFlags().Bool("multimodelMode", false, "enable multi-model mode")
 	rootCmd.PersistentFlags().Bool("pipelineMode", false, "enable pipeline mode")
 	rootCmd.PersistentFlags().Bool("jsonMode", false, "enable JSON output mode")
+	rootCmd.PersistentFlags().Bool("mcpMode", false, "proxy LLM traffic through the MCP server")
+	rootCmd.PersistentFlags().String("mcpBinary", "dist/agon-mcp", "path to the MCP server binary")
+	rootCmd.PersistentFlags().Int("mcpInitTimeout", 10, "seconds to wait for MCP startup")
 	rootCmd.PersistentFlags().String("export", "", "write pipeline runs to this JSON file")
 	rootCmd.PersistentFlags().String("exportMarkdown", "", "write pipeline runs to this Markdown file")
 
@@ -79,6 +85,9 @@ func init() {
 	_ = viper.BindPFlag("multimodelMode", rootCmd.PersistentFlags().Lookup("multimodelMode"))
 	_ = viper.BindPFlag("pipelineMode", rootCmd.PersistentFlags().Lookup("pipelineMode"))
 	_ = viper.BindPFlag("jsonMode", rootCmd.PersistentFlags().Lookup("jsonMode"))
+	_ = viper.BindPFlag("mcpMode", rootCmd.PersistentFlags().Lookup("mcpMode"))
+	_ = viper.BindPFlag("mcpBinary", rootCmd.PersistentFlags().Lookup("mcpBinary"))
+	_ = viper.BindPFlag("mcpInitTimeout", rootCmd.PersistentFlags().Lookup("mcpInitTimeout"))
 	_ = viper.BindPFlag("export", rootCmd.PersistentFlags().Lookup("export"))
 	_ = viper.BindPFlag("exportMarkdown", rootCmd.PersistentFlags().Lookup("exportMarkdown"))
 }
@@ -95,6 +104,9 @@ func ensureConfigLoaded() error {
 	viper.SetDefault("multimodelMode", false)
 	viper.SetDefault("pipelineMode", false)
 	viper.SetDefault("jsonMode", false)
+	viper.SetDefault("mcpMode", false)
+	viper.SetDefault("mcpBinary", "dist/agon-mcp")
+	viper.SetDefault("mcpInitTimeout", 10)
 	viper.SetDefault("export", "")
 	viper.SetDefault("exportMarkdown", "")
 
