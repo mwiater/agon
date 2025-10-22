@@ -29,10 +29,23 @@ type Provider struct {
 	seqMu    sync.Mutex
 	seq      int64
 	fallback providers.ChatProvider
+	rpcMu    sync.Mutex
+	tools    map[string]string
 }
 
 func (p *Provider) log(format string, args ...any) {
 	mcplog.Write(p.cfg, format, args...)
+}
+
+func truncateForLog(s string, max int) string {
+	runes := []rune(s)
+	if len(runes) <= max {
+		return s
+	}
+	if max <= 0 {
+		return ""
+	}
+	return string(runes[:max]) + "…"
 }
 
 type jsonrpcResponse struct {
@@ -55,7 +68,7 @@ func New(ctx context.Context, cfg *appconfig.Config) (*Provider, error) {
 
 	binary := cfg.MCPBinary
 	if binary == "" {
-		binary = "dist/agon-mcp"
+		binary = "dist/agon-mcp_linux_amd64_v1/agon-mcp"
 	}
 
 	if _, err := os.Stat(binary); err != nil {
@@ -92,6 +105,7 @@ func New(ctx context.Context, cfg *appconfig.Config) (*Provider, error) {
 		reader:   bufio.NewReader(stdout),
 		writer:   bufio.NewWriter(stdin),
 		fallback: ollama.New(cfg),
+		tools:    make(map[string]string),
 	}
 
 	initCtx, cancel := context.WithTimeout(ctx, cfg.MCPInitTimeoutDuration())
@@ -107,6 +121,10 @@ func New(ctx context.Context, cfg *appconfig.Config) (*Provider, error) {
 		provider.log("MCP server started: binary=%s pid=%d", binary, provider.cmd.Process.Pid)
 	} else {
 		provider.log("MCP server started: binary=%s", binary)
+	}
+
+	if err := provider.discoverTools(); err != nil {
+		provider.log("Failed to list MCP tools: %v", err)
 	}
 
 	return provider, nil
@@ -221,6 +239,116 @@ func (p *Provider) readResponseBlocking() (jsonrpcResponse, error) {
 	return resp, nil
 }
 
+func (p *Provider) rpcCall(ctx context.Context, method string, params map[string]any) (jsonrpcResponse, error) {
+	p.rpcMu.Lock()
+	defer p.rpcMu.Unlock()
+
+	id := p.nextID()
+	payload := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      id,
+		"method":  method,
+	}
+	if params != nil {
+		payload["params"] = params
+	}
+	if err := p.writeMessage(payload); err != nil {
+		return jsonrpcResponse{}, err
+	}
+	resp, err := p.readResponse(ctx)
+	if err != nil {
+		return jsonrpcResponse{}, err
+	}
+	if resp.Error != nil {
+		return jsonrpcResponse{}, fmt.Errorf("%s", resp.Error.Message)
+	}
+	return resp, nil
+}
+
+func (p *Provider) discoverTools() error {
+	ctx, cancel := context.WithTimeout(context.Background(), p.cfg.MCPInitTimeoutDuration())
+	defer cancel()
+
+	resp, err := p.rpcCall(ctx, "tools/list", nil)
+	if err != nil {
+		return err
+	}
+	if len(resp.Result) == 0 {
+		return nil
+	}
+	var payload struct {
+		Tools []struct {
+			Name string `json:"name"`
+		} `json:"tools"`
+	}
+	if err := json.Unmarshal(resp.Result, &payload); err != nil {
+		return err
+	}
+	var names []string
+	for _, tool := range payload.Tools {
+		name := strings.ToLower(tool.Name)
+		p.tools[name] = tool.Name
+		names = append(names, tool.Name)
+	}
+	if len(names) > 0 {
+		p.log("Available MCP tools: %s", strings.Join(names, ", "))
+	}
+	return nil
+}
+
+func (p *Provider) selectTool(history []providers.ChatMessage) (string, string) {
+	if len(history) == 0 || len(p.tools) == 0 {
+		return "", ""
+	}
+	for i := len(history) - 1; i >= 0; i-- {
+		msg := history[i]
+		if strings.ToLower(msg.Role) != "user" {
+			continue
+		}
+		content := msg.Content
+		lower := strings.ToLower(content)
+		for key, original := range p.tools {
+			if strings.Contains(lower, key) && strings.Contains(lower, "tool") {
+				return original, content
+			}
+		}
+		break
+	}
+	return "", ""
+}
+
+func (p *Provider) callTool(ctx context.Context, name, text string) (string, error) {
+	params := map[string]any{
+		"name": name,
+		"arguments": map[string]any{
+			"text": text,
+		},
+	}
+	resp, err := p.rpcCall(ctx, "tools/call", params)
+	if err != nil {
+		return "", err
+	}
+	if len(resp.Result) == 0 {
+		return "", nil
+	}
+	var payload struct {
+		Content []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"content"`
+	}
+	if err := json.Unmarshal(resp.Result, &payload); err != nil {
+		return "", err
+	}
+	var parts []string
+	for _, part := range payload.Content {
+		if part.Text != "" {
+			parts = append(parts, part.Text)
+		}
+	}
+	return strings.Join(parts, "\n"), nil
+}
+
 // LoadedModels currently delegates to the underlying Ollama provider while the
 // MCP toolchain is being fleshed out.
 func (p *Provider) LoadedModels(ctx context.Context, host appconfig.Host) ([]string, error) {
@@ -245,16 +373,44 @@ func (p *Provider) EnsureModelReady(ctx context.Context, host appconfig.Host, mo
 	return nil
 }
 
-// Stream currently proxies to the Ollama provider. The MCP transport will be
-// wired up in a follow-up step when the server exposes responses/create.
+// Stream proxies chat traffic through MCP tools before delegating to the Ollama backend.
 func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, callbacks providers.StreamCallbacks) error {
 	p.log("Tool invoked: tool=chat host=%s model=%s messages=%d", req.Host.Name, req.Model, len(req.History))
-	err := p.fallback.Stream(ctx, req, callbacks)
+	toolName, userText := p.selectTool(req.History)
+	executed := false
+	forwardReq := req
+	if toolName != "" {
+		toolCtx, cancel := context.WithTimeout(ctx, p.cfg.MCPInitTimeoutDuration())
+		defer cancel()
+		result, err := p.callTool(toolCtx, toolName, userText)
+		if err != nil {
+			p.log("Tool bypassed: tool=%s host=%s model=%s reason=%v", toolName, req.Host.Name, req.Model, err)
+		} else {
+			executed = true
+			output := fmt.Sprintf("[MCP %s]\n%s", toolName, result)
+			if callbacks.OnChunk != nil {
+				if err := callbacks.OnChunk(providers.ChatMessage{Role: "assistant", Content: output}); err != nil {
+					p.log("Tool output dispatch failed: %v", err)
+				}
+			}
+			forwardHistory := append([]providers.ChatMessage{}, req.History...)
+			forwardHistory = append(forwardHistory, providers.ChatMessage{Role: "assistant", Content: output})
+			forwardReq.History = forwardHistory
+			p.log("Tool executed: tool=%s host=%s model=%s output=%s", toolName, req.Host.Name, req.Model, truncateForLog(result, 160))
+		}
+	}
+	err := p.fallback.Stream(ctx, forwardReq, callbacks)
 	if err != nil {
-		p.log("Tool bypassed: tool=chat host=%s model=%s reason=%v", req.Host.Name, req.Model, err)
+		if !executed {
+			p.log("Tool bypassed: tool=chat host=%s model=%s reason=%v", req.Host.Name, req.Model, err)
+		}
 		return err
 	}
-	p.log("Tool bypassed: tool=chat host=%s model=%s reason=delegated to Ollama API", req.Host.Name, req.Model)
+	if executed {
+		p.log("Tool executed: tool=chat host=%s model=%s forwarded to Ollama", req.Host.Name, req.Model)
+	} else {
+		p.log("Tool bypassed: tool=chat host=%s model=%s reason=delegated to Ollama API", req.Host.Name, req.Model)
+	}
 	return nil
 }
 
