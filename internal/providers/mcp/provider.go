@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/mwiater/agon/internal/appconfig"
+	"github.com/mwiater/agon/internal/mcplog"
 	"github.com/mwiater/agon/internal/providers"
 	"github.com/mwiater/agon/internal/providers/ollama"
 )
@@ -28,6 +29,10 @@ type Provider struct {
 	seqMu    sync.Mutex
 	seq      int64
 	fallback providers.ChatProvider
+}
+
+func (p *Provider) log(format string, args ...any) {
+	mcplog.Write(p.cfg, format, args...)
 }
 
 type jsonrpcResponse struct {
@@ -55,8 +60,10 @@ func New(ctx context.Context, cfg *appconfig.Config) (*Provider, error) {
 
 	if _, err := os.Stat(binary); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
+			mcplog.Write(cfg, "MCP server start aborted: binary %q missing", binary)
 			return nil, fmt.Errorf("mcp binary not found at %q", binary)
 		}
+		mcplog.Write(cfg, "MCP server start aborted: binary %q not accessible (%v)", binary, err)
 		return nil, fmt.Errorf("mcp binary %q not accessible: %w", binary, err)
 	}
 
@@ -74,6 +81,7 @@ func New(ctx context.Context, cfg *appconfig.Config) (*Provider, error) {
 	}
 
 	if err := cmd.Start(); err != nil {
+		mcplog.Write(cfg, "MCP server failed to start: %v", err)
 		return nil, fmt.Errorf("start mcp server: %w", err)
 	}
 
@@ -90,8 +98,15 @@ func New(ctx context.Context, cfg *appconfig.Config) (*Provider, error) {
 	defer cancel()
 
 	if err := provider.initialize(initCtx); err != nil {
+		provider.log("MCP server initialization failed: %v", err)
 		provider.Close()
 		return nil, err
+	}
+
+	if provider.cmd != nil && provider.cmd.Process != nil {
+		provider.log("MCP server started: binary=%s pid=%d", binary, provider.cmd.Process.Pid)
+	} else {
+		provider.log("MCP server started: binary=%s", binary)
 	}
 
 	return provider, nil
@@ -209,18 +224,38 @@ func (p *Provider) readResponseBlocking() (jsonrpcResponse, error) {
 // LoadedModels currently delegates to the underlying Ollama provider while the
 // MCP toolchain is being fleshed out.
 func (p *Provider) LoadedModels(ctx context.Context, host appconfig.Host) ([]string, error) {
-	return p.fallback.LoadedModels(ctx, host)
+	p.log("Tool invoked: tool=loaded_models host=%s", host.Name)
+	models, err := p.fallback.LoadedModels(ctx, host)
+	if err != nil {
+		p.log("Tool bypassed: tool=loaded_models host=%s reason=%v", host.Name, err)
+		return nil, err
+	}
+	p.log("Tool bypassed: tool=loaded_models host=%s reason=delegated to Ollama API", host.Name)
+	return models, nil
 }
 
 // EnsureModelReady currently proxies to the Ollama provider.
 func (p *Provider) EnsureModelReady(ctx context.Context, host appconfig.Host, model string) error {
-	return p.fallback.EnsureModelReady(ctx, host, model)
+	p.log("Tool invoked: tool=ensure_model host=%s model=%s", host.Name, model)
+	if err := p.fallback.EnsureModelReady(ctx, host, model); err != nil {
+		p.log("Tool bypassed: tool=ensure_model host=%s model=%s reason=%v", host.Name, model, err)
+		return err
+	}
+	p.log("Tool bypassed: tool=ensure_model host=%s model=%s reason=delegated to Ollama API", host.Name, model)
+	return nil
 }
 
 // Stream currently proxies to the Ollama provider. The MCP transport will be
 // wired up in a follow-up step when the server exposes responses/create.
 func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, callbacks providers.StreamCallbacks) error {
-	return p.fallback.Stream(ctx, req, callbacks)
+	p.log("Tool invoked: tool=chat host=%s model=%s messages=%d", req.Host.Name, req.Model, len(req.History))
+	err := p.fallback.Stream(ctx, req, callbacks)
+	if err != nil {
+		p.log("Tool bypassed: tool=chat host=%s model=%s reason=%v", req.Host.Name, req.Model, err)
+		return err
+	}
+	p.log("Tool bypassed: tool=chat host=%s model=%s reason=delegated to Ollama API", req.Host.Name, req.Model)
+	return nil
 }
 
 // Close terminates the MCP process and closes any subordinate providers.

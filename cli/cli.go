@@ -16,6 +16,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mwiater/agon/internal/appconfig"
+	"github.com/mwiater/agon/internal/mcplog"
 	"github.com/mwiater/agon/internal/models"
 	"github.com/mwiater/agon/internal/providerfactory"
 	"github.com/mwiater/agon/internal/providers"
@@ -53,6 +54,7 @@ const (
 type model struct {
 	config           *Config
 	provider         providers.ChatProvider
+	mcpStatus        mcpStatus
 	state            viewState
 	isLoading        bool
 	err              error
@@ -102,6 +104,7 @@ func initialModel(cfg *Config, provider providers.ChatProvider) *model {
 	return &model{
 		config:    cfg,
 		provider:  provider,
+		mcpStatus: deriveMCPStatus(cfg, provider),
 		state:     viewHostSelector,
 		spinner:   s,
 		textArea:  ta,
@@ -467,6 +470,7 @@ func (m *model) chatView() string {
 	} else {
 		JSONMode = fmt.Sprintf("JSON Mode: %s", "false")
 	}
+	mcpBadge := renderMCPBadge(m.mcpStatus)
 
 	var modelTopK string
 	if m.selectedHost.Parameters.TopK != nil {
@@ -570,6 +574,7 @@ func (m *model) chatView() string {
 		headerStyle.Render(hostInfo),
 		headerStyle.MarginLeft(1).Render(modelInfo),
 		jsonModeStyle.Render(JSONMode),
+		mcpBadge,
 	)
 
 	configSettingsLine1 := lipgloss.JoinHorizontal(lipgloss.Top,
@@ -678,6 +683,7 @@ func StartGUI(cfg *appconfig.Config) {
 	if err != nil {
 		if cfg.MCPMode {
 			log.Printf("MCP provider unavailable: %v — falling back to direct Ollama access", err)
+			mcplog.Write(cfg, "MCP provider unavailable: %v — falling back to direct Ollama access", err)
 			provider = ollama.New(cfg)
 		} else {
 			log.Fatalf("Failed to initialize provider: %v", err)

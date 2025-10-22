@@ -1,0 +1,18 @@
+[2025-10-22T11:36:34-07:00] MCP server started: binary=dist/agon-mcp_linux_amd64_v1/agon-mcp pid=73509
+[2025-10-22T11:36:34-07:00] MCP provider ready: using local server
+[2025-10-22T11:36:35-07:00] Tool invoked: tool=loaded_models host=Ollama01
+[2025-10-22T11:36:35-07:00] Tool bypassed: tool=loaded_models host=Ollama01 reason=delegated to Ollama API
+[2025-10-22T11:36:37-07:00] Tool invoked: tool=ensure_model host=Ollama01 model=granite3.1-moe:1b
+[2025-10-22T11:36:45-07:00] Tool bypassed: tool=ensure_model host=Ollama01 model=granite3.1-moe:1b reason=delegated to Ollama API
+[2025-10-22T11:37:09-07:00] Tool invoked: tool=chat host=Ollama01 model=granite3.1-moe:1b messages=1
+[2025-10-22T11:37:15-07:00] Tool bypassed: tool=chat host=Ollama01 model=granite3.1-moe:1b reason=delegated to Ollama API
+[2025-10-22T11:39:09-07:00] MCP server started: binary=dist/agon-mcp_linux_amd64_v1/agon-mcp pid=73622
+[2025-10-22T11:39:09-07:00] MCP provider ready: using local server
+[2025-10-22T11:39:12-07:00] Tool invoked: tool=loaded_models host=Ollama01
+[2025-10-22T11:39:12-07:00] Tool bypassed: tool=loaded_models host=Ollama01 reason=delegated to Ollama API
+[2025-10-22T11:39:13-07:00] Tool invoked: tool=ensure_model host=Ollama01 model=granite4:micro
+[2025-10-22T11:40:01-07:00] Tool bypassed: tool=ensure_model host=Ollama01 model=granite4:micro reason=delegated to Ollama API
+[2025-10-22T11:40:20-07:00] Tool invoked: tool=chat host=Ollama01 model=granite4:micro messages=1
+[2025-10-22T11:40:57-07:00] Tool bypassed: tool=chat host=Ollama01 model=granite4:micro reason=delegated to Ollama API
+[2025-10-22T11:41:21-07:00] Tool invoked: tool=chat host=Ollama01 model=granite4:micro messages=3
+[2025-10-22T11:41:41-07:00] Tool bypassed: tool=chat host=Ollama01 model=granite4:micro reason=delegated to Ollama API

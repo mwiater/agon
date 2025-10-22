@@ -23,6 +23,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mwiater/agon/internal/mcplog"
 	"github.com/mwiater/agon/internal/providerfactory"
 	"github.com/mwiater/agon/internal/providers/ollama"
 )
@@ -208,6 +209,7 @@ type pipelineModel struct {
 	config         *Config
 	client         *http.Client
 	requestTimeout time.Duration
+	mcpStatus      mcpStatus
 
 	viewState     pipelineViewState
 	focusIndex    int
@@ -296,6 +298,7 @@ func initialPipelineModel(cfg *Config) *pipelineModel {
 	return &pipelineModel{
 		config:             cfg,
 		requestTimeout:     timeout,
+		mcpStatus:          deriveMCPStatusFromConfig(cfg),
 		viewState:          pipelineViewAssignment,
 		focusIndex:         0,
 		expandedIndex:      -1,
@@ -788,7 +791,8 @@ func (m *pipelineModel) assignmentView() string {
 	var builder strings.Builder
 
 	header := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("62")).Render("Pipeline Mode - Map hosts to stages")
-	builder.WriteString(header + "\n\n")
+	builder.WriteString(header + "\n")
+	builder.WriteString(renderMCPBadge(m.mcpStatus) + "\n\n")
 
 	for i, stage := range m.stages {
 		pointer := "  "
@@ -945,8 +949,9 @@ func (m *pipelineModel) renderProgressLine() string {
 	if m.config.JSONMode {
 		jsonMode = "jsonMode: on"
 	}
+	mcpIndicator := formatMCPIndicator(m.mcpStatus)
 
-	return fmt.Sprintf("Pipeline: %s | %s | %s | %s | %s", pipelinePath, stageStatus, speed, ttft, jsonMode)
+	return fmt.Sprintf("Pipeline: %s | %s | %s | %s | %s | %s", pipelinePath, stageStatus, speed, ttft, jsonMode, mcpIndicator)
 }
 
 func (m *pipelineModel) renderStageColumns(targetHeight int) string {
@@ -1583,6 +1588,7 @@ func StartPipelineGUI(cfg *Config) error {
 		if perr != nil {
 			if cfg.MCPMode {
 				log.Printf("MCP provider unavailable: %v — falling back to direct Ollama access", perr)
+				mcplog.Write(cfg, "MCP provider unavailable: %v — falling back to direct Ollama access", perr)
 				provider = ollama.New(cfg)
 			} else {
 				return perr

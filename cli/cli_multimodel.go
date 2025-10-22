@@ -52,7 +52,8 @@ type multimodelModel struct {
 	// config stores the shared application configuration.
 	config *Config
 	// provider issues chat interactions on behalf of the UI.
-	provider providers.ChatProvider
+	provider  providers.ChatProvider
+	mcpStatus mcpStatus
 	// state tracks which multimodel view is currently active.
 	state multimodelViewState
 	// isLoading reports whether a background operation is still running.
@@ -183,6 +184,7 @@ func initialMultimodelModel(cfg *Config, provider providers.ChatProvider) *multi
 	return &multimodelModel{
 		config:            cfg,
 		provider:          provider,
+		mcpStatus:         deriveMCPStatus(cfg, provider),
 		state:             multimodelViewAssignment,
 		assignments:       assignments,
 		selectedHostIndex: 0,
@@ -508,7 +510,8 @@ func (m *multimodelModel) assignmentView() string {
 	var builder strings.Builder
 
 	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("5"))
-	builder.WriteString(titleStyle.Render("Multimodel Mode - Assign Models to Hosts") + "\n\n")
+	builder.WriteString(titleStyle.Render("Multimodel Mode - Assign Models to Hosts") + "\n")
+	builder.WriteString(renderMCPBadge(m.mcpStatus) + "\n\n")
 
 	if m.inModelSelection {
 		return lipgloss.NewStyle().Margin(1, 2).Render(m.modelList.View())
@@ -564,7 +567,7 @@ func (m *multimodelModel) multimodelChatView() string {
 	var builder strings.Builder
 
 	headerStyle := lipgloss.NewStyle().Background(lipgloss.Color("62")).Foreground(lipgloss.Color("230")).Padding(0, 1)
-	header := headerStyle.Render("Multimodel Chat")
+	header := lipgloss.JoinHorizontal(lipgloss.Top, headerStyle.Render("Multimodel Chat"), renderMCPBadge(m.mcpStatus))
 	help := lipgloss.NewStyle().Faint(true).Render(" (tab to reassign, q to quit)")
 	builder.WriteString(header + help + "\n\n")
 
