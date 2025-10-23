@@ -6,4 +6,5 @@
 !config.example.json
 !config.example.JSONMode.json
 !config.example.Facts.json
+!config.example.MCPMode.json
 !config.example.PipelineMode.json
