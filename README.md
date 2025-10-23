@@ -134,7 +134,7 @@ CLI flags take precedence over config; if both modes are set simultaneously the 
   - `type`: Host backend identifier (`"ollama"`).
   - `models`: Desired model identifiers to monitor on the host.
   - `systemprompt`: Optional system prompt string. Leave empty to use the model default.
-- `debug`: Boolean flag. When `true`, timing/token metrics are shown and `debug.log` captures detailed traces.
+- `debug`: Boolean flag. When `true`, timing/token metrics are shown and `agon.log` captures detailed traces.
 - `multimodelMode`: Boolean flag. When `true`, the CLI launches directly into the multimodel chat interface.
 - `pipelineMode`: Boolean flag. When `true`, the CLI opens the four-stage pipeline orchestrator. `multimodelMode` and `pipelineMode` are mutually exclusive—only one may be `true` at launch.
 - `jsonMode`: Boolean flag. When `true`, the CLI forces the LLM to respond in JSON format.
@@ -210,7 +210,7 @@ With `debug` enabled in configuration, the chat interface displays:
 - **Response eval duration/tokens** – Latency and tokens consumed during generation.
 - **Total duration** – End-to-end latency from request to final token.
 
-Each run also appends to `debug.log`, providing a persistent trace for troubleshooting.
+Each run also appends to `agon.log`, providing a persistent trace for troubleshooting.
 
 ## Building From Source
 GoReleaser powers both local test builds and tagged GitHub releases. Start your prereleases at `v0.1.0` and increment as you iterate.

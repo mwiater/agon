@@ -666,10 +666,10 @@ func formatMeta(meta LLMResponseMeta) string {
 
 // StartGUI initializes and runs the interactive TUI for single-model chat.
 // It reads configuration from config/config.json by default, optionally switches to multimodel
-// mode, and blocks until the UI exits. It logs diagnostic output to debug.log
+// mode, and blocks until the UI exits. It logs diagnostic output to agon.log
 // when enabled. StartGUI does not return a value.
 func StartGUI(cfg *appconfig.Config) {
-	f, err := tea.LogToFile("debug.log", "debug")
+	f, err := tea.LogToFile("agon.log", "debug")
 	if err != nil {
 		log.Fatalf("could not open log file: %v", err)
 	}

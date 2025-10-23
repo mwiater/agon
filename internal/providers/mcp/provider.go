@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -21,16 +22,17 @@ import (
 )
 
 type Provider struct {
-	cfg      *appconfig.Config
-	cmd      *exec.Cmd
-	stdin    io.WriteCloser
-	reader   *bufio.Reader
-	writer   *bufio.Writer
-	seqMu    sync.Mutex
-	seq      int64
-	fallback providers.ChatProvider
-	rpcMu    sync.Mutex
-	tools    map[string]string
+	cfg       *appconfig.Config
+	cmd       *exec.Cmd
+	stdin     io.WriteCloser
+	reader    *bufio.Reader
+	writer    *bufio.Writer
+	seqMu     sync.Mutex
+	seq       int64
+	fallback  providers.ChatProvider
+	rpcMu     sync.Mutex
+	toolIndex map[string]providers.ToolDefinition
+	toolDefs  []providers.ToolDefinition
 }
 
 func (p *Provider) log(format string, args ...any) {
@@ -46,6 +48,33 @@ func truncateForLog(s string, max int) string {
 		return ""
 	}
 	return string(runes[:max]) + "…"
+}
+
+func formatArgs(args map[string]any) string {
+	if len(args) == 0 {
+		return "{}"
+	}
+	data, err := json.Marshal(args)
+	if err != nil {
+		return fmt.Sprintf("%v", args)
+	}
+	return string(data)
+}
+
+func (p *Provider) logToolRequest(name string, args map[string]any) {
+	payload := formatArgs(args)
+	p.log("Tool requested: tool=%s args=%s", name, payload)
+	if p.cfg != nil && p.cfg.Debug {
+		log.Printf("Tool request: %s %s", name, payload)
+	}
+}
+
+func (p *Provider) logToolSuccess(name, result string) {
+	truncated := truncateForLog(result, 160)
+	p.log("Tool executed: tool=%s output=%s", name, truncated)
+	if p.cfg != nil && p.cfg.Debug {
+		log.Printf("Tool result: %s %s", name, result)
+	}
 }
 
 type jsonrpcResponse struct {
@@ -99,13 +128,13 @@ func New(ctx context.Context, cfg *appconfig.Config) (*Provider, error) {
 	}
 
 	provider := &Provider{
-		cfg:      cfg,
-		cmd:      cmd,
-		stdin:    stdin,
-		reader:   bufio.NewReader(stdout),
-		writer:   bufio.NewWriter(stdin),
-		fallback: ollama.New(cfg),
-		tools:    make(map[string]string),
+		cfg:       cfg,
+		cmd:       cmd,
+		stdin:     stdin,
+		reader:    bufio.NewReader(stdout),
+		writer:    bufio.NewWriter(stdin),
+		fallback:  ollama.New(cfg),
+		toolIndex: make(map[string]providers.ToolDefinition),
 	}
 
 	initCtx, cancel := context.WithTimeout(ctx, cfg.MCPInitTimeoutDuration())
@@ -278,18 +307,29 @@ func (p *Provider) discoverTools() error {
 	}
 	var payload struct {
 		Tools []struct {
-			Name string `json:"name"`
+			Name        string         `json:"name"`
+			Description string         `json:"description,omitempty"`
+			InputSchema map[string]any `json:"input_schema,omitempty"`
 		} `json:"tools"`
 	}
 	if err := json.Unmarshal(resp.Result, &payload); err != nil {
 		return err
 	}
+	toolDefs := make([]providers.ToolDefinition, 0, len(payload.Tools))
+	p.toolIndex = make(map[string]providers.ToolDefinition, len(payload.Tools))
 	var names []string
 	for _, tool := range payload.Tools {
-		name := strings.ToLower(tool.Name)
-		p.tools[name] = tool.Name
+		def := providers.ToolDefinition{
+			Name:        tool.Name,
+			Description: tool.Description,
+			InputSchema: tool.InputSchema,
+		}
+		key := strings.ToLower(tool.Name)
+		p.toolIndex[key] = def
+		toolDefs = append(toolDefs, def)
 		names = append(names, tool.Name)
 	}
+	p.toolDefs = toolDefs
 	if len(names) > 0 {
 		p.log("Available MCP tools: %s", strings.Join(names, ", "))
 	}
@@ -297,7 +337,7 @@ func (p *Provider) discoverTools() error {
 }
 
 func (p *Provider) selectTool(history []providers.ChatMessage) (string, string) {
-	if len(history) == 0 || len(p.tools) == 0 {
+	if len(history) == 0 || len(p.toolIndex) == 0 {
 		return "", ""
 	}
 	for i := len(history) - 1; i >= 0; i-- {
@@ -307,9 +347,9 @@ func (p *Provider) selectTool(history []providers.ChatMessage) (string, string) 
 		}
 		content := msg.Content
 		lower := strings.ToLower(content)
-		for key, original := range p.tools {
+		for key, def := range p.toolIndex {
 			if strings.Contains(lower, key) && strings.Contains(lower, "tool") {
-				return original, content
+				return def.Name, content
 			}
 		}
 		break
@@ -317,12 +357,13 @@ func (p *Provider) selectTool(history []providers.ChatMessage) (string, string) 
 	return "", ""
 }
 
-func (p *Provider) callTool(ctx context.Context, name, text string) (string, error) {
+func (p *Provider) callTool(ctx context.Context, name string, args map[string]any) (string, error) {
+	if args == nil {
+		args = map[string]any{}
+	}
 	params := map[string]any{
-		"name": name,
-		"arguments": map[string]any{
-			"text": text,
-		},
+		"name":      name,
+		"arguments": args,
 	}
 	resp, err := p.rpcCall(ctx, "tools/call", params)
 	if err != nil {
@@ -379,14 +420,33 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 	toolName, userText := p.selectTool(req.History)
 	executed := false
 	forwardReq := req
+	if len(p.toolDefs) > 0 {
+		forwardReq.Tools = append([]providers.ToolDefinition(nil), p.toolDefs...)
+	}
+	forwardReq.DisableStreaming = true
+	forwardReq.ToolExecutor = func(execCtx context.Context, name string, callArgs map[string]any) (string, error) {
+		toolCtx, cancel := context.WithTimeout(execCtx, p.cfg.MCPInitTimeoutDuration())
+		defer cancel()
+		p.logToolRequest(name, callArgs)
+		result, err := p.callTool(toolCtx, name, callArgs)
+		if err != nil {
+			p.log("Tool bypassed: tool=%s host=%s model=%s reason=%v", name, req.Host.Name, req.Model, err)
+			return "", err
+		}
+		p.logToolSuccess(name, result)
+		return result, nil
+	}
 	if toolName != "" {
 		toolCtx, cancel := context.WithTimeout(ctx, p.cfg.MCPInitTimeoutDuration())
 		defer cancel()
-		result, err := p.callTool(toolCtx, toolName, userText)
+		args := map[string]any{"text": userText}
+		p.logToolRequest(toolName, args)
+		result, err := p.callTool(toolCtx, toolName, args)
 		if err != nil {
 			p.log("Tool bypassed: tool=%s host=%s model=%s reason=%v", toolName, req.Host.Name, req.Model, err)
 		} else {
 			executed = true
+			p.logToolSuccess(toolName, result)
 			output := fmt.Sprintf("[MCP %s]\n%s", toolName, result)
 			if callbacks.OnChunk != nil {
 				if err := callbacks.OnChunk(providers.ChatMessage{Role: "assistant", Content: output}); err != nil {
@@ -396,7 +456,6 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 			forwardHistory := append([]providers.ChatMessage{}, req.History...)
 			forwardHistory = append(forwardHistory, providers.ChatMessage{Role: "assistant", Content: output})
 			forwardReq.History = forwardHistory
-			p.log("Tool executed: tool=%s host=%s model=%s output=%s", toolName, req.Host.Name, req.Model, truncateForLog(result, 160))
 		}
 	}
 	err := p.fallback.Stream(ctx, forwardReq, callbacks)

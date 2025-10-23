@@ -11,7 +11,7 @@ import (
 
 var mu sync.Mutex
 
-// Write appends a formatted message to mcp-debug.log when debug mode is enabled.
+// Write appends a formatted message to agon-mcp-server.log when debug mode is enabled.
 func Write(cfg *appconfig.Config, format string, args ...any) {
 	if cfg == nil || !cfg.Debug {
 		return
@@ -22,7 +22,7 @@ func Write(cfg *appconfig.Config, format string, args ...any) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	file, err := os.OpenFile("mcp-debug.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	file, err := os.OpenFile("agon-mcp-server.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return
 	}

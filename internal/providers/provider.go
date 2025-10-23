@@ -14,6 +14,16 @@ type ChatMessage struct {
 	Content string
 }
 
+// ToolDefinition describes a tool exposed by an upstream provider.
+type ToolDefinition struct {
+	Name        string         `json:"name"`
+	Description string         `json:"description,omitempty"`
+	InputSchema map[string]any `json:"input_schema,omitempty"`
+}
+
+// ToolExecutor invokes a tool by name with arbitrary arguments.
+type ToolExecutor func(ctx context.Context, name string, args map[string]any) (string, error)
+
 // StreamMetadata captures timing and token metrics returned by a provider.
 type StreamMetadata struct {
 	Model              string
@@ -29,12 +39,15 @@ type StreamMetadata struct {
 
 // StreamRequest bundles all inputs necessary to start a chat stream.
 type StreamRequest struct {
-	Host         appconfig.Host
-	Model        string
-	History      []ChatMessage
-	SystemPrompt string
-	Parameters   appconfig.Parameters
-	JSONMode     bool
+	Host             appconfig.Host
+	Model            string
+	History          []ChatMessage
+	SystemPrompt     string
+	Parameters       appconfig.Parameters
+	JSONMode         bool
+	Tools            []ToolDefinition
+	DisableStreaming bool
+	ToolExecutor     ToolExecutor
 }
 
 // StreamCallbacks are invoked as the provider yields output.

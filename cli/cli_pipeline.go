@@ -25,6 +25,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mwiater/agon/internal/mcplog"
 	"github.com/mwiater/agon/internal/providerfactory"
+	"github.com/mwiater/agon/internal/providers"
 	"github.com/mwiater/agon/internal/providers/ollama"
 )
 
@@ -210,6 +211,7 @@ type pipelineModel struct {
 	client         *http.Client
 	requestTimeout time.Duration
 	mcpStatus      mcpStatus
+	provider       providers.ChatProvider
 
 	viewState     pipelineViewState
 	focusIndex    int
@@ -257,7 +259,7 @@ type pipelineModel struct {
 }
 
 // initialPipelineModel constructs a model with sensible defaults and four stages.
-func initialPipelineModel(cfg *Config) *pipelineModel {
+func initialPipelineModel(cfg *Config, provider providers.ChatProvider) *pipelineModel {
 	timeout := cfg.RequestTimeout()
 
 	s := spinner.New()
@@ -298,7 +300,8 @@ func initialPipelineModel(cfg *Config) *pipelineModel {
 	return &pipelineModel{
 		config:             cfg,
 		requestTimeout:     timeout,
-		mcpStatus:          deriveMCPStatusFromConfig(cfg),
+		mcpStatus:          deriveMCPStatus(cfg, provider),
+		provider:           provider,
 		viewState:          pipelineViewAssignment,
 		focusIndex:         0,
 		expandedIndex:      -1,
@@ -1192,7 +1195,7 @@ func (m *pipelineModel) queueStage(index int) tea.Cmd {
 		}
 	}
 
-	return pipelineStreamStageCmd(m.program, index, stage.host, stage.selectedModel, messages, stage.systemPrompt, stage.parameters, payload, m.config.JSONMode, m.client, m.requestTimeout)
+	return pipelineStreamStageCmd(m.program, m.provider, m.config.Debug, index, stage.host, stage.selectedModel, messages, stage.systemPrompt, stage.parameters, payload, m.config.JSONMode, m.client, m.requestTimeout)
 }
 
 func (m *pipelineModel) advanceToNextStage(current int, payload string) tea.Cmd {
@@ -1572,8 +1575,21 @@ func (m *pipelineModel) exportPipelineMarkdown(path string) error {
 }
 
 // StartPipelineGUI initializes the pipeline Bubble Tea program and blocks until exit.
+
 func StartPipelineGUI(cfg *Config) error {
-	m := initialPipelineModel(cfg)
+	var provider providers.ChatProvider
+	var err error
+
+	if cfg.MCPMode {
+		provider, err = providerfactory.NewChatProvider(cfg)
+		if err != nil {
+			log.Printf("MCP provider unavailable: %v — falling back to direct Ollama access", err)
+			mcplog.Write(cfg, "MCP provider unavailable: %v — falling back to direct Ollama access", err)
+			provider = ollama.New(cfg)
+		}
+	}
+
+	m := initialPipelineModel(cfg, provider)
 	m.client = &http.Client{
 		Transport: &http.Transport{ForceAttemptHTTP2: false},
 		Timeout:   m.requestTimeout,
@@ -1582,30 +1598,84 @@ func StartPipelineGUI(cfg *Config) error {
 	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	m.program = p
 
-	_, err := p.Run()
+	_, runErr := p.Run()
+
 	if m.switchToMultimodel {
-		provider, perr := providerfactory.NewChatProvider(cfg)
-		if perr != nil {
-			if cfg.MCPMode {
-				log.Printf("MCP provider unavailable: %v — falling back to direct Ollama access", perr)
-				mcplog.Write(cfg, "MCP provider unavailable: %v — falling back to direct Ollama access", perr)
-				provider = ollama.New(cfg)
-			} else {
-				return perr
+		if provider == nil {
+			provider, err = providerfactory.NewChatProvider(cfg)
+			if err != nil {
+				if cfg.MCPMode {
+					log.Printf("MCP provider unavailable: %v — falling back to direct Ollama access", err)
+					mcplog.Write(cfg, "MCP provider unavailable: %v — falling back to direct Ollama access", err)
+					provider = ollama.New(cfg)
+				} else {
+					return err
+				}
 			}
 		}
-		defer provider.Close()
-		return StartMultimodelGUI(cfg, provider)
+		multiErr := StartMultimodelGUI(cfg, provider)
+		if provider != nil {
+			if cerr := provider.Close(); cerr != nil && multiErr == nil {
+				multiErr = cerr
+			}
+		}
+		return multiErr
 	}
-	return err
+
+	if provider != nil {
+		if cerr := provider.Close(); cerr != nil && runErr == nil {
+			runErr = cerr
+		}
+	}
+
+	return runErr
 }
 
 // pipelineStreamStageCmd streams a stage response and emits updates to the Bubble Tea program.
-func pipelineStreamStageCmd(p *tea.Program, stageIndex int, host Host, modelName string, history []chatMessage, systemPrompt string, parameters Parameters, payload string, jsonMode bool, client *http.Client, timeout time.Duration) tea.Cmd {
+
+func pipelineStreamStageCmd(p *tea.Program, chatProvider providers.ChatProvider, debug bool, stageIndex int, host Host, modelName string, history []chatMessage, systemPrompt string, parameters Parameters, payload string, jsonMode bool, client *http.Client, timeout time.Duration) tea.Cmd {
 	return func() tea.Msg {
 		messages := history
 		if systemPrompt != "" {
 			messages = append([]chatMessage{{Role: "system", Content: systemPrompt}}, messages...)
+		}
+
+		if chatProvider != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			request := providers.StreamRequest{
+				Host:         host,
+				Model:        modelName,
+				History:      history,
+				SystemPrompt: systemPrompt,
+				Parameters:   parameters,
+				JSONMode:     jsonMode,
+			}
+			go func() {
+				defer cancel()
+				err := chatProvider.Stream(ctx, request, providers.StreamCallbacks{
+					OnChunk: func(msg providers.ChatMessage) error {
+						if msg.Content != "" {
+							p.Send(pipelineStageChunkMsg{Stage: stageIndex, Content: msg.Content})
+						}
+						return nil
+					},
+					OnComplete: func(meta providers.StreamMetadata) error {
+						if meta.Model == "" {
+							meta.Model = modelName
+						}
+						p.Send(pipelineStageDoneMsg{Stage: stageIndex, Meta: meta})
+						return nil
+					},
+				})
+				if err != nil {
+					p.Send(pipelineStageErrorMsg{Stage: stageIndex, Err: err})
+				}
+			}()
+			return nil
+		}
+
+		if debug {
+			log.Printf("Tools: false")
 		}
 
 		bodyPayload := map[string]any{
@@ -1664,7 +1734,7 @@ func pipelineStreamStageCmd(p *tea.Program, stageIndex int, host Host, modelName
 				}
 			}
 
-			p.Send(pipelineStageDoneMsg{Stage: stageIndex, Output: finalChunk.Message.Content, Meta: LLMResponseMeta{
+			meta := LLMResponseMeta{
 				Model:              finalChunk.Model,
 				CreatedAt:          time.Now(),
 				Done:               finalChunk.Done,
@@ -1674,7 +1744,8 @@ func pipelineStreamStageCmd(p *tea.Program, stageIndex int, host Host, modelName
 				PromptEvalDuration: finalChunk.PromptEvalDuration,
 				EvalCount:          finalChunk.EvalCount,
 				EvalDuration:       finalChunk.EvalDuration,
-			}})
+			}
+			p.Send(pipelineStageDoneMsg{Stage: stageIndex, Output: finalChunk.Message.Content, Meta: meta})
 		}()
 
 		return nil
