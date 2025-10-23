@@ -69,9 +69,9 @@ func (p *Provider) logToolRequest(name string, args map[string]any) {
 	}
 }
 
-func (p *Provider) logToolSuccess(name, result string) {
+func (p *Provider) logToolSuccess(name, result, host, model string) {
 	truncated := truncateForLog(result, 160)
-	p.log("Tool executed: tool=%s output=%s", name, truncated)
+	p.log("Tool executed: tool=%s host=%s model=%s output=%s", name, host, model, truncated)
 	if p.cfg != nil && p.cfg.Debug {
 		log.Printf("Tool result: %s %s", name, result)
 	}
@@ -433,7 +433,7 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 			p.log("Tool bypassed: tool=%s host=%s model=%s reason=%v", name, req.Host.Name, req.Model, err)
 			return "", err
 		}
-		p.logToolSuccess(name, result)
+		p.logToolSuccess(name, result, req.Host.Name, req.Model)
 		return result, nil
 	}
 	if toolName != "" {
@@ -446,7 +446,7 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 			p.log("Tool bypassed: tool=%s host=%s model=%s reason=%v", toolName, req.Host.Name, req.Model, err)
 		} else {
 			executed = true
-			p.logToolSuccess(toolName, result)
+			p.logToolSuccess(toolName, result, req.Host.Name, req.Model)
 			output := fmt.Sprintf("[MCP %s]\n%s", toolName, result)
 			if callbacks.OnChunk != nil {
 				if err := callbacks.OnChunk(providers.ChatMessage{Role: "assistant", Content: output}); err != nil {
