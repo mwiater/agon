@@ -232,7 +232,7 @@ func getGeocodedWeather(location string) (openMeteoResponse, error) {
 	lon := geoResp[0].Lon
 
 	weatherURL := fmt.Sprintf(
-		"https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&current=temperature_2m,apparent_temperature,is_day,relative_humidity_2m,precipitation,rain,wind_speed_10m,wind_direction_10m,wind_gusts_10m",
+		"https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph",
 		lat, lon,
 	)
 
@@ -290,7 +290,20 @@ func runTool(name string, args map[string]any) []contentPart {
 
 		weatherString := string(jsonWeather)
 
-		return []contentPart{{Type: "text", Text: weatherString}}
+		// Provide an interpretation prompt that instructs the LLM to turn the JSON
+		// into a concise, user-friendly weather summary.
+		// This prompt is intentionally included by the MCP server so callers can
+		// associate it with this specific tool output.
+		interpretPrompt := strings.Join([]string{
+			"You are a helpful assistant. Interpret the provided JSON weather data and reply in natural language.",
+			"Focus on temperature (actual and feels-like), precipitation, wind (speed/direction/gusts), humidity, and daytime vs nighttime.",
+			"Avoid repeating raw numbers unnecessarily; keep it concise and readable by a non-technical user.",
+		}, " ")
+
+		return []contentPart{
+			{Type: "json", Text: weatherString},
+			{Type: "interpret", Text: interpretPrompt},
+		}
 	}
 
 	return []contentPart{{Type: "text", Text: fmt.Sprintf("Unknown tool: %s", name)}}

@@ -65,3 +65,20 @@ Response:
 Notes
 - This server aims to be simple and illustrative, not a full MCP reference.
 - Extend by adding tools in `mcp/main.go` and updating the list returned by tools/list.
+4) current_weather
+   - name: "current_weather"
+   - input_schema:
+     {
+       "type": "object",
+       "properties": {"location": {"type": "string"}},
+       "required": ["location"]
+     }
+   - returns: two content parts
+     - type: "json" — raw current conditions as JSON
+     - type: "interpret" — a server-provided prompt instructing the LLM to produce a natural-language summary
+
+   The MCP provider in agon detects this pair and performs a non‑streaming follow‑up chat with the LLM: it supplies the JSON and the prompt, disables tools for that round, and renders the LLM’s natural‑language result to the console. The raw JSON is not printed directly.
+
+Debug Logging
+- The server logs failures and errors during geocoding/weather fetch.
+- The MCP provider logs when it sends the JSON+prompt to the LLM and when it receives the interpretation, including sizes and timing.

@@ -381,11 +381,37 @@ func (p *Provider) callTool(ctx context.Context, name string, args map[string]an
 	if err := json.Unmarshal(resp.Result, &payload); err != nil {
 		return "", err
 	}
+	// Detect a structured response that includes JSON + an interpretation prompt.
+	var (
+		jsonPart      string
+		interpretPart string
+	)
 	var parts []string
 	for _, part := range payload.Content {
+		t := strings.ToLower(strings.TrimSpace(part.Type))
+		switch t {
+		case "json":
+			jsonPart = part.Text
+		case "interpret", "prompt":
+			interpretPart = part.Text
+		}
 		if part.Text != "" {
 			parts = append(parts, part.Text)
 		}
+	}
+	if strings.TrimSpace(jsonPart) != "" && strings.TrimSpace(interpretPart) != "" {
+		// Return an envelope instructing the caller to perform an interpretation round-trip.
+		env := map[string]any{
+			"__mcp_interpret__": true,
+			"tool":              name,
+			"json":              jsonPart,
+			"prompt":            interpretPart,
+		}
+		data, err := json.Marshal(env)
+		if err == nil {
+			return string(data), nil
+		}
+		// If marshaling fails, fall back to the plain join below.
 	}
 	return strings.Join(parts, "\n"), nil
 }
@@ -433,6 +459,11 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 			p.log("Tool bypassed: tool=%s host=%s model=%s reason=%v", name, req.Host.Name, req.Model, err)
 			return "", err
 		}
+		// Potentially interpret via LLM if server requested it.
+		if interp, ok := p.maybeInterpretResult(execCtx, req, name, result); ok {
+			p.logToolSuccess(name, interp, req.Host.Name, req.Model)
+			return interp, nil
+		}
 		p.logToolSuccess(name, result, req.Host.Name, req.Model)
 		return result, nil
 	}
@@ -446,16 +477,30 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 			p.log("Tool bypassed: tool=%s host=%s model=%s reason=%v", toolName, req.Host.Name, req.Model, err)
 		} else {
 			executed = true
-			p.logToolSuccess(toolName, result, req.Host.Name, req.Model)
-			output := fmt.Sprintf("[MCP %s]\n%s", toolName, result)
-			if callbacks.OnChunk != nil {
-				if err := callbacks.OnChunk(providers.ChatMessage{Role: "assistant", Content: output}); err != nil {
-					p.log("Tool output dispatch failed: %v", err)
+			// If the result is an interpret envelope, perform the interpretation round-trip first.
+			if interp, ok := p.maybeInterpretResult(ctx, req, toolName, result); ok {
+				p.logToolSuccess(toolName, interp, req.Host.Name, req.Model)
+				output := fmt.Sprintf("[MCP %s] %s", toolName, strings.TrimSpace(interp))
+				if callbacks.OnChunk != nil {
+					if err := callbacks.OnChunk(providers.ChatMessage{Role: "assistant", Content: output}); err != nil {
+						p.log("Tool output dispatch failed: %v", err)
+					}
 				}
+				forwardHistory := append([]providers.ChatMessage{}, req.History...)
+				forwardHistory = append(forwardHistory, providers.ChatMessage{Role: "assistant", Content: output})
+				forwardReq.History = forwardHistory
+			} else {
+				p.logToolSuccess(toolName, result, req.Host.Name, req.Model)
+				output := fmt.Sprintf("[MCP %s] %s", toolName, result)
+				if callbacks.OnChunk != nil {
+					if err := callbacks.OnChunk(providers.ChatMessage{Role: "assistant", Content: output}); err != nil {
+						p.log("Tool output dispatch failed: %v", err)
+					}
+				}
+				forwardHistory := append([]providers.ChatMessage{}, req.History...)
+				forwardHistory = append(forwardHistory, providers.ChatMessage{Role: "assistant", Content: output})
+				forwardReq.History = forwardHistory
 			}
-			forwardHistory := append([]providers.ChatMessage{}, req.History...)
-			forwardHistory = append(forwardHistory, providers.ChatMessage{Role: "assistant", Content: output})
-			forwardReq.History = forwardHistory
 		}
 	}
 	err := p.fallback.Stream(ctx, forwardReq, callbacks)
@@ -471,6 +516,63 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 		p.log("Tool bypassed: tool=chat host=%s model=%s reason=delegated to Ollama API", req.Host.Name, req.Model)
 	}
 	return nil
+}
+
+// maybeInterpretResult inspects a tool result string for an MCP interpretation
+// envelope. If found, it performs a non-streaming LLM request to turn the JSON
+// into natural language and returns that text. The boolean indicates whether an
+// interpretation was performed.
+func (p *Provider) maybeInterpretResult(ctx context.Context, req providers.StreamRequest, toolName, result string) (string, bool) {
+	// Quick check for marker to avoid unnecessary JSON parse.
+	if !strings.Contains(result, "__mcp_interpret__") {
+		return "", false
+	}
+	var env struct {
+		Marker bool   `json:"__mcp_interpret__"`
+		Tool   string `json:"tool"`
+		JSON   string `json:"json"`
+		Prompt string `json:"prompt"`
+	}
+	if err := json.Unmarshal([]byte(result), &env); err != nil || !env.Marker {
+		return "", false
+	}
+	// Build a one-off, non-streaming chat to obtain a natural-language interpretation.
+	interpReq := req
+	interpReq.DisableStreaming = true
+	interpReq.Tools = nil // disable tools for the interpretation round
+	// Compose a short history: prior convo + assistant with JSON + user with prompt.
+	history := append([]providers.ChatMessage{}, req.History...)
+	jsonContent := strings.TrimSpace(env.JSON)
+	if jsonContent == "" {
+		jsonContent = "{}"
+	}
+	history = append(history, providers.ChatMessage{Role: "assistant", Content: fmt.Sprintf("[MCP %s JSON]\n%s", toolName, jsonContent)})
+	prompt := strings.TrimSpace(env.Prompt)
+	if prompt == "" {
+		prompt = "Interpret the JSON above into a concise, natural language summary."
+	}
+	history = append(history, providers.ChatMessage{Role: "user", Content: prompt})
+	interpReq.History = history
+
+	// Set up local capture for the response.
+	var out strings.Builder
+	start := time.Now()
+	p.log("MCP->LLM interpret send: tool=%s host=%s model=%s bytes_json=%d", toolName, req.Host.Name, req.Model, len(jsonContent))
+	cb := providers.StreamCallbacks{
+		OnChunk: func(msg providers.ChatMessage) error {
+			out.WriteString(msg.Content)
+			return nil
+		},
+		OnComplete: func(meta providers.StreamMetadata) error { return nil },
+	}
+	if err := p.fallback.Stream(ctx, interpReq, cb); err != nil {
+		p.log("MCP->LLM interpret failed: tool=%s host=%s model=%s err=%v", toolName, req.Host.Name, req.Model, err)
+		return "", false
+	}
+	dur := time.Since(start)
+	interpreted := strings.TrimSpace(out.String())
+	p.log("MCP->LLM interpret recv: tool=%s host=%s model=%s chars=%d dur=%s", toolName, req.Host.Name, req.Model, len(interpreted), dur.String())
+	return interpreted, true
 }
 
 // Close terminates the MCP process and closes any subordinate providers.

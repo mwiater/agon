@@ -15,6 +15,12 @@
 - **Comprehensive model tooling** – List, pull, delete, unload, and otherwise manage models without leaving the CLI.
 - **Debug instrumentation** – Surface timing, token counts, and other diagnostics whenever you need deeper performance insight.
 
+### MCP Mode Quickstart
+- Build the local MCP server: `go build -o dist/agon-mcp ./mcp`
+- Start a chat with MCP enabled: `agon chat --mcpMode=true --mcpBinary=dist/agon-mcp`
+- Behavior: When the `current_weather` tool runs, the server returns JSON plus an interpretation prompt; agon asks the LLM to summarize and shows the natural-language result (prefixed with `[MCP current_weather]`).
+- More details: See `mcp/README.md`.
+
 #### Multichat Mode
 
 Send the same user prompt to up to 4 different Ollama hosts
@@ -142,6 +148,28 @@ CLI flags take precedence over config; if both modes are set simultaneously the 
 - `exportMarkdown`: Optional path. When set, a Markdown summary is written alongside the JSON export.
 - `timeout`: Integer (seconds). Sets the request timeout applied to Ollama API calls (default: 240).
 
+#### MCP Mode
+- `mcpMode`: Boolean flag. When true, agon proxies LLM traffic through a local MCP server.
+- `mcpBinary`: Path to the MCP server binary (default: `dist/agon-mcp`).
+- `mcpInitTimeout`: Integer (seconds). Timeout used for MCP initialize and tool call round-trips.
+
+When `mcpMode` is enabled:
+- The MCP server is launched locally and its tools are discovered.
+- Tools can be invoked either by the model via `tool_calls` or implicitly if the last user message clearly targets a known tool.
+- For the built-in `current_weather` tool, the server returns two parts on success:
+  - type `json`: raw current conditions as JSON
+  - type `interpret`: a server-provided prompt instructing the LLM to summarize the JSON
+- The MCP provider detects this pair and performs a non-streaming interpretation call to the LLM:
+  - Adds the JSON as an assistant message and the prompt as a user message
+  - Disables tools for that round to avoid recursion
+  - Renders the LLM’s natural-language summary to the console as the tool’s output (prefixed with `[MCP current_weather]`)
+  - Appends the summary to chat history before continuing the conversation
+- If a tool returns only plain text, the output is shown directly.
+
+Debug logging in MCP mode (when `debug` is true):
+- `agon-mcp-server.log` records MCP lifecycle and tool activity, including interpretation send/receive events with sizes and timing.
+- For protocol details and example frames, see `mcp/README.md`.
+
 ## Running the CLI
 
 ### Launch an Interactive Chat
@@ -162,6 +190,9 @@ Use CLI flags to override configuration values per session, for example:
 * `agon chat --multimodelMode=false`
 * `agon chat --pipelineMode=true`
 * `agon chat --jsonMode=true`
+* `agon chat --mcpMode=true`
+* `agon chat --mcpBinary=dist/agon-mcp`
+* `agon chat --mcpInitTimeout=10`
 * `agon chat --export=run.json --exportMarkdown=run.md`
 
 ### Model Management Commands
