@@ -17,18 +17,7 @@
         "embeddinggemma:300m"
       ],
       "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point.",
-      "parameters": {
-        "top_k": 40,
-        "top_p": 0.9,
-        "min_p": 0.05,
-        "tfs_z": 1.0,
-        "typical_p": 0.95,
-        "repeat_last_n": 64,
-        "temperature": 0.7,
-        "repeat_penalty": 1.1,
-        "presence_penalty": 0.6,
-        "frequency_penalty": 0.3
-      }
+      "parameters": {}
     },
     {
       "name": "Ollama02",
@@ -47,18 +36,7 @@
         "embeddinggemma:300m"
       ],
       "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point.",
-      "parameters": {
-        "top_k": 40,
-        "top_p": 0.9,
-        "min_p": 0.05,
-        "tfs_z": 1.0,
-        "typical_p": 0.95,
-        "repeat_last_n": 64,
-        "temperature": 0.7,
-        "repeat_penalty": 1.1,
-        "presence_penalty": 0.6,
-        "frequency_penalty": 0.3
-      }
+      "parameters": {}
     },
     {
       "name": "Ollama03",
@@ -77,18 +55,7 @@
         "embeddinggemma:300m"
       ],
       "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point.",
-      "parameters": {
-        "top_k": 40,
-        "top_p": 0.9,
-        "min_p": 0.05,
-        "tfs_z": 1.0,
-        "typical_p": 0.95,
-        "repeat_last_n": 64,
-        "temperature": 0.7,
-        "repeat_penalty": 1.1,
-        "presence_penalty": 0.6,
-        "frequency_penalty": 0.3
-      }
+      "parameters": {}
     },
     {
       "name": "Ollama04",
@@ -107,18 +74,7 @@
         "embeddinggemma:300m"
       ],
       "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point.",
-      "parameters": {
-        "top_k": 40,
-        "top_p": 0.9,
-        "min_p": 0.05,
-        "tfs_z": 1.0,
-        "typical_p": 0.95,
-        "repeat_last_n": 64,
-        "temperature": 0.7,
-        "repeat_penalty": 1.1,
-        "presence_penalty": 0.6,
-        "frequency_penalty": 0.3
-      }
+      "parameters": {}
     }
   ],
   "timeout": 240,

@@ -215,7 +215,7 @@ func invokeWithRetries(toolName string, handler tools.Handler, args map[string]a
 	logs := []tools.ContentPart{{Type: "log", Text: fmt.Sprintf("attempt %d/%d failed: %v", attempt, maxRetries, err)}}
 
 	if attempt < maxRetries && prompt != "" {
-		message := fmt.Sprintf("Tool error: %v\nOriginal request: %s\nPlease retry calling the tool using the original request below. Adjust the arguments to satisfy the tool requirements before trying again. ", err, prompt)
+		message := fmt.Sprintf("Tool error: %v\nOriginal request: %s\n Ensure that you provide the arguments to satisfy the tool requirements before trying again. ", err, prompt)
 		logs = append(logs, tools.ContentPart{Type: "meta", Text: "retry"})
 		logs = append(logs, tools.ContentPart{Type: "text", Text: message})
 		return logs

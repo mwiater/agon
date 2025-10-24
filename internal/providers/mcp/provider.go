@@ -441,6 +441,82 @@ func (p *Provider) callTool(ctx context.Context, name string, args map[string]an
 	return toolCallResponse{Output: strings.Join(parts, "\n"), Retry: retryRequested}, nil
 }
 
+// fixWithLLMRoundTrip performs a one-off, non-streaming LLM request that asks the
+// model to correct and reissue the failing tool call. It threads the server's
+// fix instructions along with the original user prompt, enables tools, and
+// provides a ToolExecutor that executes the tool call without further retry
+// loops. The returned string is the aggregated assistant output of that round.
+func (p *Provider) fixWithLLMRoundTrip(ctx context.Context, req providers.StreamRequest, toolName, fixInstruction string) (string, error) {
+    // Compose a focused history to elicit a corrected tool call from the LLM.
+    history := append([]providers.ChatMessage{}, req.History...)
+    fixText := strings.TrimSpace(fixInstruction)
+    if fixText == "" {
+        fixText = "A previous tool call failed due to invalid or missing arguments. Please correct the arguments and call the tool again."
+    }
+    history = append(history, providers.ChatMessage{Role: "assistant", Content: fmt.Sprintf("[MCP %s error]\n%s", toolName, fixText)})
+    history = append(history, providers.ChatMessage{Role: "user", Content: fmt.Sprintf("Call the %s tool again now with corrected arguments. Only call the tool; do not include extra text.", toolName)})
+
+    fixReq := req
+    fixReq.DisableStreaming = true
+    // Re-enable tools so the LLM can produce a new tool call specification.
+    if len(p.toolDefs) > 0 {
+        fixReq.Tools = append([]providers.ToolDefinition(nil), p.toolDefs...)
+    }
+    fixReq.History = history
+
+    // Provide a simple ToolExecutor that executes once without internal retry loops.
+    fixReq.ToolExecutor = func(execCtx context.Context, name string, args map[string]any) (string, error) {
+        wireArgs := make(map[string]any, len(args)+2)
+        for k, v := range args {
+            wireArgs[k] = v
+        }
+        if _, ok := wireArgs["__user_prompt"]; !ok {
+            if prompt := lastUserPrompt(req.History); prompt != "" {
+                wireArgs["__user_prompt"] = prompt
+            }
+        }
+        toolCtx, cancel := context.WithTimeout(execCtx, p.cfg.MCPInitTimeoutDuration())
+        defer cancel()
+        p.logToolRequest(name, req.Host.Name, req.Model, wireArgs)
+        result, err := p.callTool(toolCtx, name, wireArgs)
+        if err != nil {
+            p.log("[ERROR] Tool retry via LLM failed: tool=%s host=%s model=%s reason=%v", name, req.Host.Name, req.Model, err)
+            return "", err
+        }
+        // If the server again indicated interpretation, honor it once.
+        if interp, ok := p.maybeInterpretResult(execCtx, req, name, result.Output); ok {
+            p.logToolSuccess(name, interp, req.Host.Name, req.Model)
+            return interp, nil
+        }
+        if result.Retry {
+            // Avoid infinite loops; surface the guidance to the model/user instead of looping.
+            p.log("Tool indicated retry again; returning guidance without further internal retries: tool=%s", name)
+        }
+        p.logToolSuccess(name, result.Output, req.Host.Name, req.Model)
+        return result.Output, nil
+    }
+
+    // Capture the non-streaming assistant output of the corrective round-trip.
+    var out strings.Builder
+    cb := providers.StreamCallbacks{
+        OnChunk: func(msg providers.ChatMessage) error {
+            out.WriteString(msg.Content)
+            return nil
+        },
+        OnComplete: func(meta providers.StreamMetadata) error { return nil },
+    }
+    start := time.Now()
+    p.log("MCP->LLM fix send: tool=%s host=%s model=%s", toolName, req.Host.Name, req.Model)
+    if err := p.fallback.Stream(ctx, fixReq, cb); err != nil {
+        p.log("MCP->LLM fix failed: tool=%s host=%s model=%s err=%v", toolName, req.Host.Name, req.Model, err)
+        return "", err
+    }
+    dur := time.Since(start)
+    fixed := strings.TrimSpace(out.String())
+    p.log("MCP->LLM fix recv: tool=%s host=%s model=%s chars=%d dur=%s", toolName, req.Host.Name, req.Model, len(fixed), dur.String())
+    return fixed, nil
+}
+
 // LoadedModels currently delegates to the underlying Ollama provider while the
 // MCP toolchain is being fleshed out.
 func (p *Provider) LoadedModels(ctx context.Context, host appconfig.Host) ([]string, error) {
@@ -477,42 +553,49 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 	forwardReq.DisableStreaming = true
 	retryState := make(map[string]int)
 	retryLimit := p.cfg.MCPRetryAttempts()
-	forwardReq.ToolExecutor = func(execCtx context.Context, name string, callArgs map[string]any) (string, error) {
-		attempt := retryState[name]
-		wireArgs := make(map[string]any, len(callArgs)+2)
-		for k, v := range callArgs {
-			wireArgs[k] = v
-		}
+    forwardReq.ToolExecutor = func(execCtx context.Context, name string, callArgs map[string]any) (string, error) {
+        attempt := retryState[name]
+        wireArgs := make(map[string]any, len(callArgs)+2)
+        for k, v := range callArgs {
+            wireArgs[k] = v
+        }
 		if _, ok := wireArgs["__user_prompt"]; !ok {
 			if prompt := lastUserPrompt(req.History); prompt != "" {
 				wireArgs["__user_prompt"] = prompt
 			}
 		}
-		for {
-			wireArgs["__mcp_attempt"] = attempt
-			toolCtx, cancel := context.WithTimeout(execCtx, p.cfg.MCPInitTimeoutDuration())
-			p.logToolRequest(name, req.Host.Name, req.Model, wireArgs)
-			result, err := p.callTool(toolCtx, name, wireArgs)
-			cancel()
-			if err != nil {
-				p.log("[ERROR] Tool bypassed: tool=%s host=%s model=%s reason=%v", name, req.Host.Name, req.Model, err)
-				return "", err
-			}
-			if result.Retry && attempt < retryLimit {
-				attempt++
-				retryState[name] = attempt
-				continue
-			}
-			retryState[name] = 0
-			// Potentially interpret via LLM if server requested it.
-			if interp, ok := p.maybeInterpretResult(execCtx, req, name, result.Output); ok {
-				p.logToolSuccess(name, interp, req.Host.Name, req.Model)
-				return interp, nil
-			}
-			p.logToolSuccess(name, result.Output, req.Host.Name, req.Model)
-			return result.Output, nil
-		}
-	}
+        for {
+            wireArgs["__mcp_attempt"] = attempt
+            toolCtx, cancel := context.WithTimeout(execCtx, p.cfg.MCPInitTimeoutDuration())
+            p.logToolRequest(name, req.Host.Name, req.Model, wireArgs)
+            result, err := p.callTool(toolCtx, name, wireArgs)
+            cancel()
+            if err != nil {
+                p.log("[ERROR] Tool bypassed: tool=%s host=%s model=%s reason=%v", name, req.Host.Name, req.Model, err)
+                return "", err
+            }
+            if result.Retry && attempt < retryLimit {
+                // Instead of blind internal retry, perform a corrective LLM round-trip
+                // to let the model fix arguments and retrigger the tool.
+                fixed, fixErr := p.fixWithLLMRoundTrip(execCtx, req, name, result.Output)
+                if fixErr == nil && strings.TrimSpace(fixed) != "" {
+                    return fixed, nil
+                }
+                // If the fix flow failed, fall back to a single internal retry once.
+                attempt++
+                retryState[name] = attempt
+                continue
+            }
+            retryState[name] = 0
+            // Potentially interpret via LLM if server requested it.
+            if interp, ok := p.maybeInterpretResult(execCtx, req, name, result.Output); ok {
+                p.logToolSuccess(name, interp, req.Host.Name, req.Model)
+                return interp, nil
+            }
+            p.logToolSuccess(name, result.Output, req.Host.Name, req.Model)
+            return result.Output, nil
+        }
+    }
 
 	if toolName != "" {
 		initialAttempt := retryState[toolName]
@@ -521,49 +604,65 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 			"__user_prompt": userText,
 			"__mcp_attempt": initialAttempt,
 		}
-		for {
-			toolCtx, cancel := context.WithTimeout(ctx, p.cfg.MCPInitTimeoutDuration())
-			p.logToolRequest(toolName, req.Host.Name, req.Model, args)
-			result, err := p.callTool(toolCtx, toolName, args)
-			cancel()
-			if err != nil {
-				p.log("[ERROR] Tool bypassed: tool=%s host=%s model=%s reason=%v", toolName, req.Host.Name, req.Model, err)
-				break
-			}
-			if result.Retry && initialAttempt < retryLimit {
-				initialAttempt++
-				retryState[toolName] = initialAttempt
-				args["__mcp_attempt"] = initialAttempt
-				continue
-			}
-			retryState[toolName] = 0
-			executed = true
-			// If the result is an interpret envelope, perform the interpretation round-trip first.
-			if interp, ok := p.maybeInterpretResult(ctx, req, toolName, result.Output); ok {
-				p.logToolSuccess(toolName, interp, req.Host.Name, req.Model)
-				output := fmt.Sprintf("[MCP %s] %s", toolName, strings.TrimSpace(interp))
-				if callbacks.OnChunk != nil {
-					if err := callbacks.OnChunk(providers.ChatMessage{Role: "assistant", Content: output}); err != nil {
-						p.log("[ERROR] Tool output dispatch failed: %v", err)
-					}
-				}
-				forwardHistory := append([]providers.ChatMessage{}, req.History...)
-				forwardHistory = append(forwardHistory, providers.ChatMessage{Role: "assistant", Content: output})
-				forwardReq.History = forwardHistory
-			} else {
-				p.logToolSuccess(toolName, result.Output, req.Host.Name, req.Model)
-				output := fmt.Sprintf("[MCP %s] %s", toolName, result.Output)
-				if callbacks.OnChunk != nil {
-					if err := callbacks.OnChunk(providers.ChatMessage{Role: "assistant", Content: output}); err != nil {
-						p.log("[ERROR] Tool output dispatch failed: %v", err)
-					}
-				}
-				forwardHistory := append([]providers.ChatMessage{}, req.History...)
-				forwardHistory = append(forwardHistory, providers.ChatMessage{Role: "assistant", Content: output})
-				forwardReq.History = forwardHistory
-			}
-			break
-		}
+        for {
+            toolCtx, cancel := context.WithTimeout(ctx, p.cfg.MCPInitTimeoutDuration())
+            p.logToolRequest(toolName, req.Host.Name, req.Model, args)
+            result, err := p.callTool(toolCtx, toolName, args)
+            cancel()
+            if err != nil {
+                p.log("[ERROR] Tool bypassed: tool=%s host=%s model=%s reason=%v", toolName, req.Host.Name, req.Model, err)
+                break
+            }
+            if result.Retry && initialAttempt < retryLimit {
+                // Invoke corrective LLM round-trip to repair arguments and reissue tool call.
+                fixed, fixErr := p.fixWithLLMRoundTrip(ctx, req, toolName, result.Output)
+                if fixErr == nil && strings.TrimSpace(fixed) != "" {
+                    executed = true
+                    output := fmt.Sprintf("[MCP %s] %s", toolName, strings.TrimSpace(fixed))
+                    if callbacks.OnChunk != nil {
+                        if err := callbacks.OnChunk(providers.ChatMessage{Role: "assistant", Content: output}); err != nil {
+                            p.log("[ERROR] Tool output dispatch failed: %v", err)
+                        }
+                    }
+                    forwardHistory := append([]providers.ChatMessage{}, req.History...)
+                    forwardHistory = append(forwardHistory, providers.ChatMessage{Role: "assistant", Content: output})
+                    forwardReq.History = forwardHistory
+                    break
+                }
+                // If the fix flow failed, fall back to a single internal retry once.
+                initialAttempt++
+                retryState[toolName] = initialAttempt
+                args["__mcp_attempt"] = initialAttempt
+                continue
+            }
+            retryState[toolName] = 0
+            executed = true
+            // If the result is an interpret envelope, perform the interpretation round-trip first.
+            if interp, ok := p.maybeInterpretResult(ctx, req, toolName, result.Output); ok {
+                p.logToolSuccess(toolName, interp, req.Host.Name, req.Model)
+                output := fmt.Sprintf("[MCP %s] %s", toolName, strings.TrimSpace(interp))
+                if callbacks.OnChunk != nil {
+                    if err := callbacks.OnChunk(providers.ChatMessage{Role: "assistant", Content: output}); err != nil {
+                        p.log("[ERROR] Tool output dispatch failed: %v", err)
+                    }
+                }
+                forwardHistory := append([]providers.ChatMessage{}, req.History...)
+                forwardHistory = append(forwardHistory, providers.ChatMessage{Role: "assistant", Content: output})
+                forwardReq.History = forwardHistory
+            } else {
+                p.logToolSuccess(toolName, result.Output, req.Host.Name, req.Model)
+                output := fmt.Sprintf("[MCP %s] %s", toolName, result.Output)
+                if callbacks.OnChunk != nil {
+                    if err := callbacks.OnChunk(providers.ChatMessage{Role: "assistant", Content: output}); err != nil {
+                        p.log("[ERROR] Tool output dispatch failed: %v", err)
+                    }
+                }
+                forwardHistory := append([]providers.ChatMessage{}, req.History...)
+                forwardHistory = append(forwardHistory, providers.ChatMessage{Role: "assistant", Content: output})
+                forwardReq.History = forwardHistory
+            }
+            break
+        }
 	}
 
 	//p.log("Last Message: %s", forwardReq.History[len(forwardReq.History)-1].Content)

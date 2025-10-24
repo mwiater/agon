@@ -2,7 +2,7 @@
   "hosts": [
     {
       "name": "Ollama01",
-      "url": "{ollama-api-endpoint-01}",
+      "url": "{ollama-api-endpoint-04}",
       "type": "ollama",
       "models": [
         "stablelm-zephyr:3b",
@@ -16,7 +16,7 @@
         "qwen3:1.7b",
         "embeddinggemma:300m"
       ],
-      "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point.",
+      "systemprompt": "Take user input as subject; return valid JSON: {\"subject\":\"{subject}\"} only.",
       "parameters": {
         "top_k": 40,
         "top_p": 0.9,
@@ -32,7 +32,7 @@
     },
     {
       "name": "Ollama02",
-      "url": "{ollama-api-endpoint-02}",
+      "url": "{ollama-api-endpoint-04}",
       "type": "ollama",
       "models": [
         "stablelm-zephyr:3b",
@@ -46,7 +46,7 @@
         "qwen3:1.7b",
         "embeddinggemma:300m"
       ],
-      "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point.",
+      "systemprompt": "Return one measurable property/value as JSON: {\"subject\":\"{subject}\",\"{property}\":\"{value}\"}.",
       "parameters": {
         "top_k": 40,
         "top_p": 0.9,
@@ -62,7 +62,7 @@
     },
     {
       "name": "Ollama03",
-      "url": "{ollama-api-endpoint-03}",
+      "url": "{ollama-api-endpoint-04}",
       "type": "ollama",
       "models": [
         "stablelm-zephyr:3b",
@@ -76,7 +76,7 @@
         "qwen3:1.7b",
         "embeddinggemma:300m"
       ],
-      "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point.",
+      "systemprompt": "Ensure clean keys/values, no extras; return valid JSON: {\"subject\":\"{subject}\",\"{property}\":\"{value}\"}.",
       "parameters": {
         "top_k": 40,
         "top_p": 0.9,
@@ -106,7 +106,7 @@
         "qwen3:1.7b",
         "embeddinggemma:300m"
       ],
-      "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point.",
+      "systemprompt": "Validate fact; return full JSON with added key 'validated': true or false, nothing else.",
       "parameters": {
         "top_k": 40,
         "top_p": 0.9,
@@ -123,7 +123,7 @@
   ],
   "timeout": 240,
   "debug": true,
-  "multimodelMode": true,
+  "multimodelMode": false,
   "pipelineMode": false,
   "jsonMode": false,
   "mcpMode": false,

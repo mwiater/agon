@@ -17,18 +17,7 @@
         "embeddinggemma:300m"
       ],
       "systemprompt": "You are a helpful assistant.",
-      "parameters": {
-        "top_k": 40,
-        "top_p": 0.9,
-        "min_p": 0.05,
-        "tfs_z": 1.0,
-        "typical_p": 0.95,
-        "repeat_last_n": 64,
-        "temperature": 0.7,
-        "repeat_penalty": 1.1,
-        "presence_penalty": 0.6,
-        "frequency_penalty": 0.3
-      }
+      "parameters": {}
     },
     {
       "name": "Facts: 02",
@@ -47,18 +36,7 @@
         "embeddinggemma:300m"
       ],
       "systemprompt": "You are a factual encyclopedia. Respond with only one sentence. Do not invent information. Do not add any extra words.",
-      "parameters": {
-        "top_k": 40,
-        "top_p": 0.9,
-        "min_p": 0.05,
-        "tfs_z": 1.0,
-        "typical_p": 0.95,
-        "repeat_last_n": 64,
-        "temperature": 0.7,
-        "repeat_penalty": 1.1,
-        "presence_penalty": 0.6,
-        "frequency_penalty": 0.3
-      }
+      "parameters": {}
     },
     {
       "name": "Facts: 03",
@@ -77,18 +55,7 @@
         "embeddinggemma:300m"
       ],
       "systemprompt": "State one verifiable fact. If you are not 100% sure, you must respond with 'I do not know'.",
-      "parameters": {
-        "top_k": 40,
-        "top_p": 0.9,
-        "min_p": 0.05,
-        "tfs_z": 1.0,
-        "typical_p": 0.95,
-        "repeat_last_n": 64,
-        "temperature": 0.7,
-        "repeat_penalty": 1.1,
-        "presence_penalty": 0.6,
-        "frequency_penalty": 0.3
-      }
+      "parameters": {}
     },
     {
       "name": "Facts: 04",
@@ -107,18 +74,7 @@
         "embeddinggemma:300m"
       ],
       "systemprompt": "You are 'FactBot 3000'. You only speak in single-sentence facts.",
-      "parameters": {
-        "top_k": 40,
-        "top_p": 0.9,
-        "min_p": 0.05,
-        "tfs_z": 1.0,
-        "typical_p": 0.95,
-        "repeat_last_n": 64,
-        "temperature": 0.7,
-        "repeat_penalty": 1.1,
-        "presence_penalty": 0.6,
-        "frequency_penalty": 0.3
-      }
+      "parameters": {}
     }
   ],
   "timeout": 240,
