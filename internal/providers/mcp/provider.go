@@ -61,7 +61,16 @@ func formatArgs(args map[string]any) string {
 	return string(data)
 }
 
-func (p *Provider) logToolRequest(name string, args map[string]any) {
+func lastUserPrompt(history []providers.ChatMessage) string {
+	for i := len(history) - 1; i >= 0; i-- {
+		if strings.ToLower(history[i].Role) == "user" {
+			return history[i].Content
+		}
+	}
+	return ""
+}
+
+func (p *Provider) logToolRequest(name, host, model string, args map[string]any) {
 	payload := formatArgs(args)
 	p.log("Tool requested: tool=%s args=%s", name, payload)
 	if p.cfg != nil && p.cfg.Debug {
@@ -357,7 +366,12 @@ func (p *Provider) selectTool(history []providers.ChatMessage) (string, string) 
 	return "", ""
 }
 
-func (p *Provider) callTool(ctx context.Context, name string, args map[string]any) (string, error) {
+type toolCallResponse struct {
+	Output string
+	Retry  bool
+}
+
+func (p *Provider) callTool(ctx context.Context, name string, args map[string]any) (toolCallResponse, error) {
 	if args == nil {
 		args = map[string]any{}
 	}
@@ -367,10 +381,10 @@ func (p *Provider) callTool(ctx context.Context, name string, args map[string]an
 	}
 	resp, err := p.rpcCall(ctx, "tools/call", params)
 	if err != nil {
-		return "", err
+		return toolCallResponse{}, err
 	}
 	if len(resp.Result) == 0 {
-		return "", nil
+		return toolCallResponse{}, nil
 	}
 	var payload struct {
 		Content []struct {
@@ -379,13 +393,14 @@ func (p *Provider) callTool(ctx context.Context, name string, args map[string]an
 		} `json:"content"`
 	}
 	if err := json.Unmarshal(resp.Result, &payload); err != nil {
-		return "", err
+		return toolCallResponse{}, err
 	}
 	// Detect a structured response that includes JSON + an interpretation prompt.
 	var (
 		jsonPart      string
 		interpretPart string
 	)
+	retryRequested := false
 	var parts []string
 	for _, part := range payload.Content {
 		t := strings.ToLower(strings.TrimSpace(part.Type))
@@ -394,6 +409,16 @@ func (p *Provider) callTool(ctx context.Context, name string, args map[string]an
 			jsonPart = part.Text
 		case "interpret", "prompt":
 			interpretPart = part.Text
+		case "log":
+			if strings.TrimSpace(part.Text) != "" {
+				p.log("MCP tool detail: tool=%s %s", name, part.Text)
+			}
+			continue
+		case "meta":
+			if strings.TrimSpace(part.Text) == "retry" {
+				retryRequested = true
+			}
+			continue
 		}
 		if part.Text != "" {
 			parts = append(parts, part.Text)
@@ -409,11 +434,11 @@ func (p *Provider) callTool(ctx context.Context, name string, args map[string]an
 		}
 		data, err := json.Marshal(env)
 		if err == nil {
-			return string(data), nil
+			return toolCallResponse{Output: string(data)}, nil
 		}
 		// If marshaling fails, fall back to the plain join below.
 	}
-	return strings.Join(parts, "\n"), nil
+	return toolCallResponse{Output: strings.Join(parts, "\n"), Retry: retryRequested}, nil
 }
 
 // LoadedModels currently delegates to the underlying Ollama provider while the
@@ -450,70 +475,110 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 		forwardReq.Tools = append([]providers.ToolDefinition(nil), p.toolDefs...)
 	}
 	forwardReq.DisableStreaming = true
+	retryState := make(map[string]int)
+	retryLimit := p.cfg.MCPRetryAttempts()
 	forwardReq.ToolExecutor = func(execCtx context.Context, name string, callArgs map[string]any) (string, error) {
-		toolCtx, cancel := context.WithTimeout(execCtx, p.cfg.MCPInitTimeoutDuration())
-		defer cancel()
-		p.logToolRequest(name, callArgs)
-		result, err := p.callTool(toolCtx, name, callArgs)
-		if err != nil {
-			p.log("Tool bypassed: tool=%s host=%s model=%s reason=%v", name, req.Host.Name, req.Model, err)
-			return "", err
+		attempt := retryState[name]
+		wireArgs := make(map[string]any, len(callArgs)+2)
+		for k, v := range callArgs {
+			wireArgs[k] = v
 		}
-		// Potentially interpret via LLM if server requested it.
-		if interp, ok := p.maybeInterpretResult(execCtx, req, name, result); ok {
-			p.logToolSuccess(name, interp, req.Host.Name, req.Model)
-			return interp, nil
+		if _, ok := wireArgs["__user_prompt"]; !ok {
+			if prompt := lastUserPrompt(req.History); prompt != "" {
+				wireArgs["__user_prompt"] = prompt
+			}
 		}
-		p.logToolSuccess(name, result, req.Host.Name, req.Model)
-		return result, nil
+		for {
+			wireArgs["__mcp_attempt"] = attempt
+			toolCtx, cancel := context.WithTimeout(execCtx, p.cfg.MCPInitTimeoutDuration())
+			p.logToolRequest(name, req.Host.Name, req.Model, wireArgs)
+			result, err := p.callTool(toolCtx, name, wireArgs)
+			cancel()
+			if err != nil {
+				p.log("[ERROR] Tool bypassed: tool=%s host=%s model=%s reason=%v", name, req.Host.Name, req.Model, err)
+				return "", err
+			}
+			if result.Retry && attempt < retryLimit {
+				attempt++
+				retryState[name] = attempt
+				continue
+			}
+			retryState[name] = 0
+			// Potentially interpret via LLM if server requested it.
+			if interp, ok := p.maybeInterpretResult(execCtx, req, name, result.Output); ok {
+				p.logToolSuccess(name, interp, req.Host.Name, req.Model)
+				return interp, nil
+			}
+			p.logToolSuccess(name, result.Output, req.Host.Name, req.Model)
+			return result.Output, nil
+		}
 	}
+
 	if toolName != "" {
-		toolCtx, cancel := context.WithTimeout(ctx, p.cfg.MCPInitTimeoutDuration())
-		defer cancel()
-		args := map[string]any{"text": userText}
-		p.logToolRequest(toolName, args)
-		result, err := p.callTool(toolCtx, toolName, args)
-		if err != nil {
-			p.log("Tool bypassed: tool=%s host=%s model=%s reason=%v", toolName, req.Host.Name, req.Model, err)
-		} else {
+		initialAttempt := retryState[toolName]
+		args := map[string]any{
+			"text":          userText,
+			"__user_prompt": userText,
+			"__mcp_attempt": initialAttempt,
+		}
+		for {
+			toolCtx, cancel := context.WithTimeout(ctx, p.cfg.MCPInitTimeoutDuration())
+			p.logToolRequest(toolName, req.Host.Name, req.Model, args)
+			result, err := p.callTool(toolCtx, toolName, args)
+			cancel()
+			if err != nil {
+				p.log("[ERROR] Tool bypassed: tool=%s host=%s model=%s reason=%v", toolName, req.Host.Name, req.Model, err)
+				break
+			}
+			if result.Retry && initialAttempt < retryLimit {
+				initialAttempt++
+				retryState[toolName] = initialAttempt
+				args["__mcp_attempt"] = initialAttempt
+				continue
+			}
+			retryState[toolName] = 0
 			executed = true
 			// If the result is an interpret envelope, perform the interpretation round-trip first.
-			if interp, ok := p.maybeInterpretResult(ctx, req, toolName, result); ok {
+			if interp, ok := p.maybeInterpretResult(ctx, req, toolName, result.Output); ok {
 				p.logToolSuccess(toolName, interp, req.Host.Name, req.Model)
 				output := fmt.Sprintf("[MCP %s] %s", toolName, strings.TrimSpace(interp))
 				if callbacks.OnChunk != nil {
 					if err := callbacks.OnChunk(providers.ChatMessage{Role: "assistant", Content: output}); err != nil {
-						p.log("Tool output dispatch failed: %v", err)
+						p.log("[ERROR] Tool output dispatch failed: %v", err)
 					}
 				}
 				forwardHistory := append([]providers.ChatMessage{}, req.History...)
 				forwardHistory = append(forwardHistory, providers.ChatMessage{Role: "assistant", Content: output})
 				forwardReq.History = forwardHistory
 			} else {
-				p.logToolSuccess(toolName, result, req.Host.Name, req.Model)
-				output := fmt.Sprintf("[MCP %s] %s", toolName, result)
+				p.logToolSuccess(toolName, result.Output, req.Host.Name, req.Model)
+				output := fmt.Sprintf("[MCP %s] %s", toolName, result.Output)
 				if callbacks.OnChunk != nil {
 					if err := callbacks.OnChunk(providers.ChatMessage{Role: "assistant", Content: output}); err != nil {
-						p.log("Tool output dispatch failed: %v", err)
+						p.log("[ERROR] Tool output dispatch failed: %v", err)
 					}
 				}
 				forwardHistory := append([]providers.ChatMessage{}, req.History...)
 				forwardHistory = append(forwardHistory, providers.ChatMessage{Role: "assistant", Content: output})
 				forwardReq.History = forwardHistory
 			}
+			break
 		}
 	}
+
+	//p.log("Last Message: %s", forwardReq.History[len(forwardReq.History)-1].Content)
+	p.log("Forwarding request: host=%s model=%s messages=%d tools=%d", forwardReq.Host.Name, forwardReq.Model, len(forwardReq.History), len(forwardReq.Tools))
 	err := p.fallback.Stream(ctx, forwardReq, callbacks)
 	if err != nil {
 		if !executed {
-			p.log("Tool bypassed: tool=chat host=%s model=%s reason=%v", req.Host.Name, req.Model, err)
+			p.log("[ERROR] Tool bypassed: tool=chat host=%s model=%s reason=%v", req.Host.Name, req.Model, err)
 		}
 		return err
 	}
 	if executed {
 		p.log("Tool executed: tool=chat host=%s model=%s forwarded to Ollama", req.Host.Name, req.Model)
 	} else {
-		p.log("Tool bypassed: tool=chat host=%s model=%s reason=delegated to Ollama API", req.Host.Name, req.Model)
+		p.log("[*ERROR*] Tool bypassed: tool=chat host=%s model=%s reason=delegated to Ollama API", req.Host.Name, req.Model)
 	}
 	return nil
 }

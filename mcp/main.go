@@ -1,6 +1,6 @@
 // mcp/main.go
 // Minimal MCP server over stdio (JSON-RPC 2.0 + Content-Length framing)
-// Tools: current_weather
+// Tools: current_weather, current_time
 package main
 
 import (
@@ -9,11 +9,12 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/http"
-	"net/url"
 	"os"
+	"strconv"
 	"strings"
-	"time"
+
+	"github.com/mwiater/agon/internal/appconfig"
+	"github.com/mwiater/agon/mcp/tools"
 )
 
 // --- Protocol data types ---
@@ -37,63 +38,15 @@ type jsonrpcResponse struct {
 	Error   *jsonrpcError `json:"error,omitempty"`
 }
 
-// tools/list shape
-type toolDef struct {
-	Name        string         `json:"name"`
-	Description string         `json:"description"`
-	InputSchema map[string]any `json:"input_schema"`
-}
-
-// tools/call result content part
-type contentPart struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
-}
-
 // tools/call params
 type toolsCallParams struct {
 	Name      string         `json:"name"`
 	Arguments map[string]any `json:"arguments"`
 }
 
-// --- API Response Structs ---
+const fallbackRetryCount = 1
 
-// nominatimResponse defines the fields we need from OpenStreetMap
-type nominatimResponse struct {
-	Lat string `json:"lat"`
-	Lon string `json:"lon"`
-}
-
-// openMeteoResponse defines the fields we need from Open-Meteo
-type openMeteoResponse struct {
-	CurrentUnits struct {
-		Temperature   string `json:"temperature_2m"`
-		ApparentTemp  string `json:"apparent_temperature"`
-		Humidity      string `json:"relative_humidity_2m"`
-		Precipitation string `json:"precipitation"`
-		Rain          string `json:"rain"`
-		WindSpeed     string `json:"wind_speed_10m"`
-		WindDirection string `json:"wind_direction_10m"`
-		WindGusts     string `json:"wind_gusts_10m"`
-	} `json:"current_units"`
-	Current struct {
-		Temperature   float64 `json:"temperature_2m"`
-		ApparentTemp  float64 `json:"apparent_temperature"`
-		IsDay         int     `json:"is_day"`
-		Humidity      float64 `json:"relative_humidity_2m"`
-		Precipitation float64 `json:"precipitation"`
-		Rain          float64 `json:"rain"`
-		WindSpeed     float64 `json:"wind_speed_10m"`
-		WindDirection float64 `json:"wind_direction_10m"`
-		WindGusts     float64 `json:"wind_gusts_10m"`
-	} `json:"current"`
-}
-
-// --- Global HTTP Client ---
-
-var httpClient = &http.Client{
-	Timeout: 10 * time.Second,
-}
+var retryCount = resolveRetryCount()
 
 // --- Framing Helpers ---
 
@@ -169,144 +122,109 @@ func makeError(id any, code int, msg string) jsonrpcResponse {
 
 // --- Tool Definitions ---
 
-func toolDefinitions() []toolDef {
-	return []toolDef{
-		{
-			Name: "current_weather",
-			Description: "Provides the real-time weather conditions, temperature, and forecast for a specific location. " +
-				"Use this tool for ANY user query about weather, such as 'What's the temperature in...', " +
-				"'Is it raining in...', 'What's the forecast for...', or 'How windy is it?'",
-			InputSchema: map[string]any{
-				"type": "object",
-				"properties": map[string]any{
-					"location": map[string]any{
-						"type": "string",
-						"description": "The city and state (e.g., 'Portland, OR') or city and country (e.g., 'London, UK'). " +
-							"You MUST provide a location. If the user only gives a city, " +
-							"you MUST ask for the state or country to avoid ambiguity.",
-					},
-				},
-				"required": []string{"location"},
-			},
-		},
+func toolDefinitions() []tools.Definition {
+	return []tools.Definition{
+		tools.CurrentWeatherDefinition(),
+		tools.CurrentTimeDefinition(),
 	}
 }
 
-// --- Tool Implementation ---
-
-// getGeocodedWeather handles the multi-step API calls
-func getGeocodedWeather(location string) (openMeteoResponse, error) {
-	geoURL := fmt.Sprintf("https://nominatim.openstreetmap.org/search?q=%s&format=jsonv2&limit=1", url.QueryEscape(location))
-
-	req, err := http.NewRequest("GET", geoURL, nil)
+func resolveRetryCount() int {
+	cfg, err := appconfig.Load("")
 	if err != nil {
-		return openMeteoResponse{}, fmt.Errorf("failed to create geocoding request: %v", err)
+		log.Printf("MCP retry count defaulting to %d (config load failed: %v)", fallbackRetryCount, err)
+		return fallbackRetryCount
 	}
-	req.Header.Set("User-Agent", "mcp-weather-tool/1.0 (dev)")
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return openMeteoResponse{}, fmt.Errorf("geocoding request failed: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return openMeteoResponse{}, fmt.Errorf("geocoding service returned status: %s", resp.Status)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return openMeteoResponse{}, fmt.Errorf("failed to read geocoding response: %v", err)
-	}
-
-	var geoResp []nominatimResponse
-	if err := json.Unmarshal(body, &geoResp); err != nil {
-		return openMeteoResponse{}, fmt.Errorf("failed to parse geocoding JSON: %v", err)
-	}
-
-	if len(geoResp) == 0 {
-		return openMeteoResponse{}, fmt.Errorf("location not found: '%s'", location)
-	}
-
-	lat := geoResp[0].Lat
-	lon := geoResp[0].Lon
-
-	weatherURL := fmt.Sprintf(
-		"https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph",
-		lat, lon,
-	)
-
-	resp, err = httpClient.Get(weatherURL)
-	if err != nil {
-		return openMeteoResponse{}, fmt.Errorf("weather request failed: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return openMeteoResponse{}, fmt.Errorf("weather service returned status: %s", resp.Status)
-	}
-
-	body, err = io.ReadAll(resp.Body)
-	if err != nil {
-		return openMeteoResponse{}, fmt.Errorf("failed to read weather response: %v", err)
-	}
-
-	var weatherResp openMeteoResponse
-	if err := json.Unmarshal(body, &weatherResp); err != nil {
-		return openMeteoResponse{}, fmt.Errorf("failed to parse weather JSON: %v", err)
-	}
-
-	return weatherResp, nil
+	attempts := cfg.MCPRetryAttempts()
+	log.Printf("MCP retry count configured: %d", attempts)
+	return attempts
 }
 
-func runTool(name string, args map[string]any) []contentPart {
+// --- Tool Implementation Wrapper ---
+
+func runTool(name string, args map[string]any) []tools.ContentPart {
+	handler := handlerFor(name)
+	if handler == nil {
+		return []tools.ContentPart{{Type: "text", Text: fmt.Sprintf("Unknown tool: %s", name)}}
+	}
+
+	return invokeWithRetries(name, handler, args)
+}
+
+func handlerFor(name string) tools.Handler {
 	switch name {
-	case "current_weather":
-		locationVal, ok := args["location"]
-		if !ok {
-			return []contentPart{{Type: "text", Text: "Error: 'location' argument is required."}}
-		}
-		location, ok := locationVal.(string)
-		if !ok {
-			return []contentPart{{Type: "text", Text: "Error: 'location' argument must be a string."}}
-		}
-		if location == "" {
-			return []contentPart{{Type: "text", Text: "Error: 'location' argument cannot be empty."}}
-		}
+	case tools.CurrentWeatherName:
+		return tools.CurrentWeather
+	case tools.CurrentTimeName:
+		return tools.CurrentTime
+	default:
+		return nil
+	}
+}
 
-		// Call the helper function
-		weather, err := getGeocodedWeather(location)
-		if err != nil {
-			// Log the detailed error to stderr for the server operator
-			log.Printf("Weather tool error for location '%s': %v", location, err)
-			// Return a user-friendly error to the LLM
-			return []contentPart{{Type: "text", Text: fmt.Sprintf("Error fetching weather: %v", err)}}
-		}
-
-		jsonWeather, err := json.Marshal(weather.Current)
-		if err != nil {
-			log.Fatalf("Error marshaling JSON: %s", err)
-		}
-
-		weatherString := string(jsonWeather)
-
-		// Provide an interpretation prompt that instructs the LLM to turn the JSON
-		// into a concise, user-friendly weather summary.
-		// This prompt is intentionally included by the MCP server so callers can
-		// associate it with this specific tool output.
-		interpretPrompt := strings.Join([]string{
-			"You are a helpful assistant. Interpret the provided JSON weather data and reply in natural language.",
-			"Focus on temperature (actual and feels-like), precipitation, wind (speed/direction/gusts), humidity, and daytime vs nighttime.",
-			"Avoid repeating raw numbers unnecessarily; keep it concise and readable by a non-technical user.",
-		}, " ")
-
-		return []contentPart{
-			{Type: "json", Text: weatherString},
-			{Type: "interpret", Text: interpretPrompt},
+func attemptFromArgs(args map[string]any) int {
+	if args == nil {
+		return 0
+	}
+	if v, ok := args["__mcp_attempt"]; ok {
+		switch val := v.(type) {
+		case int:
+			return val
+		case int32:
+			return int(val)
+		case int64:
+			return int(val)
+		case float64:
+			return int(val)
+		case float32:
+			return int(val)
+		case string:
+			if n, err := strconv.Atoi(val); err == nil {
+				return n
+			}
 		}
 	}
+	return 0
+}
 
-	return []contentPart{{Type: "text", Text: fmt.Sprintf("Unknown tool: %s", name)}}
+func promptFromArgs(args map[string]any) string {
+	if args == nil {
+		return ""
+	}
+	if v, ok := args["__user_prompt"]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+func invokeWithRetries(toolName string, handler tools.Handler, args map[string]any) []tools.ContentPart {
+	attempt := attemptFromArgs(args)
+	prompt := promptFromArgs(args)
+	content, err := handler(args)
+	if err == nil {
+		return content
+	}
+
+	maxRetries := retryCount
+	if maxRetries < 0 {
+		maxRetries = 0
+	}
+	log.Printf("MCP tool failed: tool=%s attempt=%d/%d err=%v", toolName, attempt, maxRetries, err)
+	logs := []tools.ContentPart{{Type: "log", Text: fmt.Sprintf("attempt %d/%d failed: %v", attempt, maxRetries, err)}}
+
+	if attempt < maxRetries && prompt != "" {
+		message := fmt.Sprintf("Tool error: %v\nOriginal request: %s\nPlease retry calling the tool using the original request below. Adjust the arguments to satisfy the tool requirements before trying again. ", err, prompt)
+		logs = append(logs, tools.ContentPart{Type: "meta", Text: "retry"})
+		logs = append(logs, tools.ContentPart{Type: "text", Text: message})
+		return logs
+	}
+
+	logs = append(logs, tools.ContentPart{Type: "log", Text: fmt.Sprintf("giving up after %d attempts: %v", attempt+1, err)})
+	log.Printf("MCP tool giving up: tool=%s attempts=%d err=%v", toolName, attempt+1, err)
+	logs = append(logs, tools.ContentPart{Type: "text", Text: "I could not handle your request."})
+	return logs
 }
 
 // --- MCP Request Handler ---

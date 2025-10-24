@@ -33,6 +33,7 @@ type Config struct {
 	MCPMode            bool   `json:"mcpMode"`
 	MCPBinary          string `json:"mcpBinary,omitempty"`
 	MCPInitTimeout     int    `json:"mcpInitTimeout,omitempty"`
+	MCPRetryCount      int    `json:"mcpRetryCount,omitempty"`
 	TimeoutSeconds     int    `json:"timeout,omitempty"`
 	ExportPath         string `json:"export,omitempty"`
 	ExportMarkdownPath string `json:"exportMarkdown,omitempty"`
@@ -79,12 +80,27 @@ func (c Config) RequestTimeout() time.Duration {
 // defaultMCPInitTimeout defines the fallback timeout used while initializing the MCP server.
 const defaultMCPInitTimeout = 10 * time.Second
 
+// defaultMCPRetryCount defines how many times MCP tools are retried when the config omits the value.
+const defaultMCPRetryCount = 1
+
 // MCPInitTimeoutDuration returns the timeout duration for MCP initialization.
 func (c Config) MCPInitTimeoutDuration() time.Duration {
 	if c.MCPInitTimeout <= 0 {
 		return defaultMCPInitTimeout
 	}
 	return time.Duration(c.MCPInitTimeout) * time.Second
+}
+
+// MCPRetryAttempts returns the configured number of retry attempts for MCP tools.
+// Negative values are treated as zero, while an unset value falls back to a sensible default.
+func (c Config) MCPRetryAttempts() int {
+	if c.MCPRetryCount < 0 {
+		return 0
+	}
+	if c.MCPRetryCount == 0 {
+		return defaultMCPRetryCount
+	}
+	return c.MCPRetryCount
 }
 
 // Load reads the application configuration from the specified path. If the path

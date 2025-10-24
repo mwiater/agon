@@ -48,6 +48,10 @@ func TestLoad(t *testing.T) {
 		t.Fatalf("expected default MCP init timeout of 10s, got %v", cfg.MCPInitTimeoutDuration())
 	}
 
+	if cfg.MCPRetryAttempts() != 1 {
+		t.Fatalf("expected default MCP retry attempts of 1, got %d", cfg.MCPRetryAttempts())
+	}
+
 	invalidJSON := `{ "hosts": [`
 	tmpfile2, err := os.CreateTemp("", "config.json")
 	if err != nil {
