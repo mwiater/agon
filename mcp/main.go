@@ -172,14 +172,18 @@ func makeError(id any, code int, msg string) jsonrpcResponse {
 func toolDefinitions() []toolDef {
 	return []toolDef{
 		{
-			Name:        "current_weather",
-			Description: "Gets the current weather for a specified location.",
+			Name: "current_weather",
+			Description: "Provides the real-time weather conditions, temperature, and forecast for a specific location. " +
+				"Use this tool for ANY user query about weather, such as 'What's the temperature in...', " +
+				"'Is it raining in...', 'What's the forecast for...', or 'How windy is it?'",
 			InputSchema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
 					"location": map[string]any{
-						"type":        "string",
-						"description": "The city and state, e.g., 'Portland, OR'",
+						"type": "string",
+						"description": "The city and state (e.g., 'Portland, OR') or city and country (e.g., 'London, UK'). " +
+							"You MUST provide a location. If the user only gives a city, " +
+							"you MUST ask for the state or country to avoid ambiguity.",
 					},
 				},
 				"required": []string{"location"},
@@ -191,45 +195,42 @@ func toolDefinitions() []toolDef {
 // --- Tool Implementation ---
 
 // getGeocodedWeather handles the multi-step API calls
-func getGeocodedWeather(location string) (string, error) {
-	// Step 1: Geocode location string to lat/lon
+func getGeocodedWeather(location string) (openMeteoResponse, error) {
 	geoURL := fmt.Sprintf("https://nominatim.openstreetmap.org/search?q=%s&format=jsonv2&limit=1", url.QueryEscape(location))
 
 	req, err := http.NewRequest("GET", geoURL, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to create geocoding request: %v", err)
+		return openMeteoResponse{}, fmt.Errorf("failed to create geocoding request: %v", err)
 	}
-	// Nominatim requires a descriptive User-Agent
 	req.Header.Set("User-Agent", "mcp-weather-tool/1.0 (dev)")
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("geocoding request failed: %v", err)
+		return openMeteoResponse{}, fmt.Errorf("geocoding request failed: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("geocoding service returned status: %s", resp.Status)
+		return openMeteoResponse{}, fmt.Errorf("geocoding service returned status: %s", resp.Status)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read geocoding response: %v", err)
+		return openMeteoResponse{}, fmt.Errorf("failed to read geocoding response: %v", err)
 	}
 
 	var geoResp []nominatimResponse
 	if err := json.Unmarshal(body, &geoResp); err != nil {
-		return "", fmt.Errorf("failed to parse geocoding JSON: %v", err)
+		return openMeteoResponse{}, fmt.Errorf("failed to parse geocoding JSON: %v", err)
 	}
 
 	if len(geoResp) == 0 {
-		return "", fmt.Errorf("location not found: '%s'", location)
+		return openMeteoResponse{}, fmt.Errorf("location not found: '%s'", location)
 	}
 
 	lat := geoResp[0].Lat
 	lon := geoResp[0].Lon
 
-	// Step 2: Get Weather from lat/lon
 	weatherURL := fmt.Sprintf(
 		"https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&current=temperature_2m,apparent_temperature,is_day,relative_humidity_2m,precipitation,rain,wind_speed_10m,wind_direction_10m,wind_gusts_10m",
 		lat, lon,
@@ -237,47 +238,25 @@ func getGeocodedWeather(location string) (string, error) {
 
 	resp, err = httpClient.Get(weatherURL)
 	if err != nil {
-		return "", fmt.Errorf("weather request failed: %v", err)
+		return openMeteoResponse{}, fmt.Errorf("weather request failed: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("weather service returned status: %s", resp.Status)
+		return openMeteoResponse{}, fmt.Errorf("weather service returned status: %s", resp.Status)
 	}
 
 	body, err = io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read weather response: %v", err)
+		return openMeteoResponse{}, fmt.Errorf("failed to read weather response: %v", err)
 	}
 
 	var weatherResp openMeteoResponse
 	if err := json.Unmarshal(body, &weatherResp); err != nil {
-		return "", fmt.Errorf("failed to parse weather JSON: %v", err)
+		return openMeteoResponse{}, fmt.Errorf("failed to parse weather JSON: %v", err)
 	}
 
-	// Step 3: Format output string for the LLM
-	c := weatherResp.Current
-	u := weatherResp.CurrentUnits
-	dayNight := "night"
-	if c.IsDay == 1 {
-		dayNight = "day"
-	}
-
-	// This formatted string will be returned to the LLM
-	result := fmt.Sprintf(
-		"Weather for %s (Lat: %s, Lon: %s) (%s): Temp: %.1f%s, Feels Like: %.1f%s, Humidity: %.0f%s, Wind: %.1f%s @ %.0f°, Gusts: %.1f%s, Precip: %.2f%s, Rain: %.2f%s",
-		location, lat, lon, dayNight,
-		c.Temperature, u.Temperature,
-		c.ApparentTemp, u.ApparentTemp,
-		c.Humidity, u.Humidity,
-		c.WindSpeed, u.WindSpeed,
-		c.WindDirection,
-		c.WindGusts, u.WindGusts,
-		c.Precipitation, u.Precipitation,
-		c.Rain, u.Rain,
-	)
-
-	return result, nil
+	return weatherResp, nil
 }
 
 func runTool(name string, args map[string]any) []contentPart {
@@ -304,7 +283,14 @@ func runTool(name string, args map[string]any) []contentPart {
 			return []contentPart{{Type: "text", Text: fmt.Sprintf("Error fetching weather: %v", err)}}
 		}
 
-		return []contentPart{{Type: "text", Text: weather}}
+		jsonWeather, err := json.Marshal(weather.Current)
+		if err != nil {
+			log.Fatalf("Error marshaling JSON: %s", err)
+		}
+
+		weatherString := string(jsonWeather)
+
+		return []contentPart{{Type: "text", Text: weatherString}}
 	}
 
 	return []contentPart{{Type: "text", Text: fmt.Sprintf("Unknown tool: %s", name)}}
