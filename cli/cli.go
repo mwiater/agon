@@ -166,6 +166,15 @@ type streamErr error
 // tickMsg is a message sent at regular intervals, used for animations and timed updates.
 type tickMsg time.Time
 
+func lastUserPrompt(history []chatMessage) string {
+	for i := len(history) - 1; i >= 0; i-- {
+		if strings.ToLower(history[i].Role) == "user" {
+			return history[i].Content
+		}
+	}
+	return ""
+}
+
 // fetchAndSelectModelsCmd creates a Bubble Tea command that fetches the list of
 // loaded models and then all available models for a given host. It prepares the
 // model list for selection, prioritizing loaded models by placing them at the top.
@@ -230,9 +239,12 @@ func streamChatCmd(p *tea.Program, provider providers.ChatProvider, host Host, m
 			JSONMode:     JSONFormat,
 		}
 
+		log.Printf("[agon -> %s (%s)] Outgoing request: user_prompt='%s', system_prompt='%s'", host.Name, modelName, lastUserPrompt(history), systemPrompt)
+
 		go func() {
 			err := provider.Stream(context.Background(), req, providers.StreamCallbacks{
 				OnChunk: func(msg providers.ChatMessage) error {
+					log.Printf("[provider -> agon] Incoming chunk: %s", msg.Content)
 					p.Send(streamChunkMsg(msg.Content))
 					return nil
 				},

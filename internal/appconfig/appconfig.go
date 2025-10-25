@@ -37,6 +37,7 @@ type Config struct {
 	TimeoutSeconds     int    `json:"timeout,omitempty"`
 	ExportPath         string `json:"export,omitempty"`
 	ExportMarkdownPath string `json:"exportMarkdown,omitempty"`
+	ConfigPath         string `json:"-"` // Not marshaled to/from JSON
 }
 
 // Host represents a single host that can serve language models. It contains the
@@ -117,6 +118,7 @@ func Load(path string) (Config, error) {
 		if len(config.Hosts) == 0 {
 			return Config{}, errors.New("config must contain at least one host")
 		}
+		config.ConfigPath = path
 		return config, nil
 	}
 

@@ -12,7 +12,7 @@ import (
 func CurrentTimeDefinition() Definition {
 	return Definition{
 		Name:        CurrentTimeName,
-		Description: "Provides the server's current local time and timezone. Use this tool for user queries like 'What time is it right now?'",
+		Description: "Use this tool *only* for queries about the current time, such as 'What time is it?' or 'What is the current time?'. **This tool cannot provide any weather information.**",
 		InputSchema: map[string]any{
 			"type":       "object",
 			"properties": map[string]any{},

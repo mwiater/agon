@@ -6,6 +6,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -16,6 +17,14 @@ import (
 	"github.com/mwiater/agon/internal/appconfig"
 	"github.com/mwiater/agon/mcp/tools"
 )
+
+var (
+	configPath string
+)
+
+func init() {
+	flag.StringVar(&configPath, "config", "", "path to the config file")
+}
 
 // --- Protocol data types ---
 
@@ -46,7 +55,8 @@ type toolsCallParams struct {
 
 const fallbackRetryCount = 1
 
-var retryCount = resolveRetryCount()
+var retryCount = fallbackRetryCount
+var mcpConfig appconfig.Config // Store the loaded config
 
 // --- Framing Helpers ---
 
@@ -126,18 +136,8 @@ func toolDefinitions() []tools.Definition {
 	return []tools.Definition{
 		tools.CurrentWeatherDefinition(),
 		tools.CurrentTimeDefinition(),
+		tools.GeneralQuestionDefinition(),
 	}
-}
-
-func resolveRetryCount() int {
-	cfg, err := appconfig.Load("")
-	if err != nil {
-		log.Printf("MCP retry count defaulting to %d (config load failed: %v)", fallbackRetryCount, err)
-		return fallbackRetryCount
-	}
-	attempts := cfg.MCPRetryAttempts()
-	log.Printf("MCP retry count configured: %d", attempts)
-	return attempts
 }
 
 // --- Tool Implementation Wrapper ---
@@ -157,6 +157,8 @@ func handlerFor(name string) tools.Handler {
 		return tools.CurrentWeather
 	case tools.CurrentTimeName:
 		return tools.CurrentTime
+	case tools.GeneralQuestionName:
+		return tools.GeneralQuestion
 	default:
 		return nil
 	}
@@ -164,27 +166,37 @@ func handlerFor(name string) tools.Handler {
 
 func attemptFromArgs(args map[string]any) int {
 	if args == nil {
-		return 0
+		return 1
 	}
 	if v, ok := args["__mcp_attempt"]; ok {
 		switch val := v.(type) {
 		case int:
-			return val
+			if val > 0 {
+				return val
+			}
 		case int32:
-			return int(val)
+			if val > 0 {
+				return int(val)
+			}
 		case int64:
-			return int(val)
+			if val > 0 {
+				return int(val)
+			}
 		case float64:
-			return int(val)
+			if n := int(val); n > 0 {
+				return n
+			}
 		case float32:
-			return int(val)
+			if n := int(val); n > 0 {
+				return n
+			}
 		case string:
-			if n, err := strconv.Atoi(val); err == nil {
+			if n, err := strconv.Atoi(val); err == nil && n > 0 {
 				return n
 			}
 		}
 	}
-	return 0
+	return 1
 }
 
 func promptFromArgs(args map[string]any) string {
@@ -202,15 +214,15 @@ func promptFromArgs(args map[string]any) string {
 func invokeWithRetries(toolName string, handler tools.Handler, args map[string]any) []tools.ContentPart {
 	attempt := attemptFromArgs(args)
 	prompt := promptFromArgs(args)
+	if attempt <= 0 {
+		attempt = 1
+	}
 	content, err := handler(args)
 	if err == nil {
 		return content
 	}
 
 	maxRetries := retryCount
-	if maxRetries < 0 {
-		maxRetries = 0
-	}
 	log.Printf("MCP tool failed: tool=%s attempt=%d/%d err=%v", toolName, attempt, maxRetries, err)
 	logs := []tools.ContentPart{{Type: "log", Text: fmt.Sprintf("attempt %d/%d failed: %v", attempt, maxRetries, err)}}
 
@@ -221,8 +233,8 @@ func invokeWithRetries(toolName string, handler tools.Handler, args map[string]a
 		return logs
 	}
 
-	logs = append(logs, tools.ContentPart{Type: "log", Text: fmt.Sprintf("giving up after %d attempts: %v", attempt+1, err)})
-	log.Printf("MCP tool giving up: tool=%s attempts=%d err=%v", toolName, attempt+1, err)
+	logs = append(logs, tools.ContentPart{Type: "log", Text: fmt.Sprintf("giving up after %d attempts: %v", attempt, err)})
+	log.Printf("MCP tool giving up: tool=%s attempts=%d err=%v", toolName, attempt, err)
 	logs = append(logs, tools.ContentPart{Type: "text", Text: "I could not handle your request."})
 	return logs
 }
@@ -266,6 +278,24 @@ func handleRequest(req *jsonrpcRequest, w *bufio.Writer) error {
 // --- Main Server Loop ---
 
 func main() {
+	flag.Parse()
+	cfg, err := appconfig.Load(configPath)
+	if err == nil && cfg.Debug {
+		f, err := os.OpenFile("agon-mcp-server.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+		if err != nil {
+			log.Fatalf("could not open agon-mcp-server.log: %v", err)
+		}
+		defer f.Close()
+		log.SetOutput(f)
+	}
+
+	if err != nil {
+		log.Printf("using fallback MCP retry count %d due to config load error: %v", fallbackRetryCount, err)
+	} else {
+		retryCount = cfg.MCPRetryAttempts()
+		mcpConfig = cfg
+	}
+
 	r := bufio.NewReader(os.Stdin)
 	w := bufio.NewWriter(os.Stdout)
 

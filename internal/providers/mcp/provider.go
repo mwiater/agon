@@ -118,7 +118,7 @@ func New(ctx context.Context, cfg *appconfig.Config) (*Provider, error) {
 		return nil, fmt.Errorf("mcp binary %q not accessible: %w", binary, err)
 	}
 
-	cmd := exec.CommandContext(ctx, binary)
+	cmd := exec.CommandContext(ctx, binary, "--config", cfg.ConfigPath)
 	cmd.Env = os.Environ()
 	cmd.Stderr = os.Stderr
 
@@ -208,6 +208,7 @@ func (p *Provider) writeMessage(v any) error {
 	if err != nil {
 		return err
 	}
+	p.log("[mcp -> ollama] Outgoing request: %s", string(data))
 	if _, err := fmt.Fprintf(p.writer, "Content-Length: %d\r\n\r\n", len(data)); err != nil {
 		return err
 	}
@@ -269,6 +270,7 @@ func (p *Provider) readResponseBlocking() (jsonrpcResponse, error) {
 	if _, err := io.ReadFull(p.reader, body); err != nil {
 		return jsonrpcResponse{}, err
 	}
+	p.log("[ollama -> mcp] Incoming response: %s", string(body))
 
 	var resp jsonrpcResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
@@ -543,18 +545,35 @@ func (p *Provider) EnsureModelReady(ctx context.Context, host appconfig.Host, mo
 
 // Stream proxies chat traffic through MCP tools before delegating to the Ollama backend.
 func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, callbacks providers.StreamCallbacks) error {
-	p.log("Tool invoked: tool=chat host=%s model=%s messages=%d", req.Host.Name, req.Model, len(req.History))
+	userPrompt := lastUserPrompt(req.History)
+	systemPrompt := req.SystemPrompt
+	p.log("[agon -> mcp] Incoming request: user_prompt='%s', system_prompt='%s'", userPrompt, systemPrompt)
 	toolName, userText := p.selectTool(req.History)
 	executed := false
 	forwardReq := req
 	if len(p.toolDefs) > 0 {
 		forwardReq.Tools = append([]providers.ToolDefinition(nil), p.toolDefs...)
 	}
+
+	// Replace system prompt for MCP mode
+	newSystemPrompt := "You are a helpful assistant with access to the following tools. When the user asks a question, first determine if one of the tools can help. If so, call the tool with the required arguments. If not, answer the user's question directly. If the user's request is ambiguous, ask for clarification. For example, if they ask for the weather without a location, you must ask for a location."
+	foundSystemPrompt := false
+	for i, msg := range forwardReq.History {
+		if msg.Role == "system" {
+			forwardReq.History[i].Content = newSystemPrompt
+			foundSystemPrompt = true
+			break
+		}
+	}
+	if !foundSystemPrompt {
+		// Prepend if not found
+		forwardReq.History = append([]providers.ChatMessage{{Role: "system", Content: newSystemPrompt}}, forwardReq.History...)
+	}
+
 	forwardReq.DisableStreaming = true
 	retryState := make(map[string]int)
 	retryLimit := p.cfg.MCPRetryAttempts()
 	forwardReq.ToolExecutor = func(execCtx context.Context, name string, callArgs map[string]any) (string, error) {
-		attempt := retryState[name]
 		wireArgs := make(map[string]any, len(callArgs)+2)
 		for k, v := range callArgs {
 			wireArgs[k] = v
@@ -565,6 +584,11 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 			}
 		}
 		for {
+			attempt := retryState[name]
+			if attempt <= 0 {
+				attempt = 1
+			}
+			retryState[name] = attempt
 			wireArgs["__mcp_attempt"] = attempt
 			toolCtx, cancel := context.WithTimeout(execCtx, p.cfg.MCPInitTimeoutDuration())
 			p.logToolRequest(name, req.Host.Name, req.Model, wireArgs)
@@ -579,11 +603,10 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 				// to let the model fix arguments and retrigger the tool.
 				fixed, fixErr := p.fixWithLLMRoundTrip(execCtx, req, name, result.Output)
 				if fixErr == nil && strings.TrimSpace(fixed) != "" {
+					retryState[name] = 0
 					return fixed, nil
 				}
-				// If the fix flow failed, fall back to a single internal retry once.
-				attempt++
-				retryState[name] = attempt
+				retryState[name] = attempt + 1
 				continue
 			}
 			retryState[name] = 0
@@ -598,13 +621,17 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 	}
 
 	if toolName != "" {
-		initialAttempt := retryState[toolName]
 		args := map[string]any{
 			"text":          userText,
 			"__user_prompt": userText,
-			"__mcp_attempt": initialAttempt,
 		}
 		for {
+			attempt := retryState[toolName]
+			if attempt <= 0 {
+				attempt = 1
+			}
+			retryState[toolName] = attempt
+			args["__mcp_attempt"] = attempt
 			toolCtx, cancel := context.WithTimeout(ctx, p.cfg.MCPInitTimeoutDuration())
 			p.logToolRequest(toolName, req.Host.Name, req.Model, args)
 			result, err := p.callTool(toolCtx, toolName, args)
@@ -613,11 +640,12 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 				p.log("[ERROR] Tool bypassed: tool=%s host=%s model=%s reason=%v", toolName, req.Host.Name, req.Model, err)
 				break
 			}
-			if result.Retry && initialAttempt < retryLimit {
+			if result.Retry && attempt < retryLimit {
 				// Invoke corrective LLM round-trip to repair arguments and reissue tool call.
 				fixed, fixErr := p.fixWithLLMRoundTrip(ctx, req, toolName, result.Output)
 				if fixErr == nil && strings.TrimSpace(fixed) != "" {
 					executed = true
+					retryState[toolName] = 0
 					output := fmt.Sprintf("[MCP %s] %s", toolName, strings.TrimSpace(fixed))
 					if callbacks.OnChunk != nil {
 						if err := callbacks.OnChunk(providers.ChatMessage{Role: "assistant", Content: output}); err != nil {
@@ -629,10 +657,7 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 					forwardReq.History = forwardHistory
 					break
 				}
-				// If the fix flow failed, fall back to a single internal retry once.
-				initialAttempt++
-				retryState[toolName] = initialAttempt
-				args["__mcp_attempt"] = initialAttempt
+				retryState[toolName] = attempt + 1
 				continue
 			}
 			retryState[toolName] = 0

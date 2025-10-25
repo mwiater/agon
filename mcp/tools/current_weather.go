@@ -48,10 +48,8 @@ var httpClient = &http.Client{Timeout: 10 * time.Second}
 // CurrentWeatherDefinition describes the weather tool to the MCP host.
 func CurrentWeatherDefinition() Definition {
 	return Definition{
-		Name: CurrentWeatherName,
-		Description: "Provides the real-time weather conditions, temperature, and forecast for a specific location. " +
-			"Use this tool for ANY user query about weather, such as 'What's the temperature in...', " +
-			"'Is it raining in...', 'What's the forecast for...', or 'How windy is it?'",
+		Name:        CurrentWeatherName,
+		Description: "Provides weather conditions for a *specific geographical location*. Use this tool for queries about temperature, precipitation, wind, or forecasts. **Do not use this tool for queries about the current time.**",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -97,6 +95,8 @@ func CurrentWeather(args map[string]any) ([]ContentPart, error) {
 		"You are a helpful assistant. Interpret the provided JSON weather data and reply in natural language in 2 sentences or less.",
 		"Avoid repeating raw numbers unnecessarily; keep it concise and readable by a non-technical user.",
 	}, " ")
+
+	log.Printf("Weather tool API call successful for %s: %s", location, string(jsonWeather))
 
 	return []ContentPart{
 		{Type: "json", Text: string(jsonWeather)},
