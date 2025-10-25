@@ -5,7 +5,7 @@
       "url": "{ollama-api-endpoint-01}",
       "type": "ollama",
       "models": [
-        "stablelm-zephyr:3b",
+        "llama3.2:3b",
         "granite4:micro",
         "gemma3n:e2b",
         "gemma3:270m",
@@ -24,7 +24,7 @@
       "url": "{ollama-api-endpoint-02}",
       "type": "ollama",
       "models": [
-        "stablelm-zephyr:3b",
+        "llama3.2:3b",
         "granite4:micro",
         "gemma3n:e2b",
         "gemma3:270m",
@@ -43,7 +43,7 @@
       "url": "{ollama-api-endpoint-03}",
       "type": "ollama",
       "models": [
-        "stablelm-zephyr:3b",
+        "llama3.2:3b",
         "granite4:micro",
         "gemma3n:e2b",
         "gemma3:270m",
@@ -62,7 +62,7 @@
       "url": "{ollama-api-endpoint-04}",
       "type": "ollama",
       "models": [
-        "stablelm-zephyr:3b",
+        "llama3.2:3b",
         "granite4:micro",
         "gemma3n:e2b",
         "gemma3:270m",

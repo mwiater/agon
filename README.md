@@ -77,7 +77,7 @@ See other examples in `configs/`
       "url": "http://192.168.0.11:11434",
       "type": "ollama",
       "models": [
-                "stablelm-zephyr:3b",
+                "llama3.2:3b",
         "granite4:micro",
         "gemma3n:e2b",
         "gemma3:270m",
