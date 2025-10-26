@@ -72,9 +72,9 @@ func lastUserPrompt(history []providers.ChatMessage) string {
 
 func (p *Provider) logToolRequest(name, host, model string, args map[string]any) {
 	payload := formatArgs(args)
-	p.log("Tool requested: tool=%s args=%s", name, payload)
+	p.log("Tool requested: tool=%s args=%s host=%s model=%s", name, payload, host, model)
 	if p.cfg != nil && p.cfg.Debug {
-		log.Printf("Tool request: %s %s", name, payload)
+		log.Printf("Tool request: host=%s model=%s %s %s", host, model, name, payload)
 	}
 }
 
@@ -82,7 +82,7 @@ func (p *Provider) logToolSuccess(name, result, host, model string) {
 	truncated := truncateForLog(result, 160)
 	p.log("Tool executed: tool=%s host=%s model=%s output=%s", name, host, model, truncated)
 	if p.cfg != nil && p.cfg.Debug {
-		log.Printf("Tool result: %s %s", name, result)
+		log.Printf("Tool result: host=%s model=%s %s %s", host, model, name, result)
 	}
 }
 
@@ -452,14 +452,18 @@ func (p *Provider) callTool(ctx context.Context, name string, args map[string]an
 // loops. The returned string is the aggregated assistant output of that round.
 // fixWithLLMRoundTrip requests the LLM to correct arguments and call the same
 // tool again. It returns:
-//  - output: the assistant output (either tool output when called, or raw text if no call happened)
-//  - called: whether a tools/call was actually executed
-//  - retryAgain: whether the tool's response indicated another retry is needed
-//  - err: transport or provider error during the round-trip
+//   - output: the assistant output (either tool output when called, or raw text if no call happened)
+//   - called: whether a tools/call was actually executed
+//   - retryAgain: whether the tool's response indicated another retry is needed
+//   - err: transport or provider error during the round-trip
+//
 // nextAttempt should be the attempt number to stamp into __mcp_attempt for the
 // next tool invocation.
 func (p *Provider) fixWithLLMRoundTrip(ctx context.Context, req providers.StreamRequest, toolName, fixInstruction string, nextAttempt int) (output string, called bool, retryAgain bool, err error) {
 	// Compose a focused history to elicit a corrected tool call from the LLM.
+	if err := ctx.Err(); err != nil {
+		return "", false, false, err
+	}
 	history := append([]providers.ChatMessage{}, req.History...)
 	fixText := strings.TrimSpace(fixInstruction)
 	if fixText == "" {
@@ -635,6 +639,16 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 					nextAttempt := attempt + 1
 					fixedOut, called, retryAgain, fixErr := p.fixWithLLMRoundTrip(execCtx, req, name, result.Output, nextAttempt)
 					if fixErr != nil {
+						// If the context is done we should propagate the cancellation instead of retrying.
+						if ctxErr := execCtx.Err(); ctxErr != nil {
+							return "", ctxErr
+						}
+						if ctxErr := ctx.Err(); ctxErr != nil {
+							return "", ctxErr
+						}
+						if errors.Is(fixErr, context.Canceled) || errors.Is(fixErr, context.DeadlineExceeded) {
+							return "", fixErr
+						}
 						// Fix round-trip failed (no call executed). Try again without consuming attempts.
 						continue
 					}
@@ -698,6 +712,13 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 					nextAttempt := attempt + 1
 					fixedOut, called, retryAgain, fixErr := p.fixWithLLMRoundTrip(ctx, req, toolName, result.Output, nextAttempt)
 					if fixErr != nil {
+						// Stop retrying when the context has already been cancelled.
+						if ctxErr := ctx.Err(); ctxErr != nil {
+							return ctxErr
+						}
+						if errors.Is(fixErr, context.Canceled) || errors.Is(fixErr, context.DeadlineExceeded) {
+							return fixErr
+						}
 						// Fix round-trip failed; try again without consuming attempts.
 						continue
 					}

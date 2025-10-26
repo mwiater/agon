@@ -21,4 +21,6 @@ const (
 	CurrentWeatherName = "current_weather"
 	// CurrentTimeName is the canonical name for the time tool.
 	CurrentTimeName = "current_time"
+	// AvailableToolsName is the canonical name for the available-tools helper.
+	AvailableToolsName = "available_tools"
 )

@@ -1,6 +1,6 @@
 // mcp/main.go
 // Minimal MCP server over stdio (JSON-RPC 2.0 + Content-Length framing)
-// Tools: current_weather, current_time
+// Tools: answer_general_question, available_tools, current_time, current_weather
 package main
 
 import (
@@ -134,9 +134,10 @@ func makeError(id any, code int, msg string) jsonrpcResponse {
 
 func toolDefinitions() []tools.Definition {
 	return []tools.Definition{
+		//tools.GeneralQuestionDefinition(),
+		//tools.AvailableToolsDefinition(),
+		//tools.CurrentTimeDefinition(),
 		tools.CurrentWeatherDefinition(),
-		tools.CurrentTimeDefinition(),
-		tools.GeneralQuestionDefinition(),
 	}
 }
 
@@ -153,6 +154,8 @@ func runTool(name string, args map[string]any) []tools.ContentPart {
 
 func handlerFor(name string) tools.Handler {
 	switch name {
+	case tools.AvailableToolsName:
+		return tools.AvailableTools
 	case tools.CurrentWeatherName:
 		return tools.CurrentWeather
 	case tools.CurrentTimeName:

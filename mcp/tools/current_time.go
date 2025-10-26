@@ -36,8 +36,8 @@ func CurrentTime(args map[string]any) ([]ContentPart, error) {
 	}
 
 	interpretPrompt := strings.Join([]string{
-		"You are a helpful assistant. Interpret the provided JSON time data and explain the current local time in natural language.",
-		"Keep the answer concise and avoid restating raw field names unless helpful.",
+		"You are a helpful assistant. Interpret the provided JSON time data and explain the current local date and time in natural language.",
+		"Do not mention that you are translating JSON data",
 	}, " ")
 
 	return []ContentPart{
