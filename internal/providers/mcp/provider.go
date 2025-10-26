@@ -208,8 +208,8 @@ func (p *Provider) writeMessage(v any) error {
 	if err != nil {
 		return err
 	}
-    // This JSON-RPC frame is between agon and the MCP server over stdio.
-    p.log("[agon -> mcp] Outgoing request: %s", string(data))
+	// This JSON-RPC frame is between agon and the MCP server over stdio.
+	p.log("[agon -> mcp] Outgoing request: %s", string(data))
 	if _, err := fmt.Fprintf(p.writer, "Content-Length: %d\r\n\r\n", len(data)); err != nil {
 		return err
 	}
@@ -271,8 +271,8 @@ func (p *Provider) readResponseBlocking() (jsonrpcResponse, error) {
 	if _, err := io.ReadFull(p.reader, body); err != nil {
 		return jsonrpcResponse{}, err
 	}
-    // This JSON-RPC frame is from the MCP server back to agon over stdio.
-    p.log("[mcp -> agon] Incoming response: %s", string(body))
+	// This JSON-RPC frame is from the MCP server back to agon over stdio.
+	p.log("[mcp -> agon] Incoming response: %s", string(body))
 
 	var resp jsonrpcResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
@@ -476,37 +476,37 @@ func (p *Provider) fixWithLLMRoundTrip(ctx context.Context, req providers.Stream
 	}
 	fixReq.History = history
 
-    // Provide a ToolExecutor that executes exactly one call and reports whether
-    // the tool requested another retry. Attempt counting is handled by caller.
-    var tcResp toolCallResponse
-    var tcErr error
-    fixReq.ToolExecutor = func(execCtx context.Context, name string, args map[string]any) (string, error) {
-        wireArgs := make(map[string]any, len(args)+3)
-        for k, v := range args {
-            wireArgs[k] = v
-        }
-        if _, ok := wireArgs["__user_prompt"]; !ok {
-            if prompt := lastUserPrompt(req.History); prompt != "" {
-                wireArgs["__user_prompt"] = prompt
-            }
-        }
-        if nextAttempt > 0 {
-            wireArgs["__mcp_attempt"] = nextAttempt
-        }
-        toolCtx, cancel := context.WithTimeout(execCtx, p.cfg.MCPInitTimeoutDuration())
-        defer cancel()
-        p.logToolRequest(name, req.Host.Name, req.Model, wireArgs)
-        resp, err := p.callTool(toolCtx, name, wireArgs)
-        tcResp = resp
-        tcErr = err
-        if err != nil {
-            p.log("[ERROR] Tool retry via LLM failed: tool=%s host=%s model=%s reason=%v", name, req.Host.Name, req.Model, err)
-            return "", err
-        }
-        // Defer interpretation to the outer retry controller; return raw output here.
-        p.logToolSuccess(name, resp.Output, req.Host.Name, req.Model)
-        return resp.Output, nil
-    }
+	// Provide a ToolExecutor that executes exactly one call and reports whether
+	// the tool requested another retry. Attempt counting is handled by caller.
+	var tcResp toolCallResponse
+	var tcErr error
+	fixReq.ToolExecutor = func(execCtx context.Context, name string, args map[string]any) (string, error) {
+		wireArgs := make(map[string]any, len(args)+3)
+		for k, v := range args {
+			wireArgs[k] = v
+		}
+		if _, ok := wireArgs["__user_prompt"]; !ok {
+			if prompt := lastUserPrompt(req.History); prompt != "" {
+				wireArgs["__user_prompt"] = prompt
+			}
+		}
+		if nextAttempt > 0 {
+			wireArgs["__mcp_attempt"] = nextAttempt
+		}
+		toolCtx, cancel := context.WithTimeout(execCtx, p.cfg.MCPInitTimeoutDuration())
+		defer cancel()
+		p.logToolRequest(name, req.Host.Name, req.Model, wireArgs)
+		resp, err := p.callTool(toolCtx, name, wireArgs)
+		tcResp = resp
+		tcErr = err
+		if err != nil {
+			p.log("[ERROR] Tool retry via LLM failed: tool=%s host=%s model=%s reason=%v", name, req.Host.Name, req.Model, err)
+			return "", err
+		}
+		// Defer interpretation to the outer retry controller; return raw output here.
+		p.logToolSuccess(name, resp.Output, req.Host.Name, req.Model)
+		return resp.Output, nil
+	}
 
 	// Capture the non-streaming assistant output of the corrective round-trip.
 	var out strings.Builder
@@ -517,37 +517,37 @@ func (p *Provider) fixWithLLMRoundTrip(ctx context.Context, req providers.Stream
 		},
 		OnComplete: func(meta providers.StreamMetadata) error { return nil },
 	}
-    start := time.Now()
-    // Log what is being sent: the fix instruction, the user instruction, and enabled tools.
-    var toolNames []string
-    for _, td := range fixReq.Tools {
-        toolNames = append(toolNames, td.Name)
-    }
-    sendSummary := map[string]any{
-        "fix_instruction": strings.TrimSpace(fixText),
-        "user_instruction": fmt.Sprintf("Call the %s tool again now with corrected arguments. Only call the tool; do not include extra text.", toolName),
-        "tools":           strings.Join(toolNames, ", "),
-        "disable_streaming": true,
-    }
-    if data, err := json.Marshal(sendSummary); err == nil {
-        p.log("MCP->LLM fix send: tool=%s host=%s model=%s payload=%s", toolName, req.Host.Name, req.Model, string(data))
-    } else {
-        p.log("MCP->LLM fix send: tool=%s host=%s model=%s", toolName, req.Host.Name, req.Model)
-    }
-    if err := p.fallback.Stream(ctx, fixReq, cb); err != nil {
-        p.log("MCP->LLM fix failed: tool=%s host=%s model=%s err=%v", toolName, req.Host.Name, req.Model, err)
-        return "", false, false, err
-    }
-    dur := time.Since(start)
-    fixed := strings.TrimSpace(out.String())
-    // Log what is received: the assistant text captured from the fix round-trip.
-    recvPreview := truncateForLog(fixed, 500)
-    p.log("MCP->LLM fix recv: tool=%s host=%s model=%s chars=%d dur=%s payload=%s", toolName, req.Host.Name, req.Model, len(fixed), dur.String(), recvPreview)
-    // Report whether a tool call actually occurred and whether it asked for retry.
-    if tcErr == nil && (tcResp.Output != "" || tcResp.Retry) {
-        return tcResp.Output, true, tcResp.Retry, nil
-    }
-    return fixed, false, false, nil
+	start := time.Now()
+	// Log what is being sent: the fix instruction, the user instruction, and enabled tools.
+	var toolNames []string
+	for _, td := range fixReq.Tools {
+		toolNames = append(toolNames, td.Name)
+	}
+	sendSummary := map[string]any{
+		"fix_instruction":   strings.TrimSpace(fixText),
+		"user_instruction":  fmt.Sprintf("Call the %s tool again now with corrected arguments. Only call the tool; do not include extra text.", toolName),
+		"tools":             strings.Join(toolNames, ", "),
+		"disable_streaming": true,
+	}
+	if data, err := json.Marshal(sendSummary); err == nil {
+		p.log("MCP->LLM fix send: tool=%s host=%s model=%s payload=%s", toolName, req.Host.Name, req.Model, string(data))
+	} else {
+		p.log("MCP->LLM fix send: tool=%s host=%s model=%s", toolName, req.Host.Name, req.Model)
+	}
+	if err := p.fallback.Stream(ctx, fixReq, cb); err != nil {
+		p.log("MCP->LLM fix failed: tool=%s host=%s model=%s err=%v", toolName, req.Host.Name, req.Model, err)
+		return "", false, false, err
+	}
+	dur := time.Since(start)
+	fixed := strings.TrimSpace(out.String())
+	// Log what is received: the assistant text captured from the fix round-trip.
+	recvPreview := truncateForLog(fixed, 500)
+	p.log("MCP->LLM fix recv: tool=%s host=%s model=%s chars=%d dur=%s payload=%s", toolName, req.Host.Name, req.Model, len(fixed), dur.String(), recvPreview)
+	// Report whether a tool call actually occurred and whether it asked for retry.
+	if tcErr == nil && (tcResp.Output != "" || tcResp.Retry) {
+		return tcResp.Output, true, tcResp.Retry, nil
+	}
+	return fixed, false, false, nil
 }
 
 // LoadedModels currently delegates to the underlying Ollama provider while the
@@ -650,8 +650,13 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 						result.Output = fixedOut
 						continue
 					}
-					// Either success or max reached; return output.
+					// Either success or max reached; return output (interpreting if requested).
 					retryState[name] = 0
+					if interp, ok := p.maybeInterpretResult(execCtx, req, name, fixedOut); ok {
+						p.logToolSuccess(name, interp, req.Host.Name, req.Model)
+						return interp, nil
+					}
+					p.logToolSuccess(name, fixedOut, req.Host.Name, req.Model)
 					return fixedOut, nil
 				}
 				// Max attempts reached without success; fall through to return last known message.
@@ -700,23 +705,13 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 						// No tool call executed; elicit again.
 						continue
 					}
-					// Tool call executed; consume attempt.
+					// Tool call executed; consume attempt and stash output for final handling.
 					attempt = nextAttempt
 					retryState[toolName] = attempt
 					executed = true
-					// Dispatch output chunk from the tool call.
-					output := fmt.Sprintf("[MCP %s] %s", toolName, strings.TrimSpace(fixedOut))
-					if callbacks.OnChunk != nil {
-						if err := callbacks.OnChunk(providers.ChatMessage{Role: "assistant", Content: output}); err != nil {
-							p.log("[ERROR] Tool output dispatch failed: %v", err)
-						}
-					}
-					forwardHistory := append([]providers.ChatMessage{}, req.History...)
-					forwardHistory = append(forwardHistory, providers.ChatMessage{Role: "assistant", Content: output})
-					forwardReq.History = forwardHistory
+					result.Output = fixedOut
 					if retryAgain && attempt < retryLimit {
 						// Tool asked to retry again; continue loop for another corrective round-trip.
-						result.Output = fixedOut
 						continue
 					}
 					// Either success or max reached; stop retrying.
