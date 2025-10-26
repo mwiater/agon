@@ -1,84 +1,136 @@
-agon MCP Server (Go, experimental)
+# agon MCP Server
 
-This directory contains a tiny, dependency‑free Model Context Protocol (MCP) server implemented in Go. It communicates over stdio using JSON‑RPC 2.0 with Content‑Length framing (similar to LSP). It exposes three simple tools:
+This directory contains a tiny, dependency‑free Model Context Protocol (MCP) server implemented in Go. It communicates over stdio using JSON‑RPC 2.0 with Content‑Length framing (similar to LSP).
 
-- echo: Returns the provided text unchanged.
-- word_count: Counts words in the provided text.
-- sentiment: Naive sentiment analysis (positive/negative/neutral) based on small keyword lists.
+## Tools Overview
 
-Files
-- mcp/main.go: Stdio MCP server implementation in Go.
+The MCP server exposes the following tools:
 
-Build/Run
-- Prerequisite: Go toolchain
-- Run directly: `go run ./mcp`
-- Or build: `go build -o dist/agon-mcp ./mcp` then execute the binary
+*   **`current_weather`**: Fetches current weather conditions for a given location.
+*   **`current_time`**: Retrieves the current local time and timezone.
+*   **`general_question`**: A passthrough tool indicating that the LLM should answer the question directly.
 
-Protocol Notes
-- Transport: stdio with `Content-Length: <bytes>\r\n\r\n<json>` frames.
-- Supported methods:
-  - initialize: Returns serverInfo and capabilities (tools list/call).
-  - tools/list: Returns tool definitions with JSON Schemas.
-  - tools/call: Executes a tool and returns `content` as an array of text parts.
-  - ping: Returns empty result (handy for health checks).
+## Files
 
-Tools
-1) echo
-   - name: "echo"
-   - input_schema:
-     {
-       "type": "object",
-       "properties": {"text": {"type": "string"}},
-       "required": ["text"]
-     }
-   - returns: same text
+*   `mcp/main.go`: Stdio MCP server implementation in Go.
+*   `mcp/tools/`: Contains the implementations for individual tools.
 
-2) word_count
-   - name: "word_count"
-   - input_schema:
-     {
-       "type": "object",
-       "properties": {"text": {"type": "string"}},
-       "required": ["text"]
-     }
-   - returns: integer count as text (e.g., "5")
+## Build and Run
 
-3) sentiment
-   - name: "sentiment"
-   - input_schema:
-     {
-       "type": "object",
-       "properties": {"text": {"type": "string"}},
-       "required": ["text"]
-     }
-   - returns: label and score in plain text (e.g., "positive (score=0.75)")
+### Prerequisites
 
-Example Frames
-Request:
-  Content-Length: 88\r\n\r\n
-  {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"test"}}}
+*   Go toolchain installed.
 
-Response:
-  Content-Length: 166\r\n\r\n
-  {"jsonrpc":"2.0","id":1,"result":{"serverInfo":{"name":"agon-mcp","version":"0.1.0"},"capabilities":{"tools":{"list":true,"call":true}}}}
+### Building
 
-Notes
-- This server aims to be simple and illustrative, not a full MCP reference.
-- Extend by adding tools in `mcp/main.go` and updating the list returned by tools/list.
-4) current_weather
-   - name: "current_weather"
-   - input_schema:
-     {
-       "type": "object",
-       "properties": {"location": {"type": "string"}},
-       "required": ["location"]
-     }
-   - returns: two content parts
-     - type: "json" — raw current conditions as JSON
-     - type: "interpret" — a server-provided prompt instructing the LLM to produce a natural-language summary
+To build the `agon-mcp` binary, you can use `goreleaser` (which also builds `agon`):
 
-   The MCP provider in agon detects this pair and performs a non‑streaming follow‑up chat with the LLM: it supplies the JSON and the prompt, disables tools for that round, and renders the LLM’s natural‑language result to the console. The raw JSON is not printed directly.
+```bash
+goreleaser release --snapshot --clean --skip=publish
+```
 
-Debug Logging
-- The server logs failures and errors during geocoding/weather fetch.
-- The MCP provider logs when it sends the JSON+prompt to the LLM and when it receives the interpretation, including sizes and timing.
+Alternatively, you can build it manually:
+
+```bash
+go build -o dist/agon-mcp ./mcp
+```
+
+### Running
+
+The `agon-mcp` server is typically started and managed by the `agon` CLI when `mcpMode` is enabled.
+
+## Protocol Notes
+
+The MCP server communicates using JSON-RPC 2.0 over standard I/O with Content-Length framing.
+
+### Transport
+
+*   `stdio` with ``Content-Length: <bytes>\r\n\r\n<json>`` frames.
+
+### Supported Methods
+
+*   **`initialize`**: Returns server information and capabilities (tools list/call).
+*   **`ping`**: Returns an empty result (useful for health checks).
+*   **`tools/list`**: Returns tool definitions, including their JSON Schemas.
+*   **`tools/call`**: Executes a specified tool with provided arguments and returns an array of content parts.
+
+## Tool Details
+
+### `current_weather`
+
+*   **Name**: `current_weather`
+*   **Description**: Provides weather conditions for a *specific geographical location*. Use this tool for queries about temperature, precipitation, wind, or forecasts. **Do not use this tool for queries about the current time.**
+*   **Input Schema**:
+    ```json
+    {
+      "type": "object",
+      "properties": {"location": {"type": "string", "description": "The city and state (e.g., 'Portland, OR') or city and country (e.g., 'London, UK'). You MUST provide a location. If the user only gives a city, you MUST ask for the state or country to avoid ambiguity."}},
+      "required": ["location"]
+    }
+    ```
+*   **Returns**: Two content parts:
+    *   `type: "json"`: Raw current conditions as JSON.
+    *   `type: "interpret"`: A server-provided prompt instructing the LLM to produce a natural-language summary.
+
+    *Note*: The MCP provider in `agon` detects this pair and performs a non‑streaming follow‑up chat with the LLM: it supplies the JSON and the prompt, disables tools for that round, and renders the LLM’s natural‑language result to the console. The raw JSON is not printed directly.
+
+### `current_time`
+
+*   **Name**: `current_time`
+*   **Description**: Use this tool *only* for queries about the current time, such as 'What time is it?' or 'What is the current time?'. **This tool cannot provide any weather information.**
+*   **Input Schema**:
+    ```json
+    {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+    ```
+*   **Returns**: Two content parts:
+    *   `type: "json"`: Raw current time data as JSON.
+    *   `type: "interpret"`: A server-provided prompt instructing the LLM to produce a natural-language summary.
+
+### `general_question`
+
+*   **Name**: `answer_general_question`
+*   **Description**: Use this tool to answer general questions that do not require real-time information or specific device actions. Most questions about facts, history, or general knowledge fall into this category.
+*   **Input Schema**:
+    ```json
+    {
+      "type": "object",
+      "properties": {"question": {"type": "string", "description": "The user's original question."}},
+      "required": ["question"]
+    }
+    ```
+*   **Returns**: The user's original question as plain text, indicating the LLM should answer it directly.
+
+## Example Frames
+
+### Request Example (`initialize`)
+
+```
+Content-Length: 88
+
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"test"}}}
+```
+
+### Response Example (`initialize`)
+
+```
+Content-Length: 166
+
+{"jsonrpc":"2.0","id":1,"result":{"serverInfo":{"name":"agon-mcp","version":"0.1.0"},"capabilities":{"tools":{"list":true,"call":true}}}}
+```
+
+## Notes
+
+*   This server aims to be simple and illustrative, not a full MCP reference implementation.
+*   You can extend its functionality by adding new tools in `mcp/main.go` and updating the list returned by `tools/list`.
+
+## Debug Logging
+
+When `debug` mode is enabled in the main `agon` CLI configuration, the `agon-mcp` server logs its activity to `agon-mcp-server.log`. This includes:
+
+*   Failures and errors during external API calls (e.g., geocoding/weather fetch).
+*   MCP provider logs when it sends JSON+prompt to the LLM for interpretation and when it receives the interpretation, including sizes and timing.
+*   Context cancellation events are also logged when a request is interrupted, providing insight into graceful shutdowns.
