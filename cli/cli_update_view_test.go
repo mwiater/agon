@@ -2,6 +2,7 @@
 package cli
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -14,7 +15,7 @@ func TestSingleModel_StateTransitions_And_View(t *testing.T) {
 	cfg := &Config{Hosts: []Host{{Name: "HostA", URL: "http://x", Models: []string{"m1", "m2"}}}}
 	provider := newTestProvider()
 	provider.loadedModels["HostA"] = []string{"m1"}
-	m := initialModel(cfg, provider)
+	m := initialModel(context.Background(), cfg, provider)
 
 	_, _ = m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 
@@ -83,7 +84,7 @@ func TestMultimodel_Assignment_And_Chat_Flow(t *testing.T) {
 	}}
 	provider := newTestProvider()
 
-	mm := initialMultimodelModel(cfg, provider)
+	mm := initialMultimodelModel(context.Background(), cfg, provider)
 	mm.program = &tea.Program{}
 
 	_, _ = mm.Update(tea.WindowSizeMsg{Width: 120, Height: 40})

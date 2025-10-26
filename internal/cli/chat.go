@@ -2,6 +2,7 @@
 package agon
 
 import (
+	"context"
 	"log"
 
 	"github.com/mwiater/agon/cli"
@@ -19,20 +20,22 @@ var chatCmd = &cobra.Command{
 	Short: "Start a chat session",
 	Long:  `The 'chat' command starts an interactive chat session with a large language model.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx, cancel := context.WithCancel(context.Background())
+
 		cfg := getConfig()
 		if cfg == nil {
-			startGUI(cfg)
+			startGUI(ctx, cfg, cancel)
 			return
 		}
 
 		if cfg.PipelineMode {
-			if err := startPipelineGUI(cfg); err != nil {
+			if err := startPipelineGUI(ctx, cfg, cancel); err != nil {
 				log.Fatalf("Error running pipeline program: %v", err)
 			}
 			return
 		}
 
-		startGUI(cfg)
+		startGUI(ctx, cfg, cancel)
 	},
 }
 

@@ -52,6 +52,7 @@ const (
 // model is the main application model for the Bubble Tea UI. It holds all the
 // state necessary for the chat application to function.
 type model struct {
+	ctx              context.Context
 	config           *Config
 	provider         providers.ChatProvider
 	mcpStatus        mcpStatus
@@ -77,7 +78,7 @@ type model struct {
 // initialModel creates and initializes a new model with default values. It sets
 // up the necessary Bubble Tea components, such as the spinner, textarea, and lists,
 // and configures the HTTP client with the appropriate timeout.
-func initialModel(cfg *Config, provider providers.ChatProvider) *model {
+func initialModel(ctx context.Context, cfg *Config, provider providers.ChatProvider) *model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
@@ -102,6 +103,7 @@ func initialModel(cfg *Config, provider providers.ChatProvider) *model {
 	vp := viewport.New(100, 5)
 
 	return &model{
+		ctx:       ctx,
 		config:    cfg,
 		provider:  provider,
 		mcpStatus: deriveMCPStatus(cfg, provider),
@@ -228,7 +230,7 @@ func loadModelCmd(host Host, modelName string, provider providers.ChatProvider) 
 // streamChatCmd creates a Bubble Tea command that initiates a streaming chat
 // conversation with the selected language model. It delegates streaming to the
 // configured provider and relays chunk and completion events back to the UI.
-func streamChatCmd(p *tea.Program, provider providers.ChatProvider, host Host, modelName string, history []chatMessage, systemPrompt string, JSONFormat bool, parameters Parameters) tea.Cmd {
+func streamChatCmd(ctx context.Context, p *tea.Program, provider providers.ChatProvider, host Host, modelName string, history []chatMessage, systemPrompt string, JSONFormat bool, parameters Parameters) tea.Cmd {
 	return func() tea.Msg {
 		req := providers.StreamRequest{
 			Host:         host,
@@ -242,7 +244,7 @@ func streamChatCmd(p *tea.Program, provider providers.ChatProvider, host Host, m
 		log.Printf("[agon -> %s (%s)] Outgoing request: user_prompt='%s', system_prompt='%s'", host.Name, modelName, lastUserPrompt(history), systemPrompt)
 
 		go func() {
-			err := provider.Stream(context.Background(), req, providers.StreamCallbacks{
+			err := provider.Stream(ctx, req, providers.StreamCallbacks{
 				OnChunk: func(msg providers.ChatMessage) error {
 					log.Printf("[provider -> agon] Incoming chunk: %s", msg.Content)
 					p.Send(streamChunkMsg(msg.Content))
@@ -409,7 +411,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.isLoading = true
 				m.err = nil
 
-				cmds = append(cmds, m.spinner.Tick, streamChatCmd(m.program, m.provider, m.selectedHost, m.selectedModel, m.chatHistory, m.selectedHost.SystemPrompt, m.config.JSONMode, m.selectedHost.Parameters))
+				cmds = append(cmds, m.spinner.Tick, streamChatCmd(m.ctx, m.program, m.provider, m.selectedHost, m.selectedModel, m.chatHistory, m.selectedHost.SystemPrompt, m.config.JSONMode, m.selectedHost.Parameters))
 			}
 		}
 	}
@@ -680,12 +682,16 @@ func formatMeta(meta LLMResponseMeta) string {
 // It reads configuration from config/config.json by default, optionally switches to multimodel
 // mode, and blocks until the UI exits. It logs diagnostic output to agon.log
 // when enabled. StartGUI does not return a value.
-func StartGUI(cfg *appconfig.Config) {
+func StartGUI(ctx context.Context, cfg *appconfig.Config, cancel context.CancelFunc) {
 	f, err := tea.LogToFile("agon.log", "debug")
 	if err != nil {
 		log.Fatalf("could not open log file: %v", err)
 	}
 	defer f.Close()
+	defer func() {
+		log.Println("Cancelling all running requests...")
+		cancel()
+	}()
 
 	if cfg == nil {
 		log.Fatalf("Failed to start: configuration is not loaded")
@@ -709,13 +715,13 @@ func StartGUI(cfg *appconfig.Config) {
 
 	if cfg.MultimodelMode {
 		models.UnloadModels(cfg)
-		if err := StartMultimodelGUI(cfg, provider); err != nil {
+		if err := StartMultimodelGUI(ctx, cfg, provider, cancel); err != nil {
 			log.Fatalf("Error running multimodel program: %v", err)
 		}
 		return
 	}
 
-	m := initialModel(cfg, provider)
+	m := initialModel(ctx, cfg, provider)
 
 	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	m.program = p

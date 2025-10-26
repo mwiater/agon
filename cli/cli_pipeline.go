@@ -207,6 +207,7 @@ type exportTokens struct {
 
 // pipelineModel owns all state for the pipeline Bubble Tea program.
 type pipelineModel struct {
+	ctx            context.Context
 	config         *Config
 	client         *http.Client
 	requestTimeout time.Duration
@@ -259,7 +260,7 @@ type pipelineModel struct {
 }
 
 // initialPipelineModel constructs a model with sensible defaults and four stages.
-func initialPipelineModel(cfg *Config, provider providers.ChatProvider) *pipelineModel {
+func initialPipelineModel(ctx context.Context, cfg *Config, provider providers.ChatProvider) *pipelineModel {
 	timeout := cfg.RequestTimeout()
 
 	s := spinner.New()
@@ -298,6 +299,7 @@ func initialPipelineModel(cfg *Config, provider providers.ChatProvider) *pipelin
 	modelList.Title = "Select a Model"
 
 	return &pipelineModel{
+		ctx:                ctx,
 		config:             cfg,
 		requestTimeout:     timeout,
 		mcpStatus:          deriveMCPStatus(cfg, provider),
@@ -1195,7 +1197,7 @@ func (m *pipelineModel) queueStage(index int) tea.Cmd {
 		}
 	}
 
-	return pipelineStreamStageCmd(m.program, m.provider, m.config.Debug, index, stage.host, stage.selectedModel, messages, stage.systemPrompt, stage.parameters, payload, m.config.JSONMode, m.client, m.requestTimeout)
+	return pipelineStreamStageCmd(m.ctx, m.program, m.provider, m.config.Debug, index, stage.host, stage.selectedModel, messages, stage.systemPrompt, stage.parameters, payload, m.config.JSONMode, m.client, m.requestTimeout)
 }
 
 func (m *pipelineModel) advanceToNextStage(current int, payload string) tea.Cmd {
@@ -1576,9 +1578,14 @@ func (m *pipelineModel) exportPipelineMarkdown(path string) error {
 
 // StartPipelineGUI initializes the pipeline Bubble Tea program and blocks until exit.
 
-func StartPipelineGUI(cfg *Config) error {
+func StartPipelineGUI(ctx context.Context, cfg *Config, cancel context.CancelFunc) error {
 	var provider providers.ChatProvider
 	var err error
+
+	defer func() {
+		log.Println("Cancelling all running requests...")
+		cancel()
+	}()
 
 	if cfg.MCPMode {
 		provider, err = providerfactory.NewChatProvider(cfg)
@@ -1589,7 +1596,7 @@ func StartPipelineGUI(cfg *Config) error {
 		}
 	}
 
-	m := initialPipelineModel(cfg, provider)
+	m := initialPipelineModel(ctx, cfg, provider)
 	m.client = &http.Client{
 		Transport: &http.Transport{ForceAttemptHTTP2: false},
 		Timeout:   m.requestTimeout,
@@ -1613,7 +1620,7 @@ func StartPipelineGUI(cfg *Config) error {
 				}
 			}
 		}
-		multiErr := StartMultimodelGUI(cfg, provider)
+		multiErr := StartMultimodelGUI(m.ctx, cfg, provider, cancel)
 		if provider != nil {
 			if cerr := provider.Close(); cerr != nil && multiErr == nil {
 				multiErr = cerr
@@ -1633,7 +1640,7 @@ func StartPipelineGUI(cfg *Config) error {
 
 // pipelineStreamStageCmd streams a stage response and emits updates to the Bubble Tea program.
 
-func pipelineStreamStageCmd(p *tea.Program, chatProvider providers.ChatProvider, debug bool, stageIndex int, host Host, modelName string, history []chatMessage, systemPrompt string, parameters Parameters, payload string, jsonMode bool, client *http.Client, timeout time.Duration) tea.Cmd {
+func pipelineStreamStageCmd(pctx context.Context, p *tea.Program, chatProvider providers.ChatProvider, debug bool, stageIndex int, host Host, modelName string, history []chatMessage, systemPrompt string, parameters Parameters, payload string, jsonMode bool, client *http.Client, timeout time.Duration) tea.Cmd {
 	return func() tea.Msg {
 		messages := history
 		if systemPrompt != "" {
@@ -1641,7 +1648,7 @@ func pipelineStreamStageCmd(p *tea.Program, chatProvider providers.ChatProvider,
 		}
 
 		if chatProvider != nil {
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			ctx, cancel := context.WithTimeout(pctx, timeout)
 			request := providers.StreamRequest{
 				Host:         host,
 				Model:        modelName,
@@ -1690,7 +1697,7 @@ func pipelineStreamStageCmd(p *tea.Program, chatProvider providers.ChatProvider,
 
 		body, _ := json.Marshal(bodyPayload)
 
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		ctx, cancel := context.WithTimeout(pctx, timeout)
 		req, err := http.NewRequestWithContext(ctx, "POST", host.URL+"/api/chat", bytes.NewReader(body))
 		if err != nil {
 			cancel()

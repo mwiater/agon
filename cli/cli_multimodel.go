@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -49,6 +50,8 @@ type multimodelColumnResponse struct {
 
 // multimodelModel is the Bubble Tea model for multimodel mode.
 type multimodelModel struct {
+	// ctx is the application-wide context for cancellation.
+	ctx context.Context
 	// config stores the shared application configuration.
 	config *Config
 	// provider issues chat interactions on behalf of the UI.
@@ -88,6 +91,8 @@ type multimodelModel struct {
 	width, height int
 	// program references the Bubble Tea program running the TUI.
 	program *tea.Program
+
+	requestWg sync.WaitGroup
 }
 
 // assignmentItem represents a host row in the assignment list.
@@ -147,7 +152,7 @@ type multimodelStreamErr struct {
 }
 
 // initialMultimodelModel creates a new multimodel Bubble Tea model with defaults.
-func initialMultimodelModel(cfg *Config, provider providers.ChatProvider) *multimodelModel {
+func initialMultimodelModel(ctx context.Context, cfg *Config, provider providers.ChatProvider) *multimodelModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
@@ -182,6 +187,7 @@ func initialMultimodelModel(cfg *Config, provider providers.ChatProvider) *multi
 	modelList := list.New(nil, list.NewDefaultDelegate(), 0, 0)
 
 	return &multimodelModel{
+		ctx:               ctx,
 		config:            cfg,
 		provider:          provider,
 		mcpStatus:         deriveMCPStatus(cfg, provider),
@@ -209,8 +215,10 @@ func multimodelStreamChatCmd(p *tea.Program, m *multimodelModel) tea.Cmd {
 	return func() tea.Msg {
 		for i, assignment := range m.assignments {
 			if assignment.isAssigned {
+				m.requestWg.Add(1)
 				go func(hostIndex int, host Host, model string, history []chatMessage) {
-					if err := streamToColumn(p, m.provider, hostIndex, host, model, history, host.SystemPrompt, m.config.JSONMode, host.Parameters); err != nil {
+					defer m.requestWg.Done()
+					if err := streamToColumn(m.ctx, p, m.provider, hostIndex, host, model, history, host.SystemPrompt, m.config.JSONMode, host.Parameters); err != nil {
 						p.Send(multimodelStreamErr{hostIndex: hostIndex, err: err})
 					}
 				}(i, assignment.host, assignment.selectedModel, m.columnResponses[i].chatHistory)
@@ -221,7 +229,7 @@ func multimodelStreamChatCmd(p *tea.Program, m *multimodelModel) tea.Cmd {
 }
 
 // streamToColumn streams chat responses for a single assigned column.
-func streamToColumn(p *tea.Program, provider providers.ChatProvider, hostIndex int, host Host, modelName string, history []chatMessage, systemPrompt string, JSONFormat bool, parameters Parameters) error {
+func streamToColumn(ctx context.Context, p *tea.Program, provider providers.ChatProvider, hostIndex int, host Host, modelName string, history []chatMessage, systemPrompt string, JSONFormat bool, parameters Parameters) error {
 	req := providers.StreamRequest{
 		Host:         host,
 		Model:        modelName,
@@ -231,7 +239,7 @@ func streamToColumn(p *tea.Program, provider providers.ChatProvider, hostIndex i
 		JSONMode:     JSONFormat,
 	}
 
-	return provider.Stream(context.Background(), req, providers.StreamCallbacks{
+	return provider.Stream(ctx, req, providers.StreamCallbacks{
 		OnChunk: func(msg providers.ChatMessage) error {
 			p.Send(multimodelStreamChunkMsg{hostIndex: hostIndex, message: msg})
 			return nil
@@ -675,12 +683,14 @@ func (m *multimodelModel) multimodelChatView() string {
 // StartMultimodelGUI initializes and runs the four-column multimodel chat UI.
 // It accepts a parsed Config and provider, sets up the Bubble Tea program, and blocks until
 // the UI exits. StartMultimodelGUI returns an error if the TUI cannot be run.
-func StartMultimodelGUI(cfg *Config, provider providers.ChatProvider) error {
-	m := initialMultimodelModel(cfg, provider)
+func StartMultimodelGUI(ctx context.Context, cfg *Config, provider providers.ChatProvider, cancel context.CancelFunc) error {
+	m := initialMultimodelModel(ctx, cfg, provider)
 
 	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	m.program = p
 
 	_, err := p.Run()
+	cancel()
+	m.requestWg.Wait()
 	return err
 }

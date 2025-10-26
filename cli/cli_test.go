@@ -2,6 +2,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -26,7 +27,7 @@ func TestUpdate(t *testing.T) {
 	}
 	provider := newTestProvider()
 	provider.loadedModels["Test Host"] = []string{"model1"}
-	m := initialModel(cfg, provider)
+	m := initialModel(context.Background(), cfg, provider)
 
 	if m.state != viewHostSelector {
 		t.Errorf("Expected initial state to be viewHostSelector, got %v", m.state)
@@ -48,7 +49,7 @@ func TestUpdate(t *testing.T) {
 		t.Errorf("Expected width and height to be 100, got %d and %d", m.width, m.height)
 	}
 
-	m = initialModel(cfg, provider)
+	m = initialModel(context.Background(), cfg, provider)
 
 	newModel, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = newModel.(*model)
@@ -75,7 +76,7 @@ func TestView(t *testing.T) {
 	}
 	provider := newTestProvider()
 	provider.loadedModels["Test Host"] = []string{"model1"}
-	m := initialModel(cfg, provider)
+	m := initialModel(context.Background(), cfg, provider)
 
 	m.width = 0
 	view := m.View()
