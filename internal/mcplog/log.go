@@ -3,31 +3,58 @@ package mcplog
 import (
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
-
-	"github.com/mwiater/agon/internal/appconfig"
 )
 
-var mu sync.Mutex
+var (
+	mu      sync.Mutex
+	logFile *os.File
+)
 
-// Write appends a formatted message to agon-mcp-server.log when debug mode is enabled.
-func Write(cfg *appconfig.Config, format string, args ...any) {
-	if cfg == nil || !cfg.Debug {
+func ensureFile() (*os.File, error) {
+	if logFile != nil {
+		return logFile, nil
+	}
+	file, err := os.OpenFile("agon-mcp-server.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return nil, err
+	}
+	logFile = file
+	return logFile, nil
+}
+
+func Close() error {
+	mu.Lock()
+	defer mu.Unlock()
+	if logFile == nil {
+		return nil
+	}
+	err := logFile.Close()
+	logFile = nil
+	return err
+}
+
+func Write(message string) {
+	if strings.TrimSpace(message) == "" {
 		return
 	}
+	writeLine(message)
+}
 
-	msg := fmt.Sprintf(format, args...)
+func Writef(format string, args ...any) {
+	writeLine(fmt.Sprintf(format, args...))
+}
 
+func writeLine(line string) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	file, err := os.OpenFile("agon-mcp-server.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	file, err := ensureFile()
 	if err != nil {
 		return
 	}
-	defer file.Close()
-
 	timestamp := time.Now().Format(time.RFC3339)
-	fmt.Fprintf(file, "[%s] %s\n", timestamp, msg)
+	fmt.Fprintf(file, "[%s] %s\n", timestamp, line)
 }

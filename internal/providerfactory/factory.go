@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/mwiater/agon/internal/appconfig"
-	"github.com/mwiater/agon/internal/mcplog"
+	"github.com/mwiater/agon/internal/logging"
 	"github.com/mwiater/agon/internal/providers"
 	"github.com/mwiater/agon/internal/providers/mcp"
 	"github.com/mwiater/agon/internal/providers/ollama"
@@ -20,10 +20,10 @@ func NewChatProvider(cfg *appconfig.Config) (providers.ChatProvider, error) {
 	if cfg.MCPMode {
 		provider, err := mcp.New(context.Background(), cfg)
 		if err != nil {
-			mcplog.Write(cfg, "MCP provider unavailable: %v", err)
+			logging.LogEvent("MCP provider unavailable: %v", err)
 			return nil, err
 		}
-		mcplog.Write(cfg, "MCP provider ready: using local server")
+		logging.LogEvent("MCP provider ready: using local server")
 		return provider, nil
 	}
 

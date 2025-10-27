@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -16,7 +15,7 @@ import (
 	"time"
 
 	"github.com/mwiater/agon/internal/appconfig"
-	"github.com/mwiater/agon/internal/mcplog"
+	"github.com/mwiater/agon/internal/logging"
 	"github.com/mwiater/agon/internal/providers"
 	"github.com/mwiater/agon/internal/providers/ollama"
 )
@@ -31,12 +30,14 @@ type Provider struct {
 	seq       int64
 	fallback  providers.ChatProvider
 	rpcMu     sync.Mutex
+	rpcMetaMu sync.Mutex
+	rpcMeta   map[string]rpcMetadata
 	toolIndex map[string]providers.ToolDefinition
 	toolDefs  []providers.ToolDefinition
 }
 
 func (p *Provider) log(format string, args ...any) {
-	mcplog.Write(p.cfg, format, args...)
+	logging.LogEvent(format, args...)
 }
 
 func truncateForLog(s string, max int) string {
@@ -61,6 +62,17 @@ func formatArgs(args map[string]any) string {
 	return string(data)
 }
 
+func hostLabel(host appconfig.Host) string {
+	name := strings.TrimSpace(host.Name)
+	if name != "" {
+		return name
+	}
+	if url := strings.TrimSpace(host.URL); url != "" {
+		return url
+	}
+	return "local-mcp"
+}
+
 func lastUserPrompt(history []providers.ChatMessage) string {
 	for i := len(history) - 1; i >= 0; i-- {
 		if strings.ToLower(history[i].Role) == "user" {
@@ -72,18 +84,65 @@ func lastUserPrompt(history []providers.ChatMessage) string {
 
 func (p *Provider) logToolRequest(name, host, model string, args map[string]any) {
 	payload := formatArgs(args)
-	p.log("Tool requested: tool=%s args=%s host=%s model=%s", name, payload, host, model)
-	if p.cfg != nil && p.cfg.Debug {
-		log.Printf("Tool request: host=%s model=%s %s %s", host, model, name, payload)
-	}
+	logging.LogEvent("Tool requested: tool=%s host=%s model=%s args=%s", name, host, model, payload)
 }
 
 func (p *Provider) logToolSuccess(name, result, host, model string) {
 	truncated := truncateForLog(result, 160)
-	p.log("Tool executed: tool=%s host=%s model=%s output=%s", name, host, model, truncated)
-	if p.cfg != nil && p.cfg.Debug {
-		log.Printf("Tool result: host=%s model=%s %s %s", host, model, name, result)
+	logging.LogEvent("Tool executed: tool=%s host=%s model=%s output=%s", name, host, model, truncated)
+}
+
+func (p *Provider) defaultMCPHost() string {
+	if p.cfg != nil {
+		if strings.TrimSpace(p.cfg.MCPBinary) != "" {
+			return p.cfg.MCPBinary
+		}
+		if strings.TrimSpace(p.cfg.ConfigPath) != "" {
+			return p.cfg.ConfigPath
+		}
 	}
+	return "local-mcp"
+}
+
+func (p *Provider) storeRPCMeta(id string, meta rpcMetadata) {
+	p.rpcMetaMu.Lock()
+	if p.rpcMeta == nil {
+		p.rpcMeta = make(map[string]rpcMetadata)
+	}
+	p.rpcMeta[id] = meta
+	p.rpcMetaMu.Unlock()
+}
+
+func (p *Provider) popRPCMeta(id string) (rpcMetadata, bool) {
+	p.rpcMetaMu.Lock()
+	defer p.rpcMetaMu.Unlock()
+	if p.rpcMeta == nil {
+		return rpcMetadata{}, false
+	}
+	meta, ok := p.rpcMeta[id]
+	if ok {
+		delete(p.rpcMeta, id)
+	}
+	return meta, ok
+}
+
+func normalizeID(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	trimmed := strings.TrimSpace(string(raw))
+	trimmed = strings.Trim(trimmed, "\"")
+	return trimmed
+}
+
+func toolLabel(meta rpcMetadata) string {
+	if strings.TrimSpace(meta.tool) != "" {
+		return meta.tool
+	}
+	if strings.TrimSpace(meta.method) != "" {
+		return meta.method
+	}
+	return "unknown"
 }
 
 type jsonrpcResponse struct {
@@ -96,6 +155,13 @@ type jsonrpcResponse struct {
 type jsonrpcError struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
+}
+
+type rpcMetadata struct {
+	method string
+	host   string
+	model  string
+	tool   string
 }
 
 // New spins up the MCP server process and performs the initialize handshake.
@@ -111,10 +177,10 @@ func New(ctx context.Context, cfg *appconfig.Config) (*Provider, error) {
 
 	if _, err := os.Stat(binary); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			mcplog.Write(cfg, "MCP server start aborted: binary %q missing", binary)
+			logging.LogEvent("MCP server start aborted: binary %q missing", binary)
 			return nil, fmt.Errorf("mcp binary not found at %q", binary)
 		}
-		mcplog.Write(cfg, "MCP server start aborted: binary %q not accessible (%v)", binary, err)
+		logging.LogEvent("MCP server start aborted: binary %q not accessible (%v)", binary, err)
 		return nil, fmt.Errorf("mcp binary %q not accessible: %w", binary, err)
 	}
 
@@ -132,7 +198,7 @@ func New(ctx context.Context, cfg *appconfig.Config) (*Provider, error) {
 	}
 
 	if err := cmd.Start(); err != nil {
-		mcplog.Write(cfg, "MCP server failed to start: %v", err)
+		logging.LogEvent("MCP server failed to start: %v", err)
 		return nil, fmt.Errorf("start mcp server: %w", err)
 	}
 
@@ -143,6 +209,7 @@ func New(ctx context.Context, cfg *appconfig.Config) (*Provider, error) {
 		reader:    bufio.NewReader(stdout),
 		writer:    bufio.NewWriter(stdin),
 		fallback:  ollama.New(cfg),
+		rpcMeta:   make(map[string]rpcMetadata),
 		toolIndex: make(map[string]providers.ToolDefinition),
 	}
 
@@ -169,29 +236,15 @@ func New(ctx context.Context, cfg *appconfig.Config) (*Provider, error) {
 }
 
 func (p *Provider) initialize(ctx context.Context) error {
-	id := p.nextID()
-	payload := map[string]any{
-		"jsonrpc": "2.0",
-		"id":      id,
-		"method":  "initialize",
-		"params": map[string]any{
-			"clientInfo": map[string]any{
-				"name":    "agon-cli",
-				"version": "dev",
-			},
+	params := map[string]any{
+		"clientInfo": map[string]any{
+			"name":    "agon-cli",
+			"version": "dev",
 		},
 	}
-
-	if err := p.writeMessage(payload); err != nil {
-		return fmt.Errorf("mcp initialize write: %w", err)
-	}
-
-	resp, err := p.readResponse(ctx)
-	if err != nil {
-		return fmt.Errorf("mcp initialize read: %w", err)
-	}
-	if resp.Error != nil {
-		return fmt.Errorf("mcp initialize error: %s", resp.Error.Message)
+	meta := rpcMetadata{host: p.defaultMCPHost(), method: "initialize"}
+	if _, err := p.rpcCall(ctx, "initialize", params, meta); err != nil {
+		return fmt.Errorf("mcp initialize: %w", err)
 	}
 	return nil
 }
@@ -208,8 +261,10 @@ func (p *Provider) writeMessage(v any) error {
 	if err != nil {
 		return err
 	}
-	// This JSON-RPC frame is between agon and the MCP server over stdio.
-	p.log("[agon -> mcp] Outgoing request: %s", string(data))
+	return p.writeRawFrame(data)
+}
+
+func (p *Provider) writeRawFrame(data []byte) error {
 	if _, err := fmt.Fprintf(p.writer, "Content-Length: %d\r\n\r\n", len(data)); err != nil {
 		return err
 	}
@@ -219,31 +274,32 @@ func (p *Provider) writeMessage(v any) error {
 	return p.writer.Flush()
 }
 
-func (p *Provider) readResponse(ctx context.Context) (jsonrpcResponse, error) {
+func (p *Provider) readResponse(ctx context.Context) (jsonrpcResponse, []byte, error) {
 	type result struct {
 		resp jsonrpcResponse
+		raw  []byte
 		err  error
 	}
 	done := make(chan result, 1)
 	go func() {
-		r, err := p.readResponseBlocking()
-		done <- result{resp: r, err: err}
+		r, raw, err := p.readResponseBlocking()
+		done <- result{resp: r, raw: raw, err: err}
 	}()
 
 	select {
 	case <-ctx.Done():
-		return jsonrpcResponse{}, ctx.Err()
+		return jsonrpcResponse{}, nil, ctx.Err()
 	case res := <-done:
-		return res.resp, res.err
+		return res.resp, res.raw, res.err
 	}
 }
 
-func (p *Provider) readResponseBlocking() (jsonrpcResponse, error) {
+func (p *Provider) readResponseBlocking() (jsonrpcResponse, []byte, error) {
 	headers := make(map[string]string)
 	for {
 		line, err := p.reader.ReadString('\n')
 		if err != nil {
-			return jsonrpcResponse{}, err
+			return jsonrpcResponse{}, nil, err
 		}
 		if line == "\r\n" || line == "\n" {
 			break
@@ -259,29 +315,27 @@ func (p *Provider) readResponseBlocking() (jsonrpcResponse, error) {
 
 	cl, ok := headers["content-length"]
 	if !ok {
-		return jsonrpcResponse{}, fmt.Errorf("missing Content-Length header")
+		return jsonrpcResponse{}, nil, fmt.Errorf("missing Content-Length header")
 	}
 
 	var length int
 	if _, err := fmt.Sscanf(cl, "%d", &length); err != nil {
-		return jsonrpcResponse{}, fmt.Errorf("invalid Content-Length: %w", err)
+		return jsonrpcResponse{}, nil, fmt.Errorf("invalid Content-Length: %w", err)
 	}
 
 	body := make([]byte, length)
 	if _, err := io.ReadFull(p.reader, body); err != nil {
-		return jsonrpcResponse{}, err
+		return jsonrpcResponse{}, nil, err
 	}
-	// This JSON-RPC frame is from the MCP server back to agon over stdio.
-	p.log("[mcp -> agon] Incoming response: %s", string(body))
 
 	var resp jsonrpcResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
-		return jsonrpcResponse{}, err
+		return jsonrpcResponse{}, body, err
 	}
-	return resp, nil
+	return resp, body, nil
 }
 
-func (p *Provider) rpcCall(ctx context.Context, method string, params map[string]any) (jsonrpcResponse, error) {
+func (p *Provider) rpcCall(ctx context.Context, method string, params map[string]any, meta rpcMetadata) (jsonrpcResponse, error) {
 	p.rpcMu.Lock()
 	defer p.rpcMu.Unlock()
 
@@ -294,13 +348,50 @@ func (p *Provider) rpcCall(ctx context.Context, method string, params map[string
 	if params != nil {
 		payload["params"] = params
 	}
-	if err := p.writeMessage(payload); err != nil {
-		return jsonrpcResponse{}, err
+	if meta.method == "" {
+		meta.method = method
 	}
-	resp, err := p.readResponse(ctx)
+	if meta.host == "" {
+		meta.host = p.defaultMCPHost()
+	}
+	metaKey := fmt.Sprintf("%d", id)
+	p.storeRPCMeta(metaKey, meta)
+
+	data, err := json.Marshal(payload)
 	if err != nil {
+		p.popRPCMeta(metaKey)
 		return jsonrpcResponse{}, err
 	}
+	logging.LogRequest("AGON->MCP", meta.host, meta.model, toolLabel(meta), data)
+
+	if err := p.writeRawFrame(data); err != nil {
+		p.popRPCMeta(metaKey)
+		return jsonrpcResponse{}, err
+	}
+
+	resp, raw, err := p.readResponse(ctx)
+	if err != nil {
+		p.popRPCMeta(metaKey)
+		return jsonrpcResponse{}, err
+	}
+
+	respID := normalizeID(resp.ID)
+	if respID == "" {
+		respID = metaKey
+	}
+	storedMeta, ok := p.popRPCMeta(respID)
+	if ok {
+		meta = storedMeta
+	}
+
+	payloadIn := raw
+	if len(payloadIn) == 0 {
+		if data, marshalErr := json.Marshal(resp); marshalErr == nil {
+			payloadIn = data
+		}
+	}
+	logging.LogRequest("MCP->AGON", meta.host, meta.model, toolLabel(meta), payloadIn)
+
 	if resp.Error != nil {
 		return jsonrpcResponse{}, fmt.Errorf("%s", resp.Error.Message)
 	}
@@ -311,7 +402,8 @@ func (p *Provider) discoverTools() error {
 	ctx, cancel := context.WithTimeout(context.Background(), p.cfg.MCPInitTimeoutDuration())
 	defer cancel()
 
-	resp, err := p.rpcCall(ctx, "tools/list", nil)
+	meta := rpcMetadata{host: p.defaultMCPHost(), method: "tools/list"}
+	resp, err := p.rpcCall(ctx, "tools/list", nil, meta)
 	if err != nil {
 		return err
 	}
@@ -375,7 +467,7 @@ type toolCallResponse struct {
 	Retry  bool
 }
 
-func (p *Provider) callTool(ctx context.Context, name string, args map[string]any) (toolCallResponse, error) {
+func (p *Provider) callTool(ctx context.Context, host, model, name string, args map[string]any) (toolCallResponse, error) {
 	if args == nil {
 		args = map[string]any{}
 	}
@@ -383,7 +475,13 @@ func (p *Provider) callTool(ctx context.Context, name string, args map[string]an
 		"name":      name,
 		"arguments": args,
 	}
-	resp, err := p.rpcCall(ctx, "tools/call", params)
+	meta := rpcMetadata{
+		host:   host,
+		model:  model,
+		tool:   name,
+		method: "tools/call",
+	}
+	resp, err := p.rpcCall(ctx, "tools/call", params, meta)
 	if err != nil {
 		return toolCallResponse{}, err
 	}
@@ -464,6 +562,7 @@ func (p *Provider) fixWithLLMRoundTrip(ctx context.Context, req providers.Stream
 	if err := ctx.Err(); err != nil {
 		return "", false, false, err
 	}
+	hostName := hostLabel(req.Host)
 	history := append([]providers.ChatMessage{}, req.History...)
 	fixText := strings.TrimSpace(fixInstruction)
 	if fixText == "" {
@@ -499,16 +598,21 @@ func (p *Provider) fixWithLLMRoundTrip(ctx context.Context, req providers.Stream
 		}
 		toolCtx, cancel := context.WithTimeout(execCtx, p.cfg.MCPInitTimeoutDuration())
 		defer cancel()
-		p.logToolRequest(name, req.Host.Name, req.Model, wireArgs)
-		resp, err := p.callTool(toolCtx, name, wireArgs)
+		attemptLabel := nextAttempt
+		if attemptLabel <= 0 {
+			attemptLabel = 1
+		}
+		logging.LogEvent("MCP tool attempt: tool=%s host=%s model=%s attempt=%d/%d (fix round-trip)", name, hostName, req.Model, attemptLabel, p.cfg.MCPRetryAttempts())
+		p.logToolRequest(name, hostName, req.Model, wireArgs)
+		resp, err := p.callTool(toolCtx, hostName, req.Model, name, wireArgs)
 		tcResp = resp
 		tcErr = err
 		if err != nil {
-			p.log("[ERROR] Tool retry via LLM failed: tool=%s host=%s model=%s reason=%v", name, req.Host.Name, req.Model, err)
+			p.log("[ERROR] Tool retry via LLM failed: tool=%s host=%s model=%s reason=%v", name, hostName, req.Model, err)
 			return "", err
 		}
 		// Defer interpretation to the outer retry controller; return raw output here.
-		p.logToolSuccess(name, resp.Output, req.Host.Name, req.Model)
+		p.logToolSuccess(name, resp.Output, hostName, req.Model)
 		return resp.Output, nil
 	}
 
@@ -534,19 +638,23 @@ func (p *Provider) fixWithLLMRoundTrip(ctx context.Context, req providers.Stream
 		"disable_streaming": true,
 	}
 	if data, err := json.Marshal(sendSummary); err == nil {
-		p.log("MCP->LLM fix send: tool=%s host=%s model=%s payload=%s", toolName, req.Host.Name, req.Model, string(data))
+		logging.LogRequest("MCP->LLM", hostName, req.Model, toolName, data)
 	} else {
-		p.log("MCP->LLM fix send: tool=%s host=%s model=%s", toolName, req.Host.Name, req.Model)
+		logging.LogEvent("MCP->LLM fix send: tool=%s host=%s model=%s", toolName, hostName, req.Model)
 	}
 	if err := p.fallback.Stream(ctx, fixReq, cb); err != nil {
-		p.log("MCP->LLM fix failed: tool=%s host=%s model=%s err=%v", toolName, req.Host.Name, req.Model, err)
+		logging.LogEvent("MCP->LLM fix failed: tool=%s host=%s model=%s err=%v", toolName, hostName, req.Model, err)
 		return "", false, false, err
 	}
 	dur := time.Since(start)
 	fixed := strings.TrimSpace(out.String())
 	// Log what is received: the assistant text captured from the fix round-trip.
 	recvPreview := truncateForLog(fixed, 500)
-	p.log("MCP->LLM fix recv: tool=%s host=%s model=%s chars=%d dur=%s payload=%s", toolName, req.Host.Name, req.Model, len(fixed), dur.String(), recvPreview)
+	logging.LogRequest("LLM->MCP", hostName, req.Model, toolName, map[string]any{
+		"characters": len(fixed),
+		"duration":   dur.String(),
+		"preview":    recvPreview,
+	})
 	// Report whether a tool call actually occurred and whether it asked for retry.
 	if tcErr == nil && (tcResp.Output != "" || tcResp.Retry) {
 		return tcResp.Output, true, tcResp.Retry, nil
@@ -582,7 +690,8 @@ func (p *Provider) EnsureModelReady(ctx context.Context, host appconfig.Host, mo
 func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, callbacks providers.StreamCallbacks) error {
 	userPrompt := lastUserPrompt(req.History)
 	systemPrompt := req.SystemPrompt
-	p.log("[agon -> mcp] Incoming request: user_prompt='%s', system_prompt='%s'", userPrompt, systemPrompt)
+	hostName := hostLabel(req.Host)
+	logging.LogEvent("[AGON->MCP] Incoming request metadata: user_prompt='%s', system_prompt='%s'", userPrompt, systemPrompt)
 	toolName, userText := p.selectTool(req.History)
 	executed := false
 	forwardReq := req
@@ -626,11 +735,12 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 			retryState[name] = attempt
 			wireArgs["__mcp_attempt"] = attempt
 			toolCtx, cancel := context.WithTimeout(execCtx, p.cfg.MCPInitTimeoutDuration())
-			p.logToolRequest(name, req.Host.Name, req.Model, wireArgs)
-			result, err := p.callTool(toolCtx, name, wireArgs)
+			logging.LogEvent("MCP tool attempt: tool=%s host=%s model=%s attempt=%d/%d", name, hostName, req.Model, attempt, retryLimit)
+			p.logToolRequest(name, hostName, req.Model, wireArgs)
+			result, err := p.callTool(toolCtx, hostName, req.Model, name, wireArgs)
 			cancel()
 			if err != nil {
-				p.log("[ERROR] Tool bypassed: tool=%s host=%s model=%s reason=%v", name, req.Host.Name, req.Model, err)
+				p.log("[ERROR] Tool bypassed: tool=%s host=%s model=%s reason=%v", name, hostName, req.Model, err)
 				return "", err
 			}
 			if result.Retry && attempt < retryLimit {
@@ -667,10 +777,10 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 					// Either success or max reached; return output (interpreting if requested).
 					retryState[name] = 0
 					if interp, ok := p.maybeInterpretResult(execCtx, req, name, fixedOut); ok {
-						p.logToolSuccess(name, interp, req.Host.Name, req.Model)
+						p.logToolSuccess(name, interp, hostName, req.Model)
 						return interp, nil
 					}
-					p.logToolSuccess(name, fixedOut, req.Host.Name, req.Model)
+					p.logToolSuccess(name, fixedOut, hostName, req.Model)
 					return fixedOut, nil
 				}
 				// Max attempts reached without success; fall through to return last known message.
@@ -678,10 +788,10 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 			retryState[name] = 0
 			// Potentially interpret via LLM if server requested it.
 			if interp, ok := p.maybeInterpretResult(execCtx, req, name, result.Output); ok {
-				p.logToolSuccess(name, interp, req.Host.Name, req.Model)
+				p.logToolSuccess(name, interp, hostName, req.Model)
 				return interp, nil
 			}
-			p.logToolSuccess(name, result.Output, req.Host.Name, req.Model)
+			p.logToolSuccess(name, result.Output, hostName, req.Model)
 			return result.Output, nil
 		}
 	}
@@ -698,12 +808,13 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 			}
 			retryState[toolName] = attempt
 			args["__mcp_attempt"] = attempt
+			logging.LogEvent("MCP tool attempt: tool=%s host=%s model=%s attempt=%d/%d", toolName, hostName, req.Model, attempt, retryLimit)
 			toolCtx, cancel := context.WithTimeout(ctx, p.cfg.MCPInitTimeoutDuration())
-			p.logToolRequest(toolName, req.Host.Name, req.Model, args)
-			result, err := p.callTool(toolCtx, toolName, args)
+			p.logToolRequest(toolName, hostName, req.Model, args)
+			result, err := p.callTool(toolCtx, hostName, req.Model, toolName, args)
 			cancel()
 			if err != nil {
-				p.log("[ERROR] Tool bypassed: tool=%s host=%s model=%s reason=%v", toolName, req.Host.Name, req.Model, err)
+				p.log("[ERROR] Tool bypassed: tool=%s host=%s model=%s reason=%v", toolName, hostName, req.Model, err)
 				break
 			}
 			if result.Retry && attempt < retryLimit {
@@ -745,7 +856,7 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 			executed = true
 			// If the result is an interpret envelope, perform the interpretation round-trip first.
 			if interp, ok := p.maybeInterpretResult(ctx, req, toolName, result.Output); ok {
-				p.logToolSuccess(toolName, interp, req.Host.Name, req.Model)
+				p.logToolSuccess(toolName, interp, hostName, req.Model)
 				output := fmt.Sprintf("[MCP %s] %s", toolName, strings.TrimSpace(interp))
 				if callbacks.OnChunk != nil {
 					if err := callbacks.OnChunk(providers.ChatMessage{Role: "assistant", Content: output}); err != nil {
@@ -756,7 +867,7 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 				forwardHistory = append(forwardHistory, providers.ChatMessage{Role: "assistant", Content: output})
 				forwardReq.History = forwardHistory
 			} else {
-				p.logToolSuccess(toolName, result.Output, req.Host.Name, req.Model)
+				p.logToolSuccess(toolName, result.Output, hostName, req.Model)
 				output := fmt.Sprintf("[MCP %s] %s", toolName, result.Output)
 				if callbacks.OnChunk != nil {
 					if err := callbacks.OnChunk(providers.ChatMessage{Role: "assistant", Content: output}); err != nil {
@@ -772,18 +883,18 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 	}
 
 	//p.log("Last Message: %s", forwardReq.History[len(forwardReq.History)-1].Content)
-	p.log("Forwarding request: host=%s model=%s messages=%d tools=%d", forwardReq.Host.Name, forwardReq.Model, len(forwardReq.History), len(forwardReq.Tools))
+	p.log("Forwarding request: host=%s model=%s messages=%d tools=%d", hostName, forwardReq.Model, len(forwardReq.History), len(forwardReq.Tools))
 	err := p.fallback.Stream(ctx, forwardReq, callbacks)
 	if err != nil {
 		if !executed {
-			p.log("[ERROR] Tool bypassed: tool=chat host=%s model=%s reason=%v", req.Host.Name, req.Model, err)
+			p.log("[ERROR] Tool bypassed: tool=chat host=%s model=%s reason=%v", hostName, req.Model, err)
 		}
 		return err
 	}
 	if executed {
-		p.log("Tool executed: tool=chat host=%s model=%s forwarded to Ollama", req.Host.Name, req.Model)
+		p.log("Tool executed: tool=chat host=%s model=%s forwarded to Ollama", hostName, req.Model)
 	} else {
-		p.log("Tool bypassed: tool=chat host=%s model=%s reason=delegated to Ollama API", req.Host.Name, req.Model)
+		p.log("Tool bypassed: tool=chat host=%s model=%s reason=delegated to Ollama API", hostName, req.Model)
 	}
 	return nil
 }
@@ -827,7 +938,11 @@ func (p *Provider) maybeInterpretResult(ctx context.Context, req providers.Strea
 	// Set up local capture for the response.
 	var out strings.Builder
 	start := time.Now()
-	p.log("MCP->LLM interpret send: tool=%s host=%s model=%s bytes_json=%d", toolName, req.Host.Name, req.Model, len(jsonContent))
+	hostName := hostLabel(req.Host)
+	logging.LogRequest("MCP->LLM", hostName, req.Model, toolName, map[string]any{
+		"json":   jsonContent,
+		"prompt": prompt,
+	})
 	cb := providers.StreamCallbacks{
 		OnChunk: func(msg providers.ChatMessage) error {
 			out.WriteString(msg.Content)
@@ -836,12 +951,16 @@ func (p *Provider) maybeInterpretResult(ctx context.Context, req providers.Strea
 		OnComplete: func(meta providers.StreamMetadata) error { return nil },
 	}
 	if err := p.fallback.Stream(ctx, interpReq, cb); err != nil {
-		p.log("MCP->LLM interpret failed: tool=%s host=%s model=%s err=%v", toolName, req.Host.Name, req.Model, err)
+		logging.LogEvent("MCP->LLM interpret failed: tool=%s host=%s model=%s err=%v", toolName, hostName, req.Model, err)
 		return "", false
 	}
 	dur := time.Since(start)
 	interpreted := strings.TrimSpace(out.String())
-	p.log("MCP->LLM interpret recv: tool=%s host=%s model=%s chars=%d dur=%s", toolName, req.Host.Name, req.Model, len(interpreted), dur.String())
+	logging.LogRequest("LLM->MCP", hostName, req.Model, toolName, map[string]any{
+		"characters": len(interpreted),
+		"duration":   dur.String(),
+		"output":     interpreted,
+	})
 	return interpreted, true
 }
 

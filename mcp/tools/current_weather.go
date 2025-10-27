@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -126,22 +125,18 @@ func CurrentWeather(args map[string]any) ([]ContentPart, error) {
 
 	weather, err := getGeocodedWeather(location)
 	if err != nil {
-		log.Printf("Weather tool error for location '%s': %v", location, err)
 		return nil, fmt.Errorf("Error fetching weather: %v", err)
 	}
 
 	jsonWeather, err := json.Marshal(weather.Current)
 	if err != nil {
-		log.Printf("Weather tool JSON marshal error for location '%s': %v", location, err)
-		return nil, fmt.Errorf("Error preparing weather response.")
+		return nil, fmt.Errorf("Error preparing weather response: %w", err)
 	}
 
 	interpretPrompt := strings.Join([]string{
 		"You are a helpful assistant. Interpret the provided JSON weather data and reply in natural language in 2 sentences or less.",
 		"Avoid repeating raw numbers unnecessarily; keep it concise and readable by a non-technical user.",
 	}, " ")
-
-	log.Printf("Weather tool API call successful for %s: %s", location, string(jsonWeather))
 
 	return []ContentPart{
 		{Type: "json", Text: string(jsonWeather)},

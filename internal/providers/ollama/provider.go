@@ -14,7 +14,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/xeipuuv/gojsonschema"
+
 	"github.com/mwiater/agon/internal/appconfig"
+	"github.com/mwiater/agon/internal/logging"
 	"github.com/mwiater/agon/internal/providers"
 )
 
@@ -63,6 +66,17 @@ func (p *Provider) logTools(tools []providers.ToolDefinition) {
 		return
 	}
 	log.Printf("Tools: {%s}", strings.Join(names, ", "))
+}
+
+func hostIdentifier(host appconfig.Host) string {
+	name := strings.TrimSpace(host.Name)
+	if name != "" {
+		return name
+	}
+	if url := strings.TrimSpace(host.URL); url != "" {
+		return url
+	}
+	return "ollama-host"
 }
 
 type toolCall struct {
@@ -431,7 +445,9 @@ func (p *Provider) LoadedModels(ctx context.Context, host appconfig.Host) ([]str
 	ctx, cancel := context.WithTimeout(ctx, p.timeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, host.URL+"/api/ps", nil)
+	endpoint := host.URL + "/api/ps"
+	logging.LogRequest("AGON->LLM", hostIdentifier(host), "", "", map[string]string{"method": http.MethodGet, "url": endpoint})
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -450,6 +466,7 @@ func (p *Provider) LoadedModels(ctx context.Context, host appconfig.Host) ([]str
 	if err != nil {
 		return nil, err
 	}
+	logging.LogRequest("LLM->AGON", hostIdentifier(host), "", "", body)
 
 	var ps ollamaPsResponse
 	if err := json.Unmarshal(body, &ps); err != nil {
@@ -476,6 +493,7 @@ func (p *Provider) EnsureModelReady(ctx context.Context, host appconfig.Host, mo
 	if err != nil {
 		return err
 	}
+	logging.LogRequest("AGON->LLM", hostIdentifier(host), model, "", body)
 
 	ctx, cancel := context.WithTimeout(ctx, p.timeout)
 	defer cancel()
@@ -491,9 +509,13 @@ func (p *Provider) EnsureModelReady(ctx context.Context, host appconfig.Host, mo
 		return err
 	}
 	defer resp.Body.Close()
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	logging.LogRequest("LLM->AGON", hostIdentifier(host), model, "", respBody)
 
 	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("ollama: /api/generate returned %s: %s", resp.Status, strings.TrimSpace(string(respBody)))
 	}
 
@@ -506,6 +528,7 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 	if req.SystemPrompt != "" {
 		messages = append([]providers.ChatMessage{{Role: "system", Content: req.SystemPrompt}}, messages...)
 	}
+	hostID := hostIdentifier(req.Host)
 
 	streamEnabled := !req.DisableStreaming
 	payload := map[string]any{
@@ -529,6 +552,7 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 	if err != nil {
 		return err
 	}
+	logging.LogRequest("AGON->LLM", hostID, req.Model, "", body)
 
 	streamCtx, cancel := context.WithTimeout(ctx, p.timeout)
 	defer cancel()
@@ -547,6 +571,7 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
+		logging.LogRequest("LLM->AGON", hostID, req.Model, "", body)
 		if req.DisableStreaming && isNoToolCapabilityResponse(body) {
 			if callbacks.OnChunk != nil {
 				if err := callbacks.OnChunk(providers.ChatMessage{Role: "assistant", Content: "This model does not have tool capabilities."}); err != nil {
@@ -573,6 +598,7 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 		if err != nil {
 			return err
 		}
+		logging.LogRequest("LLM->AGON", hostID, req.Model, "", body)
 		var result streamChunk
 		if err := json.Unmarshal(body, &result); err != nil {
 			return err
@@ -580,10 +606,20 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 		output := result.Message.Content
 		toolCalls := result.Message.ToolCalls
 		if len(toolCalls) == 0 {
-
 			if legacyCalls, cleaned := parseLegacyToolCalls(output, req.Tools); len(legacyCalls) > 0 {
 				toolCalls = legacyCalls
 				output = cleaned
+			}
+			if len(req.Tools) > 0 {
+				call, err := rebuildToolCallFromContent(output, req.Tools)
+				if err != nil {
+					if p.debug && !errors.Is(err, errNoToolJSONFound) {
+						log.Printf("ollama: unable to reconstruct tool call: %v", err)
+					}
+				} else if call != nil {
+					toolCalls = []toolCall{*call}
+					output = ""
+				}
 			}
 		}
 		if len(toolCalls) > 0 {
@@ -632,6 +668,9 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 				break
 			}
 			return err
+		}
+		if data, err := json.Marshal(chunk); err == nil {
+			logging.LogRequest("LLM->AGON", hostID, req.Model, "", data)
 		}
 
 		if callbacks.OnChunk != nil {
@@ -771,4 +810,261 @@ func isNoToolCapabilityResponse(body []byte) bool {
 
 func (p *Provider) Close() error {
 	return nil
+}
+
+var errNoToolJSONFound = errors.New("no tool json found in response")
+
+func rebuildToolCallFromContent(content string, tools []providers.ToolDefinition) (*toolCall, error) {
+	if len(tools) == 0 {
+		return nil, errNoToolJSONFound
+	}
+	candidates := extractToolCallCandidates(content)
+	if len(candidates) == 0 {
+		candidates = []string{content}
+	}
+	var firstErr error
+	for _, candidate := range candidates {
+		jsonCandidate := findValidJSON(candidate)
+		if jsonCandidate == "" {
+			trimmed := strings.TrimSpace(candidate)
+			if strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[") {
+				jsonCandidate = trimmed
+			}
+		}
+		if jsonCandidate == "" {
+			continue
+		}
+		parsed, err := parseJSONAnyWithSanitize(jsonCandidate)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = fmt.Errorf("parse candidate json: %w", err)
+			}
+			continue
+		}
+		wrapper, candidateName, err := locateArgumentsWrapper(parsed)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		argsValue, ok := wrapper["arguments"]
+		if !ok {
+			if firstErr == nil {
+				firstErr = fmt.Errorf("arguments key missing after normalization")
+			}
+			continue
+		}
+		argsMap, ok := argsValue.(map[string]any)
+		if !ok {
+			if firstErr == nil {
+				firstErr = fmt.Errorf("arguments payload is not an object")
+			}
+			continue
+		}
+		matchedTool, err := matchToolDefinition(tools, candidateName, argsMap)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		argBytes, err := json.Marshal(argsMap)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = fmt.Errorf("marshal arguments: %w", err)
+			}
+			continue
+		}
+		call := &toolCall{Type: "function"}
+		call.Function.Name = matchedTool.Name
+		call.Function.Arguments = json.RawMessage(argBytes)
+		return call, nil
+	}
+	if firstErr != nil {
+		return nil, firstErr
+	}
+	return nil, errNoToolJSONFound
+}
+
+func parseJSONAnyWithSanitize(input string) (any, error) {
+	trimmed := strings.TrimSpace(input)
+	if trimmed == "" {
+		return nil, fmt.Errorf("empty json payload")
+	}
+	var value any
+	if err := json.Unmarshal([]byte(trimmed), &value); err != nil {
+		sanitized := sanitizeLegacyJSON(trimmed)
+		if sanitized != trimmed {
+			if err := json.Unmarshal([]byte(sanitized), &value); err == nil {
+				return value, nil
+			}
+		}
+		return nil, err
+	}
+	return value, nil
+}
+
+func locateArgumentsWrapper(root any) (map[string]any, string, error) {
+	type queueItem struct {
+		value    any
+		toolName string
+	}
+	queue := []queueItem{{value: root}}
+	visited := 0
+	for len(queue) > 0 {
+		if visited > 1024 {
+			break
+		}
+		item := queue[0]
+		queue = queue[1:]
+		visited++
+		switch v := item.value.(type) {
+		case map[string]any:
+			toolName := item.toolName
+			if candidate := extractLegacyToolName(v); candidate != "" && strings.TrimSpace(toolName) == "" {
+				toolName = candidate
+			}
+			if fn, ok := v["function"]; ok {
+				queue = append(queue, queueItem{value: fn, toolName: toolName})
+			}
+			if call, ok := v["tool_call"]; ok {
+				queue = append(queue, queueItem{value: call, toolName: toolName})
+			}
+			if calls, ok := v["tool_calls"]; ok {
+				queue = append(queue, queueItem{value: calls, toolName: toolName})
+			}
+			if fnCall, ok := v["function_call"]; ok {
+				queue = append(queue, queueItem{value: fnCall, toolName: toolName})
+			}
+			if argsRaw, ok := v["arguments"]; ok {
+				if argsMap, ok := coerceLegacyArguments(argsRaw); ok {
+					return map[string]any{"arguments": argsMap}, toolName, nil
+				}
+			}
+			for _, inner := range v {
+				switch inner.(type) {
+				case map[string]any, []any, string, json.RawMessage:
+					queue = append(queue, queueItem{value: inner, toolName: toolName})
+				}
+			}
+		case []any:
+			for _, inner := range v {
+				queue = append(queue, queueItem{value: inner, toolName: item.toolName})
+			}
+		case json.RawMessage:
+			if len(v) == 0 {
+				return map[string]any{"arguments": map[string]any{}}, item.toolName, nil
+			}
+			queue = append(queue, queueItem{value: string(v), toolName: item.toolName})
+		case string:
+			trimmed := strings.TrimSpace(v)
+			if trimmed == "" {
+				continue
+			}
+			parsed, err := parseJSONAnyWithSanitize(trimmed)
+			if err == nil {
+				queue = append(queue, queueItem{value: parsed, toolName: item.toolName})
+			}
+		}
+	}
+	return nil, "", errNoToolJSONFound
+}
+
+func matchToolDefinition(tools []providers.ToolDefinition, candidateName string, args map[string]any) (providers.ToolDefinition, error) {
+	if len(tools) == 0 {
+		return providers.ToolDefinition{}, errNoToolJSONFound
+	}
+	indices := prioritizeTools(tools, candidateName)
+	var firstErr error
+	for _, idx := range indices {
+		tool := tools[idx]
+		if err := validateArgumentsAgainstTool(tool, args); err == nil {
+			return tool, nil
+		} else if firstErr == nil {
+			firstErr = err
+		}
+	}
+	if firstErr == nil {
+		firstErr = fmt.Errorf("no matching tool for arguments")
+	}
+	return providers.ToolDefinition{}, firstErr
+}
+
+func prioritizeTools(tools []providers.ToolDefinition, candidateName string) []int {
+	indices := make([]int, 0, len(tools))
+	seen := make(map[int]struct{}, len(tools))
+	if candidateName != "" {
+		lowerCandidate := strings.ToLower(strings.TrimSpace(candidateName))
+		for i, tool := range tools {
+			if strings.ToLower(tool.Name) == lowerCandidate {
+				indices = append(indices, i)
+				seen[i] = struct{}{}
+			}
+		}
+	}
+	if len(indices) == 0 && len(tools) == 1 {
+		return []int{0}
+	}
+	for i := range tools {
+		if _, ok := seen[i]; ok {
+			continue
+		}
+		indices = append(indices, i)
+	}
+	return indices
+}
+
+func validateArgumentsAgainstTool(def providers.ToolDefinition, args map[string]any) error {
+	if len(def.InputSchema) == 0 {
+		return nil
+	}
+	schemaLoader := gojsonschema.NewGoLoader(def.InputSchema)
+	argBytes, err := json.Marshal(args)
+	if err != nil {
+		return fmt.Errorf("marshal arguments for validation: %w", err)
+	}
+	result, err := gojsonschema.Validate(schemaLoader, gojsonschema.NewBytesLoader(argBytes))
+	if err != nil {
+		return fmt.Errorf("schema validation error: %w", err)
+	}
+	if result.Valid() {
+		return nil
+	}
+	var details []string
+	for _, desc := range result.Errors() {
+		details = append(details, desc.String())
+	}
+	return fmt.Errorf("arguments failed validation: %s", strings.Join(details, "; "))
+}
+
+func extractToolCallCandidates(content string) []string {
+	var candidates []string
+	lower := strings.ToLower(content)
+	startTag := "<tool_call>"
+	endTag := "</tool_call>"
+	offset := 0
+	for {
+		startIdx := strings.Index(lower[offset:], startTag)
+		if startIdx == -1 {
+			break
+		}
+		startIdx += offset
+		payloadStart := startIdx + len(startTag)
+		endIdx := strings.Index(lower[payloadStart:], endTag)
+		if endIdx == -1 {
+			segment := strings.TrimSpace(content[payloadStart:])
+			if segment != "" {
+				candidates = append(candidates, segment)
+			}
+			break
+		}
+		endIdx += payloadStart
+		segment := strings.TrimSpace(content[payloadStart:endIdx])
+		if segment != "" {
+			candidates = append(candidates, segment)
+		}
+		offset = endIdx + len(endTag)
+	}
+	return candidates
 }

@@ -3,7 +3,6 @@ package tools
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 )
@@ -31,8 +30,7 @@ func CurrentTime(args map[string]any) ([]ContentPart, error) {
 
 	jsonTime, err := json.Marshal(payload)
 	if err != nil {
-		log.Printf("Current time tool JSON marshal error: %v", err)
-		return nil, fmt.Errorf("Error preparing time response.")
+		return nil, fmt.Errorf("error preparing time response: %w", err)
 	}
 
 	interpretPrompt := strings.Join([]string{

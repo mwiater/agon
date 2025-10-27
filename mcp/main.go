@@ -9,7 +9,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -226,7 +225,6 @@ func invokeWithRetries(toolName string, handler tools.Handler, args map[string]a
 	}
 
 	maxRetries := retryCount
-	log.Printf("MCP tool failed: tool=%s attempt=%d/%d err=%v", toolName, attempt, maxRetries, err)
 	logs := []tools.ContentPart{{Type: "log", Text: fmt.Sprintf("attempt %d/%d failed: %v", attempt, maxRetries, err)}}
 
 	if attempt < maxRetries && prompt != "" {
@@ -237,7 +235,6 @@ func invokeWithRetries(toolName string, handler tools.Handler, args map[string]a
 	}
 
 	logs = append(logs, tools.ContentPart{Type: "log", Text: fmt.Sprintf("giving up after %d attempts: %v", attempt, err)})
-	log.Printf("MCP tool giving up: tool=%s attempts=%d err=%v", toolName, attempt, err)
 	logs = append(logs, tools.ContentPart{Type: "text", Text: "I could not handle your request."})
 	return logs
 }
@@ -283,18 +280,7 @@ func handleRequest(req *jsonrpcRequest, w *bufio.Writer) error {
 func main() {
 	flag.Parse()
 	cfg, err := appconfig.Load(configPath)
-	if err == nil && cfg.Debug {
-		f, err := os.OpenFile("agon-mcp-server.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-		if err != nil {
-			log.Fatalf("could not open agon-mcp-server.log: %v", err)
-		}
-		defer f.Close()
-		log.SetOutput(f)
-	}
-
-	if err != nil {
-		log.Printf("using fallback MCP retry count %d due to config load error: %v", fallbackRetryCount, err)
-	} else {
+	if err == nil {
 		retryCount = cfg.MCPRetryAttempts()
 		mcpConfig = cfg
 	}

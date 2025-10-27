@@ -16,7 +16,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mwiater/agon/internal/appconfig"
-	"github.com/mwiater/agon/internal/mcplog"
+	"github.com/mwiater/agon/internal/logging"
 	"github.com/mwiater/agon/internal/models"
 	"github.com/mwiater/agon/internal/providerfactory"
 	"github.com/mwiater/agon/internal/providers"
@@ -700,8 +700,7 @@ func StartGUI(ctx context.Context, cfg *appconfig.Config, cancel context.CancelF
 	provider, err := providerfactory.NewChatProvider(cfg)
 	if err != nil {
 		if cfg.MCPMode {
-			log.Printf("MCP provider unavailable: %v — falling back to direct Ollama access", err)
-			mcplog.Write(cfg, "MCP provider unavailable: %v — falling back to direct Ollama access", err)
+			logging.LogEvent("MCP provider unavailable: %v — falling back to direct Ollama access", err)
 			provider = ollama.New(cfg)
 		} else {
 			log.Fatalf("Failed to initialize provider: %v", err)
@@ -709,7 +708,7 @@ func StartGUI(ctx context.Context, cfg *appconfig.Config, cancel context.CancelF
 	}
 	defer func() {
 		if err := provider.Close(); err != nil {
-			log.Printf("provider shutdown error: %v", err)
+			logging.LogEvent("provider shutdown error: %v", err)
 		}
 	}()
 

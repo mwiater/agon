@@ -23,7 +23,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/mwiater/agon/internal/mcplog"
+	"github.com/mwiater/agon/internal/logging"
 	"github.com/mwiater/agon/internal/providerfactory"
 	"github.com/mwiater/agon/internal/providers"
 	"github.com/mwiater/agon/internal/providers/ollama"
@@ -1590,8 +1590,7 @@ func StartPipelineGUI(ctx context.Context, cfg *Config, cancel context.CancelFun
 	if cfg.MCPMode {
 		provider, err = providerfactory.NewChatProvider(cfg)
 		if err != nil {
-			log.Printf("MCP provider unavailable: %v — falling back to direct Ollama access", err)
-			mcplog.Write(cfg, "MCP provider unavailable: %v — falling back to direct Ollama access", err)
+			logging.LogEvent("MCP provider unavailable: %v — falling back to direct Ollama access", err)
 			provider = ollama.New(cfg)
 		}
 	}
@@ -1612,8 +1611,7 @@ func StartPipelineGUI(ctx context.Context, cfg *Config, cancel context.CancelFun
 			provider, err = providerfactory.NewChatProvider(cfg)
 			if err != nil {
 				if cfg.MCPMode {
-					log.Printf("MCP provider unavailable: %v — falling back to direct Ollama access", err)
-					mcplog.Write(cfg, "MCP provider unavailable: %v — falling back to direct Ollama access", err)
+					logging.LogEvent("MCP provider unavailable: %v — falling back to direct Ollama access", err)
 					provider = ollama.New(cfg)
 				} else {
 					return err
