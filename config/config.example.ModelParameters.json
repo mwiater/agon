@@ -7,6 +7,7 @@
       "models": [
         "llama3.2:3b",
         "granite4:micro",
+        "granite3.1-moe:3b",
         "gemma3n:e2b",
         "gemma3:270m",
         "deepseek-r1:1.5b",
@@ -37,6 +38,7 @@
       "models": [
         "llama3.2:3b",
         "granite4:micro",
+        "granite3.1-moe:3b",
         "gemma3n:e2b",
         "gemma3:270m",
         "deepseek-r1:1.5b",
@@ -67,6 +69,7 @@
       "models": [
         "llama3.2:3b",
         "granite4:micro",
+        "granite3.1-moe:3b",
         "gemma3n:e2b",
         "gemma3:270m",
         "deepseek-r1:1.5b",
@@ -97,6 +100,7 @@
       "models": [
         "llama3.2:3b",
         "granite4:micro",
+        "granite3.1-moe:3b",
         "gemma3n:e2b",
         "gemma3:270m",
         "deepseek-r1:1.5b",
