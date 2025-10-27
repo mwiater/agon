@@ -9,6 +9,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/xeipuuv/gojsonschema"
 )
 
 // nominatimResponse defines the fields we need from OpenStreetMap.
@@ -63,6 +65,49 @@ func CurrentWeatherDefinition() Definition {
 			"required": []string{"location"},
 		},
 	}
+}
+
+// ValidateCurrentWeatherData takes a JSON string, extracts the "arguments"
+// object, and validates it against the CurrentWeatherDefinition's schema.
+func ValidateCurrentWeatherData(jsonString string) (bool, error) {
+	// 1. Load the schema from the function
+	schemaDef := CurrentWeatherDefinition().InputSchema
+	schemaLoader := gojsonschema.NewGoLoader(schemaDef)
+
+	// 2. Parse the input string to find the "arguments"
+	var inputData map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(jsonString), &inputData); err != nil {
+		return false, fmt.Errorf("could not parse outer JSON: %w", err)
+	}
+
+	// 3. Extract the "arguments" JSON (which is what we want to validate)
+	argumentsJSON, ok := inputData["arguments"]
+	if !ok {
+		// If the input doesn't even have an "arguments" key, it's invalid.
+		return false, fmt.Errorf("input JSON missing 'arguments' key")
+	}
+
+	// 4. Create a loader for the "arguments" JSON
+	documentLoader := gojsonschema.NewBytesLoader(argumentsJSON)
+
+	// 5. Perform the validation
+	result, err := gojsonschema.Validate(schemaLoader, documentLoader)
+	if err != nil {
+		// This error is for issues with the validation process itself
+		return false, fmt.Errorf("schema validation error: %w", err)
+	}
+
+	// 6. Check the result
+	if result.Valid() {
+		return true, nil
+	}
+
+	// 7. If invalid, build a comprehensive error message
+	var errs []string
+	for _, desc := range result.Errors() {
+		errs = append(errs, desc.String())
+	}
+	return false, fmt.Errorf("JSON validation failed: %s", strings.Join(errs, ", "))
 }
 
 // CurrentWeather executes the weather lookup workflow and returns JSON content for the LLM to interpret.

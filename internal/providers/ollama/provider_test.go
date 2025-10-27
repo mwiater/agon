@@ -312,3 +312,66 @@ func TestProviderStreamToolCallCityCountry(t *testing.T) {
 		t.Fatalf("expected location to be synthesized, got %+v", capturedArgs)
 	}
 }
+
+func TestProviderStreamLegacyToolCallMarkup(t *testing.T) {
+	t.Parallel()
+
+	content := `<tool_call>[{"arguments":{"location":"Portland, OR"}}]</tool_call>`
+	tools := []providers.ToolDefinition{{
+		Name:        "current_weather",
+		Description: "fetches weather",
+	}}
+
+	calls, cleaned := parseLegacyToolCalls(content, tools)
+	if len(calls) != 1 {
+		t.Fatalf("expected single tool call, got %d", len(calls))
+	}
+	if cleaned != "" {
+		t.Fatalf("expected cleaned content to be empty, got %q", cleaned)
+	}
+	if calls[0].Function.Name != "current_weather" {
+		t.Fatalf("unexpected tool name: %q", calls[0].Function.Name)
+	}
+
+	args, err := parseToolArguments(calls[0].Function.Arguments)
+	if err != nil {
+		t.Fatalf("parseToolArguments returned error: %v", err)
+	}
+	normalized := normalizeToolArgs(calls[0].Function.Name, args, tools)
+	loc, ok := normalized["location"].(string)
+	if !ok || loc != "Portland, OR" {
+		t.Fatalf("expected location to be preserved, got %+v", normalized)
+	}
+}
+
+func TestProviderStreamLegacyToolCallSingleQuoteArgs(t *testing.T) {
+	t.Parallel()
+
+	content := `<tool_call>[{"function":"weather","parameters":"{ 'city': 'Portland', 'country': 'USA' }"}]</tool_call>`
+	tools := []providers.ToolDefinition{{
+		Name:        "current_weather",
+		Description: "fetches weather",
+	}}
+
+	calls, cleaned := parseLegacyToolCalls(content, tools)
+	if len(calls) != 1 {
+		t.Fatalf("expected single tool call, got %d", len(calls))
+	}
+	if cleaned != "" {
+		t.Fatalf("expected cleaned content to be empty, got %q", cleaned)
+	}
+
+	call := calls[0]
+	if call.Function.Name != "current_weather" {
+		t.Fatalf("unexpected tool name: %q", call.Function.Name)
+	}
+	args, err := parseToolArguments(call.Function.Arguments)
+	if err != nil {
+		t.Fatalf("parseToolArguments returned error: %v", err)
+	}
+	normalized := normalizeToolArgs(call.Function.Name, args, tools)
+	loc, ok := normalized["location"].(string)
+	if !ok || loc != "Portland, USA" {
+		t.Fatalf("expected synthesized location, got %+v", normalized)
+	}
+}

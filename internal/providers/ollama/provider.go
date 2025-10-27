@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -112,13 +113,21 @@ func parseToolArguments(raw json.RawMessage) (map[string]any, error) {
 	}
 	var argString string
 	if err := json.Unmarshal(raw, &argString); err == nil {
-		if strings.TrimSpace(argString) == "" {
+		argStringTrimmed := strings.TrimSpace(argString)
+		if argStringTrimmed == "" {
 			return args, nil
 		}
-		if err := json.Unmarshal([]byte(argString), &args); err == nil {
+		if err := json.Unmarshal([]byte(argStringTrimmed), &args); err == nil {
 			return args, nil
 		} else {
-			return nil, fmt.Errorf("parse tool arguments string: %w", err)
+			lastErr = err
+			sanitized := sanitizeLegacyJSON(argStringTrimmed)
+			if sanitized != argStringTrimmed {
+				if err := json.Unmarshal([]byte(sanitized), &args); err == nil {
+					return args, nil
+				}
+			}
+			return nil, fmt.Errorf("parse tool arguments string: %w", lastErr)
 		}
 	} else {
 		lastErr = err
@@ -127,6 +136,227 @@ func parseToolArguments(raw json.RawMessage) (map[string]any, error) {
 		lastErr = fmt.Errorf("unexpected tool arguments format")
 	}
 	return nil, fmt.Errorf("parse tool arguments: %w", lastErr)
+}
+
+var (
+	singleQuotedStringPattern = regexp.MustCompile(`'([^']*)'`)
+	trailingCommaPattern      = regexp.MustCompile(`,\s*([}\]])`)
+)
+
+func sanitizeLegacyJSON(input string) string {
+	s := strings.TrimSpace(input)
+	if s == "" {
+		return s
+	}
+	replaced := singleQuotedStringPattern.ReplaceAllStringFunc(s, func(match string) string {
+		if len(match) < 2 {
+			return match
+		}
+		inner := match[1 : len(match)-1]
+		inner = strings.ReplaceAll(inner, `"`, `\"`)
+		return `"` + inner + `"`
+	})
+	cleaned := trailingCommaPattern.ReplaceAllString(replaced, "$1")
+	return cleaned
+}
+
+func parseLegacyToolCalls(content string, available []providers.ToolDefinition) ([]toolCall, string) {
+	lower := strings.ToLower(content)
+	idx := strings.Index(lower, "<tool_call>")
+	if idx == -1 {
+		return nil, content
+	}
+
+	before := strings.TrimSpace(content[:idx])
+	rest := content[idx+len("<tool_call>"):]
+
+	endIdx := strings.Index(strings.ToLower(rest), "</tool_call>")
+	var payload string
+	var after string
+	if endIdx == -1 {
+		payload = rest
+	} else {
+		payload = rest[:endIdx]
+		after = rest[endIdx+len("</tool_call>"):]
+	}
+
+	payload = strings.TrimSpace(payload)
+	cleanedParts := make([]string, 0, 2)
+	if trimmed := strings.TrimSpace(before); trimmed != "" {
+		cleanedParts = append(cleanedParts, trimmed)
+	}
+	if trimmed := strings.TrimSpace(after); trimmed != "" {
+		cleanedParts = append(cleanedParts, trimmed)
+	}
+	var cleaned string
+	if len(cleanedParts) > 0 {
+		cleaned = strings.Join(cleanedParts, "\n")
+	}
+
+	calls := buildLegacyToolCalls(payload, available, content)
+	if len(calls) == 0 {
+		return nil, content
+	}
+	return calls, cleaned
+}
+
+func buildLegacyToolCalls(payload string, available []providers.ToolDefinition, content string) []toolCall {
+	if payload == "" {
+		return nil
+	}
+	var raw any
+	if err := json.Unmarshal([]byte(payload), &raw); err != nil {
+		sanitized := sanitizeLegacyJSON(payload)
+		if sanitized == payload {
+			return nil
+		}
+		if err := json.Unmarshal([]byte(sanitized), &raw); err != nil {
+			return nil
+		}
+	}
+
+	var entries []any
+	switch v := raw.(type) {
+	case []any:
+		entries = v
+	case map[string]any:
+		entries = []any{v}
+	default:
+		return nil
+	}
+
+	calls := make([]toolCall, 0, len(entries))
+	for _, entry := range entries {
+		call, ok := legacyEntryToToolCall(entry, available, content)
+		if !ok {
+			continue
+		}
+		calls = append(calls, call)
+	}
+	return calls
+}
+
+func legacyEntryToToolCall(entry any, available []providers.ToolDefinition, content string) (toolCall, bool) {
+	data, ok := entry.(map[string]any)
+	if !ok {
+		return toolCall{}, false
+	}
+
+	name := extractLegacyToolName(data)
+	args := extractLegacyArguments(data)
+
+	if fnMap, ok := data["function"].(map[string]any); ok {
+		if innerName := extractLegacyToolName(fnMap); innerName != "" {
+			name = innerName
+		}
+		if fnArgs := extractLegacyArguments(fnMap); fnArgs != nil {
+			args = fnArgs
+		}
+	}
+
+	if args == nil {
+		args = map[string]any{}
+	}
+
+	resolvedName := resolveToolName(name, available, content)
+	if resolvedName == "" && len(available) == 1 {
+		resolvedName = available[0].Name
+	}
+
+	argBytes, err := json.Marshal(args)
+	if err != nil {
+		return toolCall{}, false
+	}
+
+	call := toolCall{Type: "function"}
+	call.Function.Name = resolvedName
+	call.Function.Arguments = json.RawMessage(argBytes)
+	return call, true
+}
+
+func extractLegacyToolName(data map[string]any) string {
+	candidates := []string{"name", "tool", "tool_name", "function"}
+	for _, key := range candidates {
+		if value, ok := data[key]; ok {
+			if s, ok := value.(string); ok && strings.TrimSpace(s) != "" {
+				return s
+			}
+		}
+	}
+	return ""
+}
+
+func extractLegacyArguments(data map[string]any) map[string]any {
+	for _, key := range []string{"arguments", "params", "parameters"} {
+		if raw, ok := data[key]; ok {
+			if parsed, ok := coerceLegacyArguments(raw); ok {
+				return parsed
+			}
+		}
+	}
+	return nil
+}
+
+func coerceLegacyArguments(value any) (map[string]any, bool) {
+	switch v := value.(type) {
+	case map[string]any:
+		return v, true
+	case string:
+		trimmed := strings.TrimSpace(v)
+		if trimmed == "" {
+			return map[string]any{}, true
+		}
+		var parsed map[string]any
+		if err := json.Unmarshal([]byte(trimmed), &parsed); err == nil {
+			return parsed, true
+		}
+		sanitized := sanitizeLegacyJSON(trimmed)
+		if sanitized != trimmed {
+			if err := json.Unmarshal([]byte(sanitized), &parsed); err == nil {
+				return parsed, true
+			}
+		}
+		return nil, false
+	case json.RawMessage:
+		return coerceLegacyArguments(string(v))
+	case float64:
+		return map[string]any{"value": v}, true
+	case bool:
+		return map[string]any{"value": v}, true
+	default:
+		if v == nil {
+			return map[string]any{}, true
+		}
+	}
+	return nil, false
+}
+
+func resolveToolName(candidate string, available []providers.ToolDefinition, content string) string {
+	candidate = strings.TrimSpace(candidate)
+	if candidate != "" {
+		lowerCandidate := strings.ToLower(candidate)
+		for _, tool := range available {
+			if strings.ToLower(tool.Name) == lowerCandidate {
+				return tool.Name
+			}
+		}
+		for _, tool := range available {
+			lowerTool := strings.ToLower(tool.Name)
+			if strings.Contains(lowerTool, lowerCandidate) || strings.Contains(lowerCandidate, lowerTool) {
+				return tool.Name
+			}
+		}
+	}
+	if len(available) == 1 {
+		return available[0].Name
+	}
+	lowerContent := strings.ToLower(content)
+	for _, tool := range available {
+		if strings.Contains(lowerContent, strings.ToLower(tool.Name)) {
+			return tool.Name
+		}
+	}
+	return candidate
 }
 
 func (p *Provider) executeToolCalls(ctx context.Context, req providers.StreamRequest, calls []toolCall) (string, error) {
@@ -348,8 +578,16 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 			return err
 		}
 		output := result.Message.Content
-		if len(result.Message.ToolCalls) > 0 {
-			toolOutput, err := p.executeToolCalls(ctx, req, result.Message.ToolCalls)
+		toolCalls := result.Message.ToolCalls
+		if len(toolCalls) == 0 {
+
+			if legacyCalls, cleaned := parseLegacyToolCalls(output, req.Tools); len(legacyCalls) > 0 {
+				toolCalls = legacyCalls
+				output = cleaned
+			}
+		}
+		if len(toolCalls) > 0 {
+			toolOutput, err := p.executeToolCalls(ctx, req, toolCalls)
 			if err != nil {
 				return err
 			}
@@ -426,6 +664,86 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 	}
 
 	return nil
+}
+
+// findValidJSON searches a string for the first valid JSON object or array
+// and returns it. If no valid JSON is found, it returns an empty string.
+func findValidJSON(text string) string {
+	// Iterate through the string to find a potential start of JSON
+	for i := 0; i < len(text); i++ {
+		char := text[i]
+
+		// A valid JSON structure must start with '{' or '['
+		if char == '{' || char == '[' {
+			// Found a potential start, try to extract the full structure
+			candidate := extractJSONStructure(text[i:])
+
+			// If we got a non-empty candidate, check if it's valid JSON
+			if candidate != "" && json.Valid([]byte(candidate)) {
+				return candidate
+			}
+			// If it's not valid, the outer loop will continue searching
+			// for the *next* '{' or '['
+		}
+	}
+	// No valid JSON found in the entire string
+	return ""
+}
+
+// extractJSONStructure attempts to find one complete, balanced JSON object or array
+// starting from the beginning of the input string.
+// It assumes the string starts with '{' or '['.
+func extractJSONStructure(text string) string {
+	if len(text) == 0 {
+		return ""
+	}
+
+	var startChar, endChar byte
+	if text[0] == '{' {
+		startChar = '{'
+		endChar = '}'
+	} else if text[0] == '[' {
+		startChar = '['
+		endChar = ']'
+	} else {
+		// Not a valid start
+		return ""
+	}
+
+	// level tracks the nesting of braces or brackets
+	level := 0
+	// inString tracks whether we are inside a string literal
+	inString := false
+
+	for i := 0; i < len(text); i++ {
+		char := text[i]
+
+		// Check for string literal boundaries
+		if char == '"' {
+			// We only toggle inString if the quote is not escaped
+			if i == 0 || text[i-1] != '\\' {
+				inString = !inString
+			}
+		}
+
+		// Only count braces/brackets if we are not inside a string
+		if !inString {
+			if char == startChar {
+				level++
+			} else if char == endChar {
+				level--
+			}
+		}
+
+		// If level returns to 0, we've found the matching end
+		if level == 0 {
+			// Return the substring from the start to this point
+			return text[0 : i+1]
+		}
+	}
+
+	// If we finish the loop and level is not 0, the JSON is incomplete
+	return ""
 }
 
 // Close releases resources held by the provider.
