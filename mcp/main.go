@@ -135,7 +135,7 @@ func toolDefinitions() []tools.Definition {
 	return []tools.Definition{
 		//tools.GeneralQuestionDefinition(),
 		//tools.AvailableToolsDefinition(),
-		//tools.CurrentTimeDefinition(),
+		tools.CurrentTimeDefinition(),
 		tools.CurrentWeatherDefinition(),
 	}
 }

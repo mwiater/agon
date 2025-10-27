@@ -375,3 +375,90 @@ func TestProviderStreamLegacyToolCallSingleQuoteArgs(t *testing.T) {
 		t.Fatalf("expected synthesized location, got %+v", normalized)
 	}
 }
+
+func TestParseLegacyToolCallMarkupBareArguments(t *testing.T) {
+	t.Parallel()
+
+	content := `<tool_call>[{"arguments":{"none"},"name":"get_time"}]</tool_call>`
+	tools := []providers.ToolDefinition{{
+		Name:        "current_time",
+		Description: "reports time",
+		InputSchema: map[string]any{"type": "object"},
+	}}
+
+	calls, cleaned := parseLegacyToolCalls(content, tools)
+	if len(calls) != 1 {
+		t.Fatalf("expected single tool call, got %d", len(calls))
+	}
+	if cleaned != "" {
+		t.Fatalf("expected cleaned content to be empty, got %q", cleaned)
+	}
+
+	args, err := parseToolArguments(calls[0].Function.Arguments)
+	if err != nil {
+		t.Fatalf("parseToolArguments returned error: %v", err)
+	}
+	if len(args) != 0 {
+		t.Fatalf("expected empty arguments, got %+v", args)
+	}
+	if calls[0].Function.Name != "current_time" {
+		t.Fatalf("unexpected tool name: %q", calls[0].Function.Name)
+	}
+}
+
+func TestParseLegacyToolCallMarkupDuplicateArguments(t *testing.T) {
+	t.Parallel()
+
+	content := `<tool_call>[{"arguments":{"none"},"name":"datetime","arguments":{"none"}}]</tool_call>`
+	tools := []providers.ToolDefinition{{
+		Name:        "current_time",
+		Description: "reports time",
+		InputSchema: map[string]any{"type": "object"},
+	}}
+
+	calls, cleaned := parseLegacyToolCalls(content, tools)
+	if len(calls) != 1 {
+		t.Fatalf("expected single tool call, got %d", len(calls))
+	}
+	if cleaned != "" {
+		t.Fatalf("expected cleaned content to be empty, got %q", cleaned)
+	}
+
+	args, err := parseToolArguments(calls[0].Function.Arguments)
+	if err != nil {
+		t.Fatalf("parseToolArguments returned error: %v", err)
+	}
+	if len(args) != 0 {
+		t.Fatalf("expected empty arguments, got %+v", args)
+	}
+	if calls[0].Function.Name != "current_time" {
+		t.Fatalf("unexpected tool name: %q", calls[0].Function.Name)
+	}
+}
+
+func TestParseLegacyToolCallMarkupTrailingBrace(t *testing.T) {
+	t.Parallel()
+
+	content := `<tool_call>[{"arguments":{"none"},"name":"None"}}]</tool_call>`
+	tools := []providers.ToolDefinition{{
+		Name:        "current_time",
+		Description: "reports time",
+		InputSchema: map[string]any{"type": "object"},
+	}}
+
+	calls, cleaned := parseLegacyToolCalls(content, tools)
+	if len(calls) != 1 {
+		t.Fatalf("expected single tool call, got %d", len(calls))
+	}
+	if cleaned != "" {
+		t.Fatalf("expected cleaned content to be empty, got %q", cleaned)
+	}
+
+	args, err := parseToolArguments(calls[0].Function.Arguments)
+	if err != nil {
+		t.Fatalf("parseToolArguments returned error: %v", err)
+	}
+	if len(args) != 0 {
+		t.Fatalf("expected empty arguments, got %+v", args)
+	}
+}

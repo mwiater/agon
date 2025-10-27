@@ -157,6 +157,8 @@ var (
 	trailingCommaPattern      = regexp.MustCompile(`,\s*([}\]])`)
 )
 
+var legacyArgsBareValuePattern = regexp.MustCompile(`"arguments"\s*:\s*\{\s*"[^":}]+\"\s*\}`)
+
 func sanitizeLegacyJSON(input string) string {
 	s := strings.TrimSpace(input)
 	if s == "" {
@@ -218,14 +220,15 @@ func buildLegacyToolCalls(payload string, available []providers.ToolDefinition, 
 	if payload == "" {
 		return nil
 	}
+	payload = normalizeLegacyToolCallPayload(payload)
 	var raw any
 	if err := json.Unmarshal([]byte(payload), &raw); err != nil {
 		sanitized := sanitizeLegacyJSON(payload)
 		if sanitized == payload {
-			return nil
+			return parseLooseLegacyToolCalls(payload, available, content)
 		}
 		if err := json.Unmarshal([]byte(sanitized), &raw); err != nil {
-			return nil
+			return parseLooseLegacyToolCalls(sanitized, available, content)
 		}
 	}
 
@@ -1067,4 +1070,125 @@ func extractToolCallCandidates(content string) []string {
 		offset = endIdx + len(endTag)
 	}
 	return candidates
+}
+
+func normalizeLegacyToolCallPayload(input string) string {
+	if strings.TrimSpace(input) == "" {
+		return input
+	}
+	return legacyArgsBareValuePattern.ReplaceAllString(input, `"arguments":{}`)
+}
+
+func parseLooseLegacyToolCalls(payload string, available []providers.ToolDefinition, content string) []toolCall {
+	entries := splitLooseLegacyEntries(payload)
+	if len(entries) == 0 {
+		return nil
+	}
+	calls := make([]toolCall, 0, len(entries))
+	for _, entry := range entries {
+		if call, ok := parseLooseLegacyEntry(entry, available, content); ok {
+			calls = append(calls, call)
+		}
+	}
+	return calls
+}
+
+func splitLooseLegacyEntries(payload string) []string {
+	s := strings.TrimSpace(payload)
+	if s == "" {
+		return nil
+	}
+	if strings.HasPrefix(s, "[") && strings.HasSuffix(s, "]") && len(s) >= 2 {
+		s = strings.TrimSpace(s[1 : len(s)-1])
+	}
+	var entries []string
+	for i := 0; i < len(s); {
+		if s[i] == '{' {
+			segment := extractJSONStructure(s[i:])
+			if segment == "" {
+				break
+			}
+			entries = append(entries, segment)
+			i += len(segment)
+			for i < len(s) && (s[i] == ',' || s[i] == '}' || s[i] == ' ' || s[i] == '\t' || s[i] == '\n') {
+				i++
+			}
+			continue
+		}
+		i++
+	}
+	if len(entries) == 0 && strings.Contains(s, "name") {
+		entries = append(entries, s)
+	}
+	return entries
+}
+
+func parseLooseLegacyEntry(entry string, available []providers.ToolDefinition, content string) (toolCall, bool) {
+	text := strings.TrimSpace(entry)
+	if text == "" {
+		return toolCall{}, false
+	}
+	var data map[string]any
+	if err := json.Unmarshal([]byte(text), &data); err == nil {
+		return legacyEntryToToolCall(data, available, content)
+	}
+
+	name := extractFirstMatch(entry, []string{`"name"`, `"tool"`, `"tool_name"`, `"function"`})
+	if name == "" {
+		return toolCall{}, false
+	}
+	argsMap := parseLooseArguments(entry)
+	call := toolCall{Type: "function"}
+	call.Function.Name = resolveToolName(name, available, content)
+	if call.Function.Name == "" && len(available) == 1 {
+		call.Function.Name = available[0].Name
+	}
+	if call.Function.Name == "" {
+		call.Function.Name = name
+	}
+	if argsMap == nil {
+		argsMap = map[string]any{}
+	}
+	argBytes, err := json.Marshal(argsMap)
+	if err != nil {
+		return toolCall{}, false
+	}
+	call.Function.Arguments = json.RawMessage(argBytes)
+	return call, true
+}
+
+func extractFirstMatch(entry string, keys []string) string {
+	for _, key := range keys {
+		pattern := fmt.Sprintf(`%s\s*:\s*"([^"]+)"`, key)
+		re := regexp.MustCompile(pattern)
+		if matches := re.FindStringSubmatch(entry); len(matches) == 2 {
+			return matches[1]
+		}
+	}
+	return ""
+}
+
+func parseLooseArguments(entry string) map[string]any {
+	idx := strings.Index(strings.ToLower(entry), `"arguments"`)
+	if idx == -1 {
+		return map[string]any{}
+	}
+	sub := entry[idx:]
+	startBrace := strings.Index(sub, "{")
+	if startBrace == -1 {
+		return map[string]any{}
+	}
+	structure := extractJSONStructure(sub[startBrace:])
+	if strings.TrimSpace(structure) == "" {
+		return map[string]any{}
+	}
+	parsed, err := parseJSONAnyWithSanitize(structure)
+	if err != nil {
+		return map[string]any{}
+	}
+	args, ok := coerceLegacyArguments(parsed)
+	if !ok || args == nil {
+		return map[string]any{}
+	}
+	return args
 }
