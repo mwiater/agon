@@ -2,13 +2,10 @@
 package cli
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -17,6 +14,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mwiater/agon/internal/providers"
 )
 
 // multimodelViewState represents the current state of the multimodel application's view.
@@ -52,12 +50,13 @@ type multimodelColumnResponse struct {
 
 // multimodelModel is the Bubble Tea model for multimodel mode.
 type multimodelModel struct {
+	// ctx is the application-wide context for cancellation.
+	ctx context.Context
 	// config stores the shared application configuration.
 	config *Config
-	// client issues HTTP requests to the configured hosts.
-	client *http.Client
-	// requestTimeout defines the HTTP timeout applied to remote operations.
-	requestTimeout time.Duration
+	// provider issues chat interactions on behalf of the UI.
+	provider  providers.ChatProvider
+	mcpStatus mcpStatus
 	// state tracks which multimodel view is currently active.
 	state multimodelViewState
 	// isLoading reports whether a background operation is still running.
@@ -92,39 +91,9 @@ type multimodelModel struct {
 	width, height int
 	// program references the Bubble Tea program running the TUI.
 	program *tea.Program
-}
 
-// assignmentItem represents a host row in the assignment list.
-type assignmentItem struct {
-	host          Host
-	assignedModel string
-	isAssigned    bool
+	requestWg sync.WaitGroup
 }
-
-// Title returns the formatted title for the assignment item.
-func (i assignmentItem) Title() string {
-	title := i.host.Name
-	if i.isAssigned {
-		title += fmt.Sprintf(" → %s", i.assignedModel)
-	}
-	return title
-}
-
-// Description returns the subtitle describing the assignment status.
-func (i assignmentItem) Description() string {
-	if i.isAssigned {
-		return "Model assigned"
-	}
-	return "Select a model for this host"
-}
-
-// FilterValue returns the name used to filter assignment items.
-func (i assignmentItem) FilterValue() string {
-	return i.host.Name
-}
-
-// multimodelAssignmentsReadyMsg is sent when model assignments are loaded.
-type multimodelAssignmentsReadyMsg struct{}
 
 // multimodelChatReadyMsg is sent when the chat interface is ready.
 type multimodelChatReadyMsg struct{}
@@ -151,8 +120,7 @@ type multimodelStreamErr struct {
 }
 
 // initialMultimodelModel creates a new multimodel Bubble Tea model with defaults.
-func initialMultimodelModel(cfg *Config) *multimodelModel {
-	timeout := cfg.RequestTimeout()
+func initialMultimodelModel(ctx context.Context, cfg *Config, provider providers.ChatProvider) *multimodelModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
@@ -187,14 +155,10 @@ func initialMultimodelModel(cfg *Config) *multimodelModel {
 	modelList := list.New(nil, list.NewDefaultDelegate(), 0, 0)
 
 	return &multimodelModel{
-		config: cfg,
-		client: &http.Client{
-			Transport: &http.Transport{
-				ForceAttemptHTTP2: false,
-			},
-			Timeout: timeout,
-		},
-		requestTimeout:    timeout,
+		ctx:               ctx,
+		config:            cfg,
+		provider:          provider,
+		mcpStatus:         deriveMCPStatus(cfg, provider),
 		state:             multimodelViewAssignment,
 		assignments:       assignments,
 		selectedHostIndex: 0,
@@ -219,8 +183,10 @@ func multimodelStreamChatCmd(p *tea.Program, m *multimodelModel) tea.Cmd {
 	return func() tea.Msg {
 		for i, assignment := range m.assignments {
 			if assignment.isAssigned {
+				m.requestWg.Add(1)
 				go func(hostIndex int, host Host, model string, history []chatMessage) {
-					if err := streamToColumn(p, hostIndex, host, model, history, host.SystemPrompt, m.config.JSONMode, host.Parameters, m.client, m.requestTimeout); err != nil {
+					defer m.requestWg.Done()
+					if err := streamToColumn(m.ctx, p, m.provider, hostIndex, host, model, history, host.SystemPrompt, m.config.JSONMode, host.Parameters); err != nil {
 						p.Send(multimodelStreamErr{hostIndex: hostIndex, err: err})
 					}
 				}(i, assignment.host, assignment.selectedModel, m.columnResponses[i].chatHistory)
@@ -231,89 +197,26 @@ func multimodelStreamChatCmd(p *tea.Program, m *multimodelModel) tea.Cmd {
 }
 
 // streamToColumn streams chat responses for a single assigned column.
-func streamToColumn(p *tea.Program, hostIndex int, host Host, modelName string, history []chatMessage, systemPrompt string, JSONFormat bool, parameters Parameters, client *http.Client, timeout time.Duration) error {
-	messages := history
-	if systemPrompt != "" {
-		messages = append([]chatMessage{{Role: "system", Content: systemPrompt}}, messages...)
+func streamToColumn(ctx context.Context, p *tea.Program, provider providers.ChatProvider, hostIndex int, host Host, modelName string, history []chatMessage, systemPrompt string, JSONFormat bool, parameters Parameters) error {
+	req := providers.StreamRequest{
+		Host:         host,
+		Model:        modelName,
+		History:      history,
+		SystemPrompt: systemPrompt,
+		Parameters:   parameters,
+		JSONMode:     JSONFormat,
 	}
 
-	payload := map[string]any{
-		"model":    modelName,
-		"messages": messages,
-		"options":  parameters,
-		"stream":   true,
-	}
-
-	if JSONFormat {
-		payload = map[string]any{
-			"model":    modelName,
-			"messages": messages,
-			"options":  parameters,
-			"stream":   true,
-			"format":   "json",
-		}
-	}
-
-	body, _ := json.Marshal(payload)
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, "POST", host.URL+"/api/chat", bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("API returned non-200 status: %s. Body: %s", resp.Status, string(bodyBytes))
-	}
-
-	decoder := json.NewDecoder(resp.Body)
-	var finalChunk streamChunk
-	for {
-		var chunk streamChunk
-		if err := decoder.Decode(&chunk); err != nil {
-			if err != io.EOF {
-				return err
-			}
-			break
-		}
-		p.Send(multimodelStreamChunkMsg{
-			hostIndex: hostIndex,
-			message: chatMessage{
-				Role:    chunk.Message.Role,
-				Content: chunk.Message.Content,
-			},
-		})
-		if chunk.Done {
-			finalChunk = chunk
-			break
-		}
-	}
-
-	p.Send(multimodelStreamEndMsg{
-		hostIndex: hostIndex,
-		meta: LLMResponseMeta{
-			Model:              finalChunk.Model,
-			CreatedAt:          time.Now(),
-			Done:               finalChunk.Done,
-			TotalDuration:      finalChunk.TotalDuration,
-			LoadDuration:       finalChunk.LoadDuration,
-			PromptEvalCount:    finalChunk.PromptEvalCount,
-			PromptEvalDuration: finalChunk.PromptEvalDuration,
-			EvalCount:          finalChunk.EvalCount,
-			EvalDuration:       finalChunk.EvalDuration,
+	return provider.Stream(ctx, req, providers.StreamCallbacks{
+		OnChunk: func(msg providers.ChatMessage) error {
+			p.Send(multimodelStreamChunkMsg{hostIndex: hostIndex, message: msg})
+			return nil
+		},
+		OnComplete: func(meta providers.StreamMetadata) error {
+			p.Send(multimodelStreamEndMsg{hostIndex: hostIndex, meta: meta})
+			return nil
 		},
 	})
-	return nil
 }
 
 // Init initializes the multimodel Bubble Tea model.
@@ -583,7 +486,8 @@ func (m *multimodelModel) assignmentView() string {
 	var builder strings.Builder
 
 	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("5"))
-	builder.WriteString(titleStyle.Render("Multimodel Mode - Assign Models to Hosts") + "\n\n")
+	builder.WriteString(titleStyle.Render("Multimodel Mode - Assign Models to Hosts") + "\n")
+	builder.WriteString(renderMCPBadge(m.mcpStatus) + "\n\n")
 
 	if m.inModelSelection {
 		return lipgloss.NewStyle().Margin(1, 2).Render(m.modelList.View())
@@ -639,7 +543,7 @@ func (m *multimodelModel) multimodelChatView() string {
 	var builder strings.Builder
 
 	headerStyle := lipgloss.NewStyle().Background(lipgloss.Color("62")).Foreground(lipgloss.Color("230")).Padding(0, 1)
-	header := headerStyle.Render("Multimodel Chat")
+	header := lipgloss.JoinHorizontal(lipgloss.Top, headerStyle.Render("Multimodel Chat"), renderMCPBadge(m.mcpStatus))
 	help := lipgloss.NewStyle().Faint(true).Render(" (tab to reassign, q to quit)")
 	builder.WriteString(header + help + "\n\n")
 
@@ -745,20 +649,16 @@ func (m *multimodelModel) multimodelChatView() string {
 }
 
 // StartMultimodelGUI initializes and runs the four-column multimodel chat UI.
-// It accepts a parsed Config, sets up the Bubble Tea program, and blocks until
+// It accepts a parsed Config and provider, sets up the Bubble Tea program, and blocks until
 // the UI exits. StartMultimodelGUI returns an error if the TUI cannot be run.
-func StartMultimodelGUI(cfg *Config) error {
-	m := initialMultimodelModel(cfg)
-	m.client = &http.Client{
-		Transport: &http.Transport{
-			ForceAttemptHTTP2: false,
-		},
-		Timeout: m.requestTimeout,
-	}
+func StartMultimodelGUI(ctx context.Context, cfg *Config, provider providers.ChatProvider, cancel context.CancelFunc) error {
+	m := initialMultimodelModel(ctx, cfg, provider)
 
 	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	m.program = p
 
 	_, err := p.Run()
+	cancel()
+	m.requestWg.Wait()
 	return err
 }

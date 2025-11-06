@@ -2,9 +2,8 @@
 package cli
 
 import (
+	"context"
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -26,7 +25,9 @@ func TestUpdate(t *testing.T) {
 			},
 		},
 	}
-	m := initialModel(cfg)
+	provider := newTestProvider()
+	provider.loadedModels["Test Host"] = []string{"model1"}
+	m := initialModel(context.Background(), cfg, provider)
 
 	if m.state != viewHostSelector {
 		t.Errorf("Expected initial state to be viewHostSelector, got %v", m.state)
@@ -48,17 +49,7 @@ func TestUpdate(t *testing.T) {
 		t.Errorf("Expected width and height to be 100, got %d and %d", m.width, m.height)
 	}
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/ps" {
-			w.Write([]byte(`{"models":[{"name":"model1"}]}`))
-		} else {
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	defer server.Close()
-
-	cfg.Hosts[0].URL = server.URL
-	m = initialModel(cfg)
+	m = initialModel(context.Background(), cfg, provider)
 
 	newModel, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = newModel.(*model)
@@ -83,7 +74,9 @@ func TestView(t *testing.T) {
 			},
 		},
 	}
-	m := initialModel(cfg)
+	provider := newTestProvider()
+	provider.loadedModels["Test Host"] = []string{"model1"}
+	m := initialModel(context.Background(), cfg, provider)
 
 	m.width = 0
 	view := m.View()
@@ -92,7 +85,7 @@ func TestView(t *testing.T) {
 	}
 
 	m.width = 100
-	m.err = modelsLoadErr(errors.New("test error"))
+	m.err = modelsLoadErr{error: errors.New("test error")}
 	view = m.View()
 	if !strings.Contains(view, "Error") {
 		t.Errorf("Expected view to contain 'Error', got '%s'", view)

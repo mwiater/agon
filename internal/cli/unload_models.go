@@ -13,7 +13,7 @@ var unloadModelsCmd = &cobra.Command{
 	Short: "Unload all loaded models on each host",
 	Long:  `The 'models' subcommand unloads all loaded models on each host.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		models.UnloadModels(getConfig())
+		models.UnloadModels(GetConfig())
 	},
 }
 

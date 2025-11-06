@@ -3,11 +3,13 @@
 package appconfig
 
 import (
-	"encoding/json"
-	"errors"
-	"fmt"
-	"os"
-	"time"
+    "encoding/json"
+    "errors"
+    "fmt"
+    "os"
+    "runtime"
+    "strings"
+    "time"
 )
 
 const (
@@ -18,18 +20,29 @@ const (
 	legacyConfigPath = "config.json"
 	// defaultRequestTimeout is the default timeout for HTTP requests made by the
 	// application.
-	defaultRequestTimeout = 120 * time.Second
+	defaultRequestTimeout = 600 * time.Second
 )
 
 // Config represents the top-level configuration for the application. It includes a
 // list of hosts, as well as global settings for debugging, multimodel mode,
-// JSON output, and request timeouts.
+// pipeline mode, JSON output, and request timeouts.
 type Config struct {
-	Hosts          []Host `json:"hosts"`
-	Debug          bool   `json:"debug"`
-	MultimodelMode bool   `json:"multimodelMode"`
-	JSONMode       bool   `json:"jsonMode"`
-	TimeoutSeconds int    `json:"timeout,omitempty"`
+	Hosts              []Host `json:"hosts"`
+	Debug              bool   `json:"debug"`
+	MultimodelMode     bool   `json:"multimodelMode"`
+	PipelineMode       bool   `json:"pipelineMode"`
+	JSONMode           bool   `json:"jsonMode"`
+	MCPMode            bool   `json:"mcpMode"`
+	MCPBinary          string `json:"mcpBinary,omitempty"`
+	MCPInitTimeout     int    `json:"mcpInitTimeout,omitempty"`
+	MCPRetryCount      int    `json:"mcpRetryCount,omitempty"`
+	TimeoutSeconds     int    `json:"timeout,omitempty"`
+	ExportPath         string `json:"export,omitempty"`
+	ExportMarkdownPath string `json:"exportMarkdown,omitempty"`
+	LogFile            string `json:"logFile,omitempty"`
+	BenchmarkMode      bool   `json:"benchmarkMode"`
+	BenchmarkCount     int    `json:"benchmarkCount"`
+	ConfigPath         string `json:"-"` // Not marshaled to/from JSON
 }
 
 // Host represents a single host that can serve language models. It contains the
@@ -64,10 +77,64 @@ type Parameters struct {
 // RequestTimeout returns the timeout duration for HTTP requests. If the timeout is
 // not specified in the configuration, it returns the default timeout.
 func (c Config) RequestTimeout() time.Duration {
-	if c.TimeoutSeconds <= 0 {
-		return defaultRequestTimeout
+    if c.TimeoutSeconds <= 0 {
+        return defaultRequestTimeout
+    }
+    return time.Duration(c.TimeoutSeconds) * time.Second
+}
+
+// defaultMCPInitTimeout defines the fallback timeout used while initializing the MCP server.
+const defaultMCPInitTimeout = 10 * time.Second
+
+// defaultMCPRetryCount defines how many times MCP tools are retried when the config omits the value.
+const defaultMCPRetryCount = 1
+
+// MCPInitTimeoutDuration returns the timeout duration for MCP initialization.
+func (c Config) MCPInitTimeoutDuration() time.Duration {
+	if c.MCPInitTimeout <= 0 {
+		return defaultMCPInitTimeout
 	}
-	return time.Duration(c.TimeoutSeconds) * time.Second
+	return time.Duration(c.MCPInitTimeout) * time.Second
+}
+
+// MCPRetryAttempts returns the configured number of retry attempts for MCP tools.
+// Negative values are treated as zero, while an unset value falls back to a sensible default.
+func (c Config) MCPRetryAttempts() int {
+    if c.MCPRetryCount < 0 {
+        return 0
+    }
+    if c.MCPRetryCount == 0 {
+        return defaultMCPRetryCount
+    }
+    return c.MCPRetryCount
+}
+
+// LogFilePath returns the path to the application log file, applying a
+// centralized default when unset in configuration.
+func (c Config) LogFilePath() string {
+    if path := c.LogFile; strings.TrimSpace(path) != "" { // strings used below
+        return path
+    }
+    return "agon.log"
+}
+
+// MCPBinaryPath returns the resolved MCP server binary path. When not provided
+// explicitly, it chooses a sensible default based on the current OS/ARCH and
+// the repository's dist layout.
+func (c Config) MCPBinaryPath() string {
+    if b := strings.TrimSpace(c.MCPBinary); b != "" {
+        return b
+    }
+    goos := runtime.GOOS
+    switch goos {
+    case "windows":
+        return "dist/agon-mcp_windows_amd64_v1/agon-mcp.exe"
+    case "linux":
+        return "dist/agon-mcp_linux_amd64_v1/agon-mcp"
+    default:
+        // Fallback to a generic path if a new platform is used.
+        return "dist/agon-mcp"
+    }
 }
 
 // Load reads the application configuration from the specified path. If the path
@@ -84,6 +151,7 @@ func Load(path string) (Config, error) {
 		if len(config.Hosts) == 0 {
 			return Config{}, errors.New("config must contain at least one host")
 		}
+		config.ConfigPath = path
 		return config, nil
 	}
 
@@ -118,6 +186,9 @@ func loadFromPath(path string) (Config, error) {
 	var config Config
 	if err := json.NewDecoder(file).Decode(&config); err != nil {
 		return Config{}, err
+	}
+	if config.TimeoutSeconds <= 0 {
+		config.TimeoutSeconds = int(defaultRequestTimeout.Seconds())
 	}
 	return config, nil
 }

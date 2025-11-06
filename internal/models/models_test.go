@@ -18,11 +18,17 @@ func TestOllamaHost(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/api/tags":
-			w.Write([]byte(`{"models":[{"name":"model1"},{"name":"model2"}]}`))
+			if _, err := w.Write([]byte(`{"models":[{"name":"model1"},{"name":"model2"}]}`)); err != nil {
+				t.Fatalf("write response for /api/tags: %v", err)
+			}
 		case "/api/ps":
-			w.Write([]byte(`{"models":[{"name":"model1"}]}`))
+			if _, err := w.Write([]byte(`{"models":[{"name":"model1"}]}`)); err != nil {
+				t.Fatalf("write response for /api/ps: %v", err)
+			}
 		case "/api/show":
-			w.Write([]byte(`{"parameters":"temperature 0.8"}`))
+			if _, err := w.Write([]byte(`{"parameters":"temperature 0.8"}`)); err != nil {
+				t.Fatalf("write response for /api/show: %v", err)
+			}
 		case "/api/pull":
 			w.WriteHeader(http.StatusOK)
 		case "/api/delete":
@@ -75,9 +81,9 @@ func TestOllamaHost(t *testing.T) {
 		t.Errorf("Expected 2 models, got %d", len(models))
 	}
 
-	runningModels, err := host.getRunningModels()
+	runningModels, err := host.GetRunningModels()
 	if err != nil {
-		t.Errorf("getRunningModels() failed: %v", err)
+		t.Errorf("GetRunningModels() failed: %v", err)
 	}
 	if len(runningModels) != 1 {
 		t.Errorf("Expected 1 running model, got %d", len(runningModels))

@@ -4,6 +4,7 @@ package appconfig
 import (
 	"os"
 	"testing"
+	"time"
 )
 
 // TestLoad tests the Load function to ensure it correctly handles various
@@ -41,6 +42,22 @@ func TestLoad(t *testing.T) {
 	}
 	if len(cfg.Hosts) != 1 {
 		t.Fatalf("expected 1 host, got %d", len(cfg.Hosts))
+	}
+
+	if cfg.TimeoutSeconds != 600 {
+		t.Fatalf("expected default timeout of 600 seconds, got %d", cfg.TimeoutSeconds)
+	}
+
+	if cfg.RequestTimeout() != 600*time.Second {
+		t.Fatalf("expected default request timeout of 600s, got %v", cfg.RequestTimeout())
+	}
+
+	if cfg.MCPInitTimeoutDuration() != 10*time.Second {
+		t.Fatalf("expected default MCP init timeout of 10s, got %v", cfg.MCPInitTimeoutDuration())
+	}
+
+	if cfg.MCPRetryAttempts() != 1 {
+		t.Fatalf("expected default MCP retry attempts of 1, got %d", cfg.MCPRetryAttempts())
 	}
 
 	invalidJSON := `{ "hosts": [`

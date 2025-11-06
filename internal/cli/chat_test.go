@@ -3,6 +3,7 @@ package agon
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"testing"
 
@@ -58,7 +59,7 @@ func TestChatCmd(t *testing.T) {
 
 	startCalled := false
 	var receivedCfg *appconfig.Config
-	startGUI = func(cfg *appconfig.Config) {
+	startGUI = func(ctx context.Context, cfg *appconfig.Config, cancel context.CancelFunc) {
 		startCalled = true
 		receivedCfg = cfg
 	}
@@ -71,7 +72,7 @@ func TestChatCmd(t *testing.T) {
 	if receivedCfg == nil {
 		t.Fatal("expected to receive a config instance")
 	}
-	if receivedCfg != getConfig() {
+	if receivedCfg != GetConfig() {
 		t.Fatal("expected startGUI to receive the loaded configuration")
 	}
 }

@@ -6,8 +6,10 @@ before:
     - go mod tidy
     - go test ./...
 builds:
-  - main: ./cmd/agon/main.go
-    id: "agon"
+  # Build 1: "agon"
+  - id: "agon"
+    # 'main' is a key specifying the entrypoint path
+    main: ./cmd/agon/main.go
     binary: agon
     env:
       - CGO_ENABLED=0
@@ -16,10 +18,20 @@ builds:
       - windows
     goarch:
       - amd64
-      - arm64
-    ignore:
-      - goos: windows
-        goarch: arm64
+
+  # Build 2: "agon-mcp"
+  - id: "agon-mcp"
+    # 'main' is used again for the second binary's entrypoint
+    main: ./mcp/main.go
+    binary: agon-mcp
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+    goarch:
+      - amd64
+      
 release:
   github:
     owner: mwiater

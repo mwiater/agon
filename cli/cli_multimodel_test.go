@@ -2,6 +2,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -25,7 +26,8 @@ func TestInitialMultimodelModel(t *testing.T) {
 			},
 		},
 	}
-	m := initialMultimodelModel(cfg)
+	provider := newTestProvider()
+	m := initialMultimodelModel(context.Background(), cfg, provider)
 
 	if m.state != multimodelViewAssignment {
 		t.Errorf("Expected initial state to be multimodelViewAssignment, got %v", m.state)
@@ -47,9 +49,8 @@ func TestMultimodelUpdate(t *testing.T) {
 			},
 		},
 	}
-	m := initialMultimodelModel(cfg)
-
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	m := initialMultimodelModel(context.Background(), cfg, newTestProvider())
+		_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	if cmd == nil {
 		t.Error("Expected a quit command, but got nil")
 	}
@@ -101,7 +102,7 @@ func TestMultimodelView(t *testing.T) {
 			},
 		},
 	}
-	m := initialMultimodelModel(cfg)
+	m := initialMultimodelModel(context.Background(), cfg, newTestProvider())
 
 	m.width = 0
 	view := m.View()

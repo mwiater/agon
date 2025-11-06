@@ -3,5 +3,10 @@
 # Except these files
 !.gitignore
 !config.example.Authors.json
-!config.example.json
 !config.example.JSONMode.json
+!config.example.Facts.json
+!config.example.MCPMode.json
+!config.example.ModelParameters.json
+!config.example.PipelineMode.json
+!config.example.SystemPromptLength.json
+!config.example.BenchmarkMode.json

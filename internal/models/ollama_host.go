@@ -1,5 +1,3 @@
-// internal/models/models.go
-// Package models manages host interactions and model metadata for Agon.
 package models
 
 import (
@@ -9,50 +7,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/k0kubun/pp"
-	"github.com/mwiater/agon/internal/appconfig"
 )
-
-// ModelParameters holds the detailed parameters of a model.
-type ModelParameters struct {
-	Model      string       `json:"model,omitempty"`
-	License    string       `json:"license,omitempty"`
-	Modelfile  string       `json:"modelfile,omitempty"`
-	Parameters string       `json:"parameters,omitempty"`
-	Template   string       `json:"template,omitempty"`
-	Details    ModelDetails `json:"details,omitempty"`
-}
-
-// ModelDetails holds the nested details of a model.
-type ModelDetails struct {
-	Family            string `json:"family,omitempty"`
-	Format            string `json:"format,omitempty"`
-	ParameterSize     string `json:"parameter_size,omitempty"`
-	QuantizationLevel string `json:"quantization_level,omitempty"`
-}
-
-// defaultRequestTimeout defines the fallback HTTP timeout for host interactions.
-const defaultRequestTimeout = 120 * time.Second
-
-// LLMHost defines the model lifecycle and metadata operations a host must support.
-// Implementations should pull, delete, list, and unload models, and expose basic metadata.
-type LLMHost interface {
-	PullModel(model string)
-	DeleteModel(model string)
-	ListModels() ([]string, error)
-	ListRawModels() ([]string, error)
-	UnloadModel(model string)
-	GetName() string
-	GetType() string
-	GetModels() []string
-	GetModelParameters() ([]ModelParameters, error)
-}
 
 // OllamaHost implements LLMHost for Ollama servers.
 type OllamaHost struct {
@@ -88,10 +47,7 @@ func (h *OllamaHost) httpClient() *http.Client {
 
 // effectiveTimeout resolves the timeout to use for outbound HTTP requests.
 func (h *OllamaHost) effectiveTimeout() time.Duration {
-	if h.requestTimeout > 0 {
-		return h.requestTimeout
-	}
-	return defaultRequestTimeout
+    return h.requestTimeout
 }
 
 // doRequest executes an HTTP request against the Ollama API with context cancellation support.
@@ -113,59 +69,6 @@ func (h *OllamaHost) doRequest(method, path string, body io.Reader, contentType 
 	return resp, cancel, nil
 }
 
-// createHosts creates LLMHost implementations for each configured host entry.
-func createHosts(config appconfig.Config) []LLMHost {
-	var hosts []LLMHost
-	timeout := config.RequestTimeout()
-	client := &http.Client{
-		Timeout: timeout,
-	}
-	for _, hostConfig := range config.Hosts {
-		switch hostConfig.Type {
-		case "ollama":
-			hosts = append(hosts, &OllamaHost{
-				Name:           hostConfig.Name,
-				URL:            hostConfig.URL,
-				Models:         hostConfig.Models,
-				client:         client,
-				requestTimeout: timeout,
-			})
-		default:
-			fmt.Printf("Unknown host type: %s\n", hostConfig.Type)
-		}
-	}
-	return hosts
-}
-
-// PullModels reads models from the provided configuration and pulls them to each supported host.
-// For Ollama hosts, it issues /api/pull requests for each configured model.
-func PullModels(config *appconfig.Config) {
-	if config == nil {
-		fmt.Println("configuration is not initialized")
-		return
-	}
-
-	hosts := createHosts(*config)
-	var wg sync.WaitGroup
-	for _, host := range hosts {
-		wg.Add(1)
-		go func(h LLMHost) {
-			defer wg.Done()
-			if h.GetType() != "ollama" {
-				fmt.Printf("Pulling models is not supported for %s (%s)\n", h.GetName(), h.GetType())
-				return
-			}
-			fmt.Printf("Starting model pulls for %s...\n", h.GetName())
-			for _, model := range h.GetModels() {
-				fmt.Printf("  -> Pulling model: %s on %s\n", model, h.GetName())
-				h.PullModel(model)
-			}
-		}(host)
-	}
-	wg.Wait()
-	fmt.Println("All model pull commands have finished.")
-}
-
 // PullModel pulls the provided model to the Ollama host via the /api/pull endpoint.
 func (h *OllamaHost) PullModel(model string) {
 	payload := map[string]string{"name": model}
@@ -182,55 +85,6 @@ func (h *OllamaHost) PullModel(model string) {
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
 		fmt.Printf("Error pulling model %s on %s: %s\n", model, h.Name, strings.TrimSpace(string(respBody)))
-	}
-}
-
-// DeleteModels uses the provided configuration and deletes any models not on the list from each supported host.
-func DeleteModels(config *appconfig.Config) {
-	if config == nil {
-		fmt.Println("configuration is not initialized")
-		return
-	}
-
-	hosts := createHosts(*config)
-	var wg sync.WaitGroup
-	for _, host := range hosts {
-		wg.Add(1)
-		go func(h LLMHost) {
-			defer wg.Done()
-			if h.GetType() != "ollama" {
-				fmt.Printf("Deleting models is not supported for %s (%s)\n", h.GetName(), h.GetType())
-				return
-			}
-			deleteModelsOnNode(h, h.GetModels())
-		}(host)
-	}
-	wg.Wait()
-	fmt.Println("All model cleanup commands have finished.")
-}
-
-// deleteModelsOnNode deletes models on a single host that are not present in modelsToKeep.
-func deleteModelsOnNode(host LLMHost, modelsToKeep []string) {
-	fmt.Printf("Starting model cleanup for %s...\n", host.GetName())
-	models, err := host.ListRawModels()
-	if err != nil {
-		fmt.Printf("Error getting models from %s: %v\n", host.GetName(), err)
-		return
-	}
-
-	modelsToKeepSet := make(map[string]struct{})
-	for _, m := range modelsToKeep {
-		modelsToKeepSet[m] = struct{}{}
-	}
-
-	for _, installedModelName := range models {
-		modelName := installedModelName
-		if _, keep := modelsToKeepSet[modelName]; !keep {
-			fmt.Printf("  -> Deleting model: %s on %s\n", modelName, host.GetName())
-			host.DeleteModel(modelName)
-		} else {
-			fmt.Printf("  -> Keeping model: %s on %s\n", modelName, host.GetName())
-		}
 	}
 }
 
@@ -253,39 +107,6 @@ func (h *OllamaHost) DeleteModel(model string) {
 	}
 }
 
-// UnloadModels unloads all currently loaded models on each supported host.
-func UnloadModels(config *appconfig.Config) {
-	if config == nil {
-		fmt.Println("configuration is not initialized")
-		return
-	}
-
-	hosts := createHosts(*config)
-	var wg sync.WaitGroup
-	for _, host := range hosts {
-		wg.Add(1)
-		go func(h LLMHost) {
-			defer wg.Done()
-			if h.GetType() != "ollama" {
-				fmt.Printf("Unloading models is not supported for %s (%s)\n", h.GetName(), h.GetType())
-				return
-			}
-			fmt.Printf("Unloading models for %s...\n", h.GetName())
-			runningModels, err := h.(*OllamaHost).getRunningModels()
-			if err != nil {
-				fmt.Printf("Error getting running models from %s: %v\n", h.GetName(), err)
-				return
-			}
-			for model := range runningModels {
-				fmt.Printf("  -> Unloading model: %s on %s\n", model, h.GetName())
-				h.UnloadModel(model)
-			}
-		}(host)
-	}
-	wg.Wait()
-	fmt.Println("All model unload commands have finished.")
-}
-
 // UnloadModel unloads a model from an Ollama host by sending a chat request with keep_alive set to 0.
 func (h *OllamaHost) UnloadModel(model string) {
 	payload := map[string]any{"model": model, "keep_alive": 0}
@@ -302,66 +123,6 @@ func (h *OllamaHost) UnloadModel(model string) {
 	if resp.StatusCode >= 400 {
 		respBody, _ := io.ReadAll(resp.Body)
 		fmt.Printf("Error unloading model %s on %s: %s\n", model, h.Name, strings.TrimSpace(string(respBody)))
-	}
-}
-
-// function aliases allow tests to spy call order.
-var (
-	// deleteModelsFunc proxies DeleteModels to allow tests to substitute behavior.
-	deleteModelsFunc = DeleteModels
-	// pullModelsFunc proxies PullModels to allow tests to substitute behavior.
-	pullModelsFunc   = PullModels
-)
-
-// SyncModels deletes any models not in config and then pulls missing models.
-func SyncModels(config *appconfig.Config) {
-	deleteModelsFunc(config)
-	pullModelsFunc(config)
-}
-
-// ListModels lists models on each configured host, indicating which are currently loaded for Ollama hosts.
-func ListModels(config *appconfig.Config) {
-	if config == nil {
-		fmt.Println("configuration is not initialized")
-		return
-	}
-
-	hosts := createHosts(*config)
-	nodeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("255"))
-
-	nodeModels := make(map[string][]string)
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-
-	for _, host := range hosts {
-		wg.Add(1)
-		go func(h LLMHost) {
-			defer wg.Done()
-			models, err := h.ListModels()
-			mu.Lock()
-			if err != nil {
-				nodeModels[h.GetName()] = []string{fmt.Sprintf("Error: %v", err)}
-			} else {
-				nodeModels[h.GetName()] = models
-			}
-			mu.Unlock()
-		}(host)
-	}
-	wg.Wait()
-
-	var sortedNodes []string
-	for node := range nodeModels {
-		sortedNodes = append(sortedNodes, node)
-	}
-	sort.Strings(sortedNodes)
-
-	for _, node := range sortedNodes {
-		fmt.Println(nodeStyle.Render(fmt.Sprintf("%s:", node)))
-		for _, model := range nodeModels[node] {
-			cleanedModelString := strings.TrimSpace(strings.ReplaceAll(model, "-", ""))
-			fmt.Println("  >>> " + cleanedModelString)
-		}
-		fmt.Println()
 	}
 }
 
@@ -405,7 +166,7 @@ func (h *OllamaHost) ListModels() ([]string, error) {
 	modelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("86"))
 	loadedModelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("46"))
 
-	runningModels, err := h.getRunningModels()
+	runningModels, err := h.GetRunningModels()
 	if err != nil {
 		return nil, fmt.Errorf("could not get running models: %v", err)
 	}
@@ -448,7 +209,7 @@ func (h *OllamaHost) ListModels() ([]string, error) {
 }
 
 // getRunningModels returns the set of currently running models on an Ollama host by querying /api/ps.
-func (h *OllamaHost) getRunningModels() (map[string]struct{}, error) {
+func (h *OllamaHost) GetRunningModels() (map[string]struct{}, error) {
 	runningModels := make(map[string]struct{})
 
 	resp, cancel, err := h.doRequest(http.MethodGet, "/api/ps", nil, "")
@@ -482,49 +243,6 @@ func (h *OllamaHost) getRunningModels() (map[string]struct{}, error) {
 	}
 
 	return runningModels, nil
-}
-
-// ListModelParameters prints the exposed parameters for each model on every configured host.
-func ListModelParameters(config *appconfig.Config) {
-	if config == nil {
-		fmt.Println("configuration is not initialized")
-		return
-	}
-
-	hosts := createHosts(*config)
-	nodeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("255"))
-
-	for _, host := range hosts {
-		fmt.Println(nodeStyle.Render(fmt.Sprintf("%s:", host.GetName())))
-		if host.GetType() != "ollama" {
-			fmt.Printf("Listing model parameters is not supported for %s (%s)\n", host.GetName(), host.GetType())
-			continue
-		}
-
-		params, err := host.GetModelParameters()
-		if err != nil {
-			fmt.Printf("Error getting model parameters from %s: %v\n", host.GetName(), err)
-			continue
-		}
-
-		for _, p := range params {
-			fmt.Printf("  >>> %s\n", p.Model)
-
-			settings := extractSettings(p.Parameters)
-
-			fmt.Println("----------------------------------------------------------------")
-			pp.Println(params)
-			fmt.Println("********************")
-			pp.Println(settings)
-			fmt.Println("----------------------------------------------------------------")
-			fmt.Printf("      temperature: %s\n", settings["temperature"])
-			fmt.Printf("      top_p: %s\n", settings["top_p"])
-			fmt.Printf("      top_k: %s\n", settings["top_k"])
-			fmt.Printf("      repeat_penalty: %s\n", settings["repeat_penalty"])
-			fmt.Printf("      min_p: %s\n", settings["min_p"])
-		}
-		fmt.Println()
-	}
 }
 
 // GetModelParameters retrieves the parameters for each model on the host.
@@ -600,7 +318,6 @@ func (h *OllamaHost) getModelParametersFromAPI(model string) (ModelParameters, e
 }
 
 // extractSettings parses the modelfile parameters text and returns the sampling settings relevant to Agon.
-
 func extractSettings(paramsText string) map[string]string {
 	wanted := map[string]string{
 		"temperature":    "n/a",

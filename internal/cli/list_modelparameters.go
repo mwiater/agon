@@ -13,7 +13,7 @@ var listModelParametersCmd = &cobra.Command{
 	Short: "List parameters for each model on each node",
 	Long:  `The 'modelParameters' subcommand iterates models on each configured node and prints their current parameters from /api/show.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		models.ListModelParameters(getConfig())
+		models.ListModelParameters(GetConfig())
 	},
 }
 

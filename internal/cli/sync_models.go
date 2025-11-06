@@ -14,7 +14,7 @@ var syncModelsCmd = &cobra.Command{
 	Short: "Sync all models from the configuration file",
 	Long:  `The 'models' subcommand syncs all models from the configuration file (default: config/config.json).`,
 	Run: func(cmd *cobra.Command, args []string) {
-		models.SyncModels(getConfig())
+		models.SyncModels(GetConfig())
 	},
 }
 

@@ -2,6 +2,7 @@
 package cli
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -12,7 +13,9 @@ import (
 // TestSingleModel_StateTransitions_And_View covers the single-model state machine and view rendering.
 func TestSingleModel_StateTransitions_And_View(t *testing.T) {
 	cfg := &Config{Hosts: []Host{{Name: "HostA", URL: "http://x", Models: []string{"m1", "m2"}}}}
-	m := initialModel(cfg)
+	provider := newTestProvider()
+	provider.loadedModels["HostA"] = []string{"m1"}
+	m := initialModel(context.Background(), cfg, provider)
 
 	_, _ = m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 
@@ -79,7 +82,9 @@ func TestMultimodel_Assignment_And_Chat_Flow(t *testing.T) {
 		{Name: "H3", URL: "http://z", Models: []string{"m4"}},
 		{Name: "H4", URL: "http://w", Models: []string{"m5"}},
 	}}
-	mm := initialMultimodelModel(cfg)
+	provider := newTestProvider()
+
+	mm := initialMultimodelModel(context.Background(), cfg, provider)
 	mm.program = &tea.Program{}
 
 	_, _ = mm.Update(tea.WindowSizeMsg{Width: 120, Height: 40})

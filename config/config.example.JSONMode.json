@@ -5,120 +5,103 @@
       "url": "{ollama-api-endpoint-01}",
       "type": "ollama",
       "models": [
-        "stablelm-zephyr:3b",
-        "granite4:micro",
-        "gemma3n:e2b",
-        "gemma3:270m",
         "deepseek-r1:1.5b",
-        "llama3.2:1b",
+        "gemma3:1b",
         "granite3.1-moe:1b",
-        "dolphin-phi:2.7b",
-        "qwen3:1.7b"
+        "granite3.1-moe:3b",
+        "granite4:1b",
+        "granite4:350m",
+        "granite4:micro",
+        "llama3.2:1b",
+        "llama3.2:3b",
+        "phi4-mini:3.8b",
+        "smollm2:360m",
+        "smollm2:1.7b",
+        "qwen3:1.7b",
+        "embeddinggemma:300m"
       ],
       "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point. Your response must be retruned as valid JSON",
-      "parameters": {
-        "top_k": 40,
-        "top_p": 0.9,
-        "min_p": 0.05,
-        "tfs_z": 1.0,
-        "typical_p": 0.95,
-        "repeat_last_n": 64,
-        "temperature": 0.7,
-        "repeat_penalty": 1.1,
-        "presence_penalty": 0.6,
-        "frequency_penalty": 0.3
-      }
+      "parameters": {}
     },
     {
       "name": "Ollama02",
       "url": "{ollama-api-endpoint-02}",
       "type": "ollama",
       "models": [
-        "stablelm-zephyr:3b",
-        "granite4:micro",
-        "gemma3n:e2b",
-        "gemma3:270m",
         "deepseek-r1:1.5b",
-        "llama3.2:1b",
+        "gemma3:1b",
         "granite3.1-moe:1b",
-        "dolphin-phi:2.7b",
-        "qwen3:1.7b"
+        "granite3.1-moe:3b",
+        "granite4:1b",
+        "granite4:350m",
+        "granite4:micro",
+        "llama3.2:1b",
+        "llama3.2:3b",
+        "phi4-mini:3.8b",
+        "smollm2:360m",
+        "smollm2:1.7b",
+        "qwen3:1.7b",
+        "embeddinggemma:300m"
       ],
       "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point. Your response must be retruned as valid JSON",
-      "parameters": {
-        "top_k": 40,
-        "top_p": 0.9,
-        "min_p": 0.05,
-        "tfs_z": 1.0,
-        "typical_p": 0.95,
-        "repeat_last_n": 64,
-        "temperature": 0.7,
-        "repeat_penalty": 1.1,
-        "presence_penalty": 0.6,
-        "frequency_penalty": 0.3
-      }
+      "parameters": {}
     },
     {
       "name": "Ollama03",
       "url": "{ollama-api-endpoint-03}",
       "type": "ollama",
       "models": [
-        "stablelm-zephyr:3b",
-        "granite4:micro",
-        "gemma3n:e2b",
-        "gemma3:270m",
         "deepseek-r1:1.5b",
-        "llama3.2:1b",
+        "gemma3:1b",
         "granite3.1-moe:1b",
-        "dolphin-phi:2.7b",
-        "qwen3:1.7b"
+        "granite3.1-moe:3b",
+        "granite4:1b",
+        "granite4:350m",
+        "granite4:micro",
+        "llama3.2:1b",
+        "llama3.2:3b",
+        "phi4-mini:3.8b",
+        "smollm2:360m",
+        "smollm2:1.7b",
+        "qwen3:1.7b",
+        "embeddinggemma:300m"
       ],
       "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point. Your response must be retruned as valid JSON",
-      "parameters": {
-        "top_k": 40,
-        "top_p": 0.9,
-        "min_p": 0.05,
-        "tfs_z": 1.0,
-        "typical_p": 0.95,
-        "repeat_last_n": 64,
-        "temperature": 0.7,
-        "repeat_penalty": 1.1,
-        "presence_penalty": 0.6,
-        "frequency_penalty": 0.3
-      }
+      "parameters": {}
     },
     {
       "name": "Ollama04",
       "url": "{ollama-api-endpoint-04}",
       "type": "ollama",
       "models": [
-        "stablelm-zephyr:3b",
-        "granite4:micro",
-        "gemma3n:e2b",
-        "gemma3:270m",
         "deepseek-r1:1.5b",
-        "llama3.2:1b",
+        "gemma3:1b",
         "granite3.1-moe:1b",
-        "dolphin-phi:2.7b",
-        "qwen3:1.7b"
+        "granite3.1-moe:3b",
+        "granite4:1b",
+        "granite4:350m",
+        "granite4:micro",
+        "llama3.2:1b",
+        "llama3.2:3b",
+        "phi4-mini:3.8b",
+        "smollm2:360m",
+        "smollm2:1.7b",
+        "qwen3:1.7b",
+        "embeddinggemma:300m"
       ],
       "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point. Your response must be retruned as valid JSON",
-      "parameters": {
-        "top_k": 40,
-        "top_p": 0.9,
-        "min_p": 0.05,
-        "tfs_z": 1.0,
-        "typical_p": 0.95,
-        "repeat_last_n": 64,
-        "temperature": 0.7,
-        "repeat_penalty": 1.1,
-        "presence_penalty": 0.6,
-        "frequency_penalty": 0.3
-      }
+      "parameters": {}
     }
   ],
-  "timeout": 240,
+  "timeout": 600,
   "debug": true,
   "multimodelMode": true,
-  "jsonMode": true
+  "pipelineMode": false,
+  "jsonMode": true,
+  "mcpMode": false,
+  "mcpBinary": "dist/agon-mcp_linux_amd64_v1/agon-mcp",
+  "mcpInitTimeout": 10,
+  "mcpRetryCount": 1,
+  "export": "",
+  "exportMarkdown": ""
 }
