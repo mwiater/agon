@@ -44,6 +44,7 @@ func listAllCommands(rootCmd *cobra.Command) {
 	}
 }
 
+// commandInfo holds the path and description of a command for display.
 type commandInfo struct {
 	path        string
 	description string

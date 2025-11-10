@@ -27,15 +27,22 @@ import (
 )
 
 const (
-	pipelineStageCount       = 4
+	// pipelineStageCount defines the number of stages in the pipeline.
+	pipelineStageCount = 4
+	// pipelineMaxHandoffTokens limits the number of tokens in a handoff payload.
 	pipelineMaxHandoffTokens = 4096
-	pipelinePreviewRunes     = 120
+	// pipelinePreviewRunes limits the number of runes in a handoff preview.
+	pipelinePreviewRunes = 120
 )
 
 var (
-	stageTitleStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
-	stageBadgeStyle   = lipgloss.NewStyle().Faint(true)
-	stageModelStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
+	// stageTitleStyle is the Lipgloss style for stage titles.
+	stageTitleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
+	// stageBadgeStyle is the Lipgloss style for stage badges.
+	stageBadgeStyle = lipgloss.NewStyle().Faint(true)
+	// stageModelStyle is the Lipgloss style for stage model names.
+	stageModelStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
+	// stageStatusStyles maps pipelineStageStatus to Lipgloss styles for rendering.
 	stageStatusStyles = map[pipelineStageStatus]lipgloss.Style{
 		pipelineStageStatusUnassigned: lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Background(lipgloss.Color("235")).Padding(0, 1),
 		pipelineStageStatusWaiting:    lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Background(lipgloss.Color("238")).Padding(0, 1),
@@ -44,20 +51,29 @@ var (
 		pipelineStageStatusSkipped:    lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Background(lipgloss.Color("236")).Padding(0, 1),
 		pipelineStageStatusError:      lipgloss.NewStyle().Foreground(lipgloss.Color("230")).Background(lipgloss.Color("160")).Padding(0, 1),
 	}
+	// stageCacheStyle is the Lipgloss style for indicating a cache hit.
 	stageCacheStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("178")).Bold(true)
-	focusedColumn   = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).BorderForeground(lipgloss.Color("135")).Padding(0, 1)
-	normalColumn    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240")).Padding(0, 1)
-	overlayStyle    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("63")).Padding(1).Width(80)
-	bannerStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("230")).Background(lipgloss.Color("124")).Padding(0, 1)
+	// focusedColumn is the Lipgloss style for a focused column.
+	focusedColumn = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).BorderForeground(lipgloss.Color("135")).Padding(0, 1)
+	// normalColumn is the Lipgloss style for a normal column.
+	normalColumn = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240")).Padding(0, 1)
+	// overlayStyle is the Lipgloss style for an overlay.
+	overlayStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("63")).Padding(1).Width(80)
+	// bannerStyle is the Lipgloss style for the status banner.
+	bannerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("230")).Background(lipgloss.Color("124")).Padding(0, 1)
 )
 
 // pipelineViewState describes which primary view is active inside pipeline mode.
 type pipelineViewState int
 
 const (
+	// pipelineViewAssignment is the state where the user assigns hosts and models to stages.
 	pipelineViewAssignment pipelineViewState = iota
+	// pipelineViewReady is the state where the pipeline is ready to run.
 	pipelineViewReady
+	// pipelineViewRunning is the state where the pipeline is actively executing.
 	pipelineViewRunning
+	// pipelineViewExpanded is the state where a single stage is expanded for detailed viewing.
 	pipelineViewExpanded
 )
 
@@ -65,11 +81,17 @@ const (
 type pipelineStageStatus int
 
 const (
+	// pipelineStageStatusUnassigned indicates the stage has no host/model assigned.
 	pipelineStageStatusUnassigned pipelineStageStatus = iota
+	// pipelineStageStatusWaiting indicates the stage is assigned and waiting to run.
 	pipelineStageStatusWaiting
+	// pipelineStageStatusRunning indicates the stage is currently executing.
 	pipelineStageStatusRunning
+	// pipelineStageStatusDone indicates the stage has completed successfully.
 	pipelineStageStatusDone
+	// pipelineStageStatusSkipped indicates the stage was skipped.
 	pipelineStageStatusSkipped
+	// pipelineStageStatusError indicates the stage encountered an error.
 	pipelineStageStatusError
 )
 
@@ -77,8 +99,11 @@ const (
 type pipelineStageView int
 
 const (
+	// pipelineStageViewOutput shows the LLM's output for the stage.
 	pipelineStageViewOutput pipelineStageView = iota
+	// pipelineStageViewStats shows performance statistics for the stage.
 	pipelineStageViewStats
+	// pipelineStageViewHandoff shows the data handed off to the next stage.
 	pipelineStageViewHandoff
 )
 
@@ -86,8 +111,11 @@ const (
 type pipelineHandoffMode int
 
 const (
+	// pipelineHandoffRaw indicates raw text handoff.
 	pipelineHandoffRaw pipelineHandoffMode = iota
+	// pipelineHandoffSelector indicates handoff via a selector.
 	pipelineHandoffSelector
+	// pipelineHandoffTemplate indicates handoff via a template.
 	pipelineHandoffTemplate
 )
 
@@ -108,8 +136,13 @@ type hostSelectorItem struct {
 	host  Host
 }
 
-func (i hostSelectorItem) Title() string       { return i.host.Name }
+// Title returns the title of the host selector item.
+func (i hostSelectorItem) Title() string { return i.host.Name }
+
+// Description returns the description of the host selector item.
 func (i hostSelectorItem) Description() string { return i.host.URL }
+
+// FilterValue returns the filter value for the host selector item.
 func (i hostSelectorItem) FilterValue() string { return i.host.Name }
 
 // modelSelectorItem renders models inside the assignment picker.
@@ -117,8 +150,13 @@ type modelSelectorItem struct {
 	name string
 }
 
-func (i modelSelectorItem) Title() string       { return i.name }
+// Title returns the title of the model selector item.
+func (i modelSelectorItem) Title() string { return i.name }
+
+// Description returns the description of the model selector item.
 func (i modelSelectorItem) Description() string { return "Select model" }
+
+// FilterValue returns the filter value for the model selector item.
 func (i modelSelectorItem) FilterValue() string { return i.name }
 
 // pipelineStage stores per-stage assignment, execution state, and cached results.
@@ -172,6 +210,7 @@ type pipelineExportRecord struct {
 	TruncationSummary string        `json:"truncationSummary,omitempty"`
 }
 
+// exportTimings captures timing metrics for an exported pipeline stage.
 type exportTimings struct {
 	TotalSeconds      float64 `json:"totalSeconds"`
 	LoadSeconds       float64 `json:"loadSeconds"`
@@ -180,6 +219,7 @@ type exportTimings struct {
 	TimeToFirstToken  float64 `json:"timeToFirstToken"`
 }
 
+// exportTokens captures token counts for an exported pipeline stage.
 type exportTokens struct {
 	Prompt int `json:"prompt"`
 	Eval   int `json:"eval"`
@@ -211,13 +251,12 @@ type pipelineModel struct {
 	selectingModel bool
 	selectedStage  int
 
-	width, height int
-	program       *tea.Program
+	width, height      int
+	program            *tea.Program
+	requestStartTime   time.Time
 
 	statusBanner  string
 	runInProgress bool
-
-	requestStartTime time.Time
 
 	showHandoffOverlay bool
 	overlayStageIndex  int
@@ -232,10 +271,9 @@ type pipelineModel struct {
 
 	switchToMultimodel bool
 
-	// remember selections to streamline assignment UX
 	nextHostIndex      int
-	defaultModelByHost map[string]string // key: host URL, value: model name
-	globalDefaultModel string            // model selected for Stage 1, used as default elsewhere
+	defaultModelByHost map[string]string
+	globalDefaultModel string
 }
 
 // initialPipelineModel constructs a model with sensible defaults and four stages.
@@ -261,9 +299,9 @@ func initialPipelineModel(ctx context.Context, cfg *Config, provider providers.C
 			index:  i,
 			view:   pipelineStageViewOutput,
 			status: pipelineStageStatusUnassigned,
-			handoff: pipelineHandoff{
-				mode: pipelineHandoffRaw,
-			},
+		handoff: pipelineHandoff{
+			mode: pipelineHandoffRaw,
+		},
 		}
 	}
 
@@ -290,15 +328,15 @@ func initialPipelineModel(ctx context.Context, cfg *Config, provider providers.C
 		spinner:            s,
 		textArea:           ta,
 		viewport:           vp,
-		hostList:           hostList,
-		modelList:          modelList,
-		selectedStage:      0,
-		overlayStageIndex:  -1,
-		memoCache:          make(map[string]pipelineCacheEntry),
-		exportPath:         cfg.ExportPath,
-		exportMarkdownPath: cfg.ExportMarkdownPath,
-		nextHostIndex:      0,
-		defaultModelByHost: make(map[string]string),
+	hostList:           hostList,
+	modelList:          modelList,
+	selectedStage:      0,
+	overlayStageIndex:  -1,
+	memoCache:          make(map[string]pipelineCacheEntry),
+	exportPath:         cfg.ExportPath,
+	exportMarkdownPath: cfg.ExportMarkdownPath,
+	nextHostIndex:      0,
+	defaultModelByHost: make(map[string]string),
 	}
 }
 
@@ -307,26 +345,30 @@ func (m *pipelineModel) Init() tea.Cmd {
 	return nil
 }
 
-// pipeline message types emitted during execution.
-type (
-	pipelineStageChunkMsg struct {
-		Stage   int
-		Content string
-	}
-	pipelineStageDoneMsg struct {
-		Stage  int
-		Output string
-		Meta   LLMResponseMeta
-	}
-	pipelineStageErrorMsg struct {
-		Stage int
-		Err   error
-	}
-	pipelineStageCacheHitMsg struct {
-		Stage int
-		Entry pipelineCacheEntry
-	}
-)
+// pipelineStageChunkMsg is a message indicating a new chunk of output from a pipeline stage.
+type pipelineStageChunkMsg struct {
+	Stage   int
+	Content string
+}
+
+// pipelineStageDoneMsg is a message indicating a pipeline stage has completed.
+type pipelineStageDoneMsg struct {
+	Stage  int
+	Output string
+	Meta   LLMResponseMeta
+}
+
+// pipelineStageErrorMsg is a message indicating an error occurred in a pipeline stage.
+type pipelineStageErrorMsg struct {
+	Stage int
+	Err   error
+}
+
+// pipelineStageCacheHitMsg is a message indicating a pipeline stage result was retrieved from cache.
+type pipelineStageCacheHitMsg struct {
+	Stage int
+	Entry pipelineCacheEntry
+}
 
 // Update routes incoming messages to the appropriate handlers.
 func (m *pipelineModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -335,13 +377,13 @@ func (m *pipelineModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		m.hostList.SetSize(msg.Width-2, msg.Height-6)
-		m.modelList.SetSize(msg.Width-2, msg.Height-6)
-		m.textArea.SetWidth(msg.Width - 3)
+		m.hostList.SetSize(msg.Width-2, m.height-6)
+		m.modelList.SetSize(msg.Width-2, m.height-6)
+		m.textArea.SetWidth(m.width - 3)
 		headerHeight := 4
 		footerHeight := 5
-		m.viewport.Width = msg.Width
-		m.viewport.Height = msg.Height - headerHeight - footerHeight
+		m.viewport.Width = m.width
+		m.viewport.Height = m.height - headerHeight - footerHeight
 		return m, nil
 
 	case pipelineStageChunkMsg:
@@ -420,7 +462,6 @@ func (m *pipelineModel) updateAssignment(msg tea.Msg) tea.Cmd {
 					}
 					m.modelList.SetItems(modelItems)
 					if len(modelItems) > 0 {
-						// Prefer globally chosen default model (Stage 1), then host-specific default
 						sel := 0
 						if m.globalDefaultModel != "" {
 							for i, it := range stage.availableModels {
@@ -438,7 +479,7 @@ func (m *pipelineModel) updateAssignment(msg tea.Msg) tea.Cmd {
 							}
 						}
 						m.modelList.Select(sel)
-					}
+						}
 					m.selectingHost = false
 					m.selectingModel = len(modelItems) > 0
 				}
@@ -466,24 +507,20 @@ func (m *pipelineModel) updateAssignment(msg tea.Msg) tea.Cmd {
 					stage.finalOutput = ""
 					m.selectingModel = false
 
-					// Record default model for this host (first selection becomes default)
 					if stage.host.URL != "" {
 						if _, exists := m.defaultModelByHost[stage.host.URL]; !exists {
 							m.defaultModelByHost[stage.host.URL] = stage.selectedModel
 						}
 					}
 
-					// If this is the first stage and no global default set, remember it
 					if m.selectedStage == 0 && m.globalDefaultModel == "" {
 						m.globalDefaultModel = stage.selectedModel
 					}
 
-					// Advance default host selection to the next host for convenience
 					if len(m.config.Hosts) > 0 {
 						m.nextHostIndex = (stage.hostIndex + 1) % len(m.config.Hosts)
 					}
 
-					// Move cursor to next stage to streamline workflow
 					if m.selectedStage < pipelineStageCount-1 {
 						m.selectedStage++
 					}
@@ -512,7 +549,6 @@ func (m *pipelineModel) updateAssignment(msg tea.Msg) tea.Cmd {
 				m.statusBanner = "No hosts configured"
 				return nil
 			}
-			// Preselect the next host to streamline assignments
 			if len(m.config.Hosts) > 0 {
 				idx := m.nextHostIndex
 				if idx < 0 || idx >= len(m.config.Hosts) {
@@ -534,7 +570,6 @@ func (m *pipelineModel) updateAssignment(msg tea.Msg) tea.Cmd {
 			}
 			m.modelList.SetItems(modelItems)
 			if len(modelItems) > 0 {
-				// Prefer global default (from Stage 1) else host-specific default if known
 				sel := 0
 				if m.globalDefaultModel != "" {
 					for i, it := range stage.availableModels {
@@ -771,6 +806,7 @@ func (m *pipelineModel) View() string {
 	}
 }
 
+// assignmentView renders the stage assignment interface.
 func (m *pipelineModel) assignmentView() string {
 	var builder strings.Builder
 
@@ -795,7 +831,7 @@ func (m *pipelineModel) assignmentView() string {
 		} else if stage.host.URL != "" {
 			builder.WriteString(stageBadgeStyle.Render(fmt.Sprintf("%s • (select model)", stage.host.Name)))
 		} else {
-			builder.WriteString(stageBadgeStyle.Render("(no host)"))
+			builder.WriteString(stageBadgeStyle.Render("(unassigned)"))
 		}
 
 		if stage.statusMessage != "" {
@@ -823,6 +859,7 @@ func (m *pipelineModel) assignmentView() string {
 	return lipgloss.NewStyle().Margin(1, 2).Render(builder.String())
 }
 
+// pipelineView renders the main pipeline execution view.
 func (m *pipelineModel) pipelineView() string {
 	var parts []string
 
@@ -830,19 +867,17 @@ func (m *pipelineModel) pipelineView() string {
 	if m.statusBanner != "" {
 		parts = append(parts, bannerStyle.Render(m.statusBanner))
 	}
-	// Calculate a target height for the stage columns to fill the console
-	partsAbove := 1 // progress line
+	partsAbove := 1
 	if m.statusBanner != "" {
-		partsAbove++ // banner
+		partsAbove++
 	}
-	partsBelow := 2 // input/spinner + help
-	separators := 3 // blank lines between progress-columns, columns-input, input-help
+	partsBelow := 2
+	separators := 3
 	if m.statusBanner != "" {
-		separators++ // progress-banner and banner-columns
+		separators++
 	}
-	marginTop, marginBottom := 1, 1 // outer margin in View()
+	marginTop, marginBottom := 1, 1
 	available := m.height - marginTop - marginBottom - partsAbove - partsBelow - separators
-	// Account for borders (top+bottom) added by each column wrapper
 	available -= 2
 	if available < 3 {
 		available = 3
@@ -866,6 +901,7 @@ func (m *pipelineModel) pipelineView() string {
 	return lipgloss.NewStyle().Margin(1, 2).Render(strings.Join(parts, "\n\n"))
 }
 
+// expandedView renders a single stage in an expanded, detailed view.
 func (m *pipelineModel) expandedView() string {
 	if m.expandedIndex < 0 || m.expandedIndex >= len(m.stages) {
 		return "No stage selected"
@@ -897,6 +933,7 @@ func (m *pipelineModel) expandedView() string {
 	return lipgloss.NewStyle().Margin(1, 2).Render(builder.String())
 }
 
+// renderProgressLine renders the pipeline's progress line.
 func (m *pipelineModel) renderProgressLine() string {
 	stageNames := make([]string, len(m.stages))
 	for i, stage := range m.stages {
@@ -938,6 +975,7 @@ func (m *pipelineModel) renderProgressLine() string {
 	return fmt.Sprintf("Pipeline: %s | %s | %s | %s | %s | %s", pipelinePath, stageStatus, speed, ttft, jsonMode, mcpIndicator)
 }
 
+// renderStageColumns renders the columns for each pipeline stage.
 func (m *pipelineModel) renderStageColumns(targetHeight int) string {
 	colWidth := util.Max(30, (m.width-8)/pipelineStageCount)
 	var columns []string
@@ -954,6 +992,7 @@ func (m *pipelineModel) renderStageColumns(targetHeight int) string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, columns...)
 }
 
+// renderStageColumn renders a single pipeline stage column.
 func (m *pipelineModel) renderStageColumn(stage pipelineStage, colWidth int, targetHeight int) string {
 	var headerLines []string
 	title := fmt.Sprintf("Stage %d", stage.index+1)
@@ -974,19 +1013,17 @@ func (m *pipelineModel) renderStageColumn(stage pipelineStage, colWidth int, tar
 	header := lipgloss.JoinVertical(lipgloss.Left, headerLines...)
 	header = lipgloss.JoinHorizontal(lipgloss.Top, header, lipgloss.NewStyle().Width(colWidth-lipgloss.Width(header)).Align(lipgloss.Right).Render(statusChip))
 
-	// Render body content constrained to a target number of lines
 	body := m.renderStageBody(stage, colWidth)
 	headerLineCount := strings.Count(header, "\n") + 1
 
 	bodyLines := strings.Split(body, "\n")
-	maxBodyLines := targetHeight - headerLineCount - 0 // 0 because we add exactly one newline between header and body
+	maxBodyLines := targetHeight - headerLineCount
 	if maxBodyLines < 0 {
 		maxBodyLines = 0
 	}
 	if len(bodyLines) > maxBodyLines {
 		bodyLines = bodyLines[:maxBodyLines]
 	} else if len(bodyLines) < maxBodyLines {
-		// pad with blank lines to fill remaining space
 		pad := make([]string, maxBodyLines-len(bodyLines))
 		bodyLines = append(bodyLines, pad...)
 	}
@@ -995,6 +1032,7 @@ func (m *pipelineModel) renderStageColumn(stage pipelineStage, colWidth int, tar
 	return header + "\n" + body
 }
 
+// renderStageBody renders the main content area of a pipeline stage column.
 func (m *pipelineModel) renderStageBody(stage pipelineStage, colWidth int) string {
 	switch stage.view {
 	case pipelineStageViewStats:
@@ -1010,7 +1048,6 @@ func (m *pipelineModel) renderStageBody(stage pipelineStage, colWidth int) strin
 		return preview + "\n" + stageBadgeStyle.Render("Ctrl+O for details")
 	default:
 		if stage.finalOutput != "" {
-			// Wrap long lines so content stays within the column
 			return util.WrapToWidth(stage.finalOutput, colWidth-4)
 		}
 		if stage.status == pipelineStageStatusWaiting {
@@ -1026,6 +1063,7 @@ func (m *pipelineModel) renderStageBody(stage pipelineStage, colWidth int) strin
 	}
 }
 
+// renderStageStats renders the performance statistics for a pipeline stage.
 func (m *pipelineModel) renderStageStats(stage pipelineStage) string {
 	if stage.stats.Model == "" {
 		return stageBadgeStyle.Render("No stats yet")
@@ -1049,6 +1087,7 @@ func (m *pipelineModel) renderStageStats(stage pipelineStage) string {
 	return strings.Join(stats, "\n")
 }
 
+// renderHandoffOverlay renders an overlay displaying detailed handoff information.
 func (m *pipelineModel) renderHandoffOverlay(stage pipelineStage) string {
 	var builder strings.Builder
 
@@ -1076,6 +1115,7 @@ func (m *pipelineModel) renderHandoffOverlay(stage pipelineStage) string {
 	return overlayStyle.Render(builder.String())
 }
 
+// moveFocus shifts the focus between pipeline stages.
 func (m *pipelineModel) moveFocus(delta int) {
 	newIndex := m.focusIndex
 	for attempt := 0; attempt < pipelineStageCount; attempt++ {
@@ -1087,6 +1127,7 @@ func (m *pipelineModel) moveFocus(delta int) {
 	m.focusIndex = newIndex
 }
 
+// startPipelineRun initiates the execution of the pipeline.
 func (m *pipelineModel) startPipelineRun(input string) tea.Cmd {
 	m.runInProgress = true
 	m.viewState = pipelineViewRunning
@@ -1138,6 +1179,7 @@ func (m *pipelineModel) startPipelineRun(input string) tea.Cmd {
 	return tea.Batch(m.spinner.Tick, m.queueStage(first))
 }
 
+// queueStage queues a pipeline stage for execution.
 func (m *pipelineModel) queueStage(index int) tea.Cmd {
 	if index < 0 || index >= len(m.stages) {
 		return nil
@@ -1175,6 +1217,7 @@ func (m *pipelineModel) queueStage(index int) tea.Cmd {
 	return pipelineStreamStageCmd(m.ctx, m.program, m.provider, index, stage.host, stage.selectedModel, messages, stage.systemPrompt, stage.parameters, payload, m.config.JSONMode, m.requestTimeout)
 }
 
+// advanceToNextStage moves the pipeline to the next assigned stage.
 func (m *pipelineModel) advanceToNextStage(current int, payload string) tea.Cmd {
 	next := m.findNextAssignedStage(current + 1)
 	if next == -1 {
@@ -1194,6 +1237,7 @@ func (m *pipelineModel) advanceToNextStage(current int, payload string) tea.Cmd 
 	return m.queueStage(next)
 }
 
+// handleStageChunk processes a new chunk of output from a pipeline stage.
 func (m *pipelineModel) handleStageChunk(msg pipelineStageChunkMsg) {
 	if msg.Stage < 0 || msg.Stage >= len(m.stages) {
 		return
@@ -1205,6 +1249,7 @@ func (m *pipelineModel) handleStageChunk(msg pipelineStageChunkMsg) {
 	stage.outputBuffer.WriteString(msg.Content)
 }
 
+// handleStageDone processes a completed pipeline stage.
 func (m *pipelineModel) handleStageDone(msg pipelineStageDoneMsg) tea.Cmd {
 	if msg.Stage < 0 || msg.Stage >= len(m.stages) {
 		return nil
@@ -1244,6 +1289,7 @@ func (m *pipelineModel) handleStageDone(msg pipelineStageDoneMsg) tea.Cmd {
 	return m.advanceToNextStage(msg.Stage, stage.handoff.payload)
 }
 
+// handleStageError processes an error in a pipeline stage.
 func (m *pipelineModel) handleStageError(msg pipelineStageErrorMsg) {
 	if msg.Stage < 0 || msg.Stage >= len(m.stages) {
 		return
@@ -1260,6 +1306,7 @@ func (m *pipelineModel) handleStageError(msg pipelineStageErrorMsg) {
 	m.textArea.Focus()
 }
 
+// handleStageCacheHit processes a cache hit for a pipeline stage.
 func (m *pipelineModel) handleStageCacheHit(msg pipelineStageCacheHitMsg) tea.Cmd {
 	if msg.Stage < 0 || msg.Stage >= len(m.stages) {
 		return nil
@@ -1279,6 +1326,7 @@ func (m *pipelineModel) handleStageCacheHit(msg pipelineStageCacheHitMsg) tea.Cm
 	return m.advanceToNextStage(msg.Stage, stage.handoff.payload)
 }
 
+// prepareHandoff prepares the data to be handed off to the next pipeline stage.
 func (m *pipelineModel) prepareHandoff(stage *pipelineStage) bool {
 	payload := strings.TrimSpace(stage.finalOutput)
 	if payload == "" {
@@ -1322,6 +1370,7 @@ func (m *pipelineModel) prepareHandoff(stage *pipelineStage) bool {
 	return true
 }
 
+// anyStageAssigned checks if at least one stage in the pipeline has an assignment.
 func (m *pipelineModel) anyStageAssigned() bool {
 	for _, stage := range m.stages {
 		if stage.hasAssignment {
@@ -1331,6 +1380,7 @@ func (m *pipelineModel) anyStageAssigned() bool {
 	return false
 }
 
+// preflightAssignments performs validation checks on stage assignments before running the pipeline.
 func (m *pipelineModel) preflightAssignments() error {
 	for i, stage := range m.stages {
 		if stage.hasAssignment {
@@ -1345,6 +1395,7 @@ func (m *pipelineModel) preflightAssignments() error {
 	return nil
 }
 
+// firstAssignedStage returns the index of the first assigned stage, or -1 if none are assigned.
 func (m *pipelineModel) firstAssignedStage() int {
 	for i, stage := range m.stages {
 		if stage.hasAssignment {
@@ -1354,6 +1405,7 @@ func (m *pipelineModel) firstAssignedStage() int {
 	return -1
 }
 
+// findNextAssignedStage finds the next assigned stage starting from a given index.
 func (m *pipelineModel) findNextAssignedStage(start int) int {
 	for i := start; i < len(m.stages); i++ {
 		if m.stages[i].hasAssignment {
@@ -1363,6 +1415,7 @@ func (m *pipelineModel) findNextAssignedStage(start int) int {
 	return -1
 }
 
+// currentStageProgress calculates the current progress of the pipeline.
 func (m *pipelineModel) currentStageProgress() (int, int, string) {
 	totalAssigned := 0
 	completed := 0
@@ -1392,6 +1445,7 @@ func (m *pipelineModel) currentStageProgress() (int, int, string) {
 	return 1, totalAssigned, "Idle"
 }
 
+// averageTokensPerSecond calculates the average tokens per second across all completed stages.
 func (m *pipelineModel) averageTokensPerSecond() float64 {
 	totalTokens := 0
 	totalDuration := 0.0
@@ -1407,6 +1461,7 @@ func (m *pipelineModel) averageTokensPerSecond() float64 {
 	return float64(totalTokens) / totalDuration
 }
 
+// currentRunningStage returns a pointer to the currently running stage, or nil if none are running.
 func (m *pipelineModel) currentRunningStage() *pipelineStage {
 	for i := range m.stages {
 		if m.stages[i].status == pipelineStageStatusRunning {
@@ -1416,6 +1471,7 @@ func (m *pipelineModel) currentRunningStage() *pipelineStage {
 	return nil
 }
 
+// formatCompletionStatus formats the completion status message for a stage.
 func (m *pipelineModel) formatCompletionStatus(meta LLMResponseMeta) string {
 	if meta.EvalDuration == 0 {
 		return "Done"
@@ -1425,6 +1481,7 @@ func (m *pipelineModel) formatCompletionStatus(meta LLMResponseMeta) string {
 	return fmt.Sprintf("Done • %.1fs • %.1f t/s", total, tps)
 }
 
+// tokensPerSecond calculates the tokens per second from StreamMetadata.
 func (m *pipelineModel) tokensPerSecond(meta LLMResponseMeta) float64 {
 	if meta.EvalDuration == 0 {
 		return 0
@@ -1432,13 +1489,14 @@ func (m *pipelineModel) tokensPerSecond(meta LLMResponseMeta) float64 {
 	return float64(meta.EvalCount) / (float64(meta.EvalDuration) / 1e9)
 }
 
+// buildExportRecord creates a pipelineExportRecord for a given stage.
 func (m *pipelineModel) buildExportRecord(idx int, stage *pipelineStage) pipelineExportRecord {
 	hash := fnv.New64a()
 	hash.Write([]byte(stage.systemPrompt))
 	promptHash := fmt.Sprintf("%x", hash.Sum64())
 
 	outputHash := fnv.New64a()
-	outputHash.Write([]byte(stage.finalOutput))
+	hash.Write([]byte(stage.finalOutput))
 
 	timings := exportTimings{
 		TotalSeconds:      float64(stage.stats.TotalDuration) / 1e9,
@@ -1465,8 +1523,7 @@ func (m *pipelineModel) buildExportRecord(idx int, stage *pipelineStage) pipelin
 	}
 }
 
-// exportPipelineJSON writes the latest run data to pipeline.json in the current directory.
-
+// autoExport automatically exports pipeline run data if export paths are configured.
 func (m *pipelineModel) autoExport() {
 	if len(m.exportRecords) == 0 {
 		return
@@ -1487,6 +1544,7 @@ func (m *pipelineModel) autoExport() {
 	}
 }
 
+// exportPipelineJSON writes the latest run data to a JSON file.
 func (m *pipelineModel) exportPipelineJSON(path string) error {
 	if len(m.exportRecords) == 0 {
 		return fmt.Errorf("no pipeline run to export")
@@ -1516,6 +1574,7 @@ func (m *pipelineModel) exportPipelineJSON(path string) error {
 	return util.WriteFile(path, data)
 }
 
+// exportPipelineMarkdown writes the latest run data to a Markdown file.
 func (m *pipelineModel) exportPipelineMarkdown(path string) error {
 	if len(m.exportRecords) == 0 {
 		return fmt.Errorf("no pipeline run to export")
@@ -1550,12 +1609,9 @@ func (m *pipelineModel) exportPipelineMarkdown(path string) error {
 }
 
 // StartPipelineGUI initializes the pipeline Bubble Tea program and blocks until exit.
-
 func StartPipelineGUI(ctx context.Context, cfg *Config, cancel context.CancelFunc) error {
 	provider, err := providerfactory.NewChatProvider(cfg)
 	if err != nil {
-		// This can only happen if MCP mode is enabled and fails to start.
-		// Fallback to a direct Ollama provider.
 		provider = ollama.New(cfg)
 	}
 
@@ -1601,7 +1657,6 @@ func StartPipelineGUI(ctx context.Context, cfg *Config, cancel context.CancelFun
 }
 
 // pipelineStreamStageCmd streams a stage response and emits updates to the Bubble Tea program.
-
 func pipelineStreamStageCmd(pctx context.Context, p *tea.Program, chatProvider providers.ChatProvider, stageIndex int, host Host, modelName string, history []chatMessage, systemPrompt string, parameters Parameters, payload string, jsonMode bool, timeout time.Duration) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(pctx, timeout)
@@ -1638,6 +1693,7 @@ func pipelineStreamStageCmd(pctx context.Context, p *tea.Program, chatProvider p
 	}
 }
 
+// attemptJSONRepair attempts to repair malformed JSON by extracting valid JSON objects or arrays.
 func attemptJSONRepair(output string) (string, bool) {
 	trimmed := strings.TrimSpace(output)
 	if json.Valid([]byte(trimmed)) {
@@ -1665,6 +1721,7 @@ func attemptJSONRepair(output string) (string, bool) {
 	return output, false
 }
 
+// makeCacheKey generates a cache key for a pipeline stage based on its parameters.
 func makeCacheKey(stage int, hostURL, modelName, payload string) string {
 	hash := fnv.New64a()
 	hash.Write([]byte(fmt.Sprintf("%d|%s|%s|", stage, hostURL, modelName)))

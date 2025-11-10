@@ -18,6 +18,10 @@ builds:
       - windows
     goarch:
       - amd64
+    ldflags:
+      - -X main.version={{.Version}}
+      - -X main.commit={{.ShortCommit}}
+      - -X main.date={{.Date}}
 
   # Build 2: "agon-mcp"
   - id: "agon-mcp"
@@ -31,6 +35,10 @@ builds:
       - windows
     goarch:
       - amd64
+    ldflags:
+      - -X main.version={{.Version}}
+      - -X main.commit={{.ShortCommit}}
+      - -X main.date={{.Date}}
       
 release:
   github:

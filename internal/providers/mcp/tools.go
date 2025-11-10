@@ -1,3 +1,4 @@
+// internal/providers/mcp/tools.go
 package mcp
 
 import (
@@ -11,6 +12,7 @@ import (
 	"github.com/mwiater/agon/internal/providers"
 )
 
+// toolLabel returns a label for a tool from RPC metadata, preferring the tool name over the method.
 func toolLabel(meta rpcMetadata) string {
 	if strings.TrimSpace(meta.tool) != "" {
 		return meta.tool
@@ -21,6 +23,7 @@ func toolLabel(meta rpcMetadata) string {
 	return "unknown"
 }
 
+// discoverTools fetches the list of available tools from the MCP and populates the provider's tool index.
 func (p *Provider) discoverTools() error {
 	ctx, cancel := context.WithTimeout(context.Background(), p.cfg.MCPInitTimeoutDuration())
 	defer cancel()
@@ -64,6 +67,7 @@ func (p *Provider) discoverTools() error {
 	return nil
 }
 
+// selectTool attempts to select a tool based on keywords in the user's chat history.
 func (p *Provider) selectTool(history []providers.ChatMessage) (string, string) {
 	if len(history) == 0 || len(p.toolIndex) == 0 {
 		return "", ""
@@ -85,11 +89,13 @@ func (p *Provider) selectTool(history []providers.ChatMessage) (string, string) 
 	return "", ""
 }
 
+// toolCallResponse represents the response from a tool call, including output and a retry flag.
 type toolCallResponse struct {
 	Output string
 	Retry  bool
 }
 
+// callTool executes a tool via an RPC call to the MCP.
 func (p *Provider) callTool(ctx context.Context, host, model, name string, args map[string]any) (toolCallResponse, error) {
 	if args == nil {
 		args = map[string]any{}
@@ -120,7 +126,7 @@ func (p *Provider) callTool(ctx context.Context, host, model, name string, args 
 	if err := json.Unmarshal(resp.Result, &payload); err != nil {
 		return toolCallResponse{}, err
 	}
-	// Detect a structured response that includes JSON + an interpretation prompt.
+
 	var (
 		jsonPart      string
 		interpretPart string
@@ -150,7 +156,6 @@ func (p *Provider) callTool(ctx context.Context, host, model, name string, args 
 		}
 	}
 	if strings.TrimSpace(jsonPart) != "" && strings.TrimSpace(interpretPart) != "" {
-		// Return an envelope instructing the caller to perform an interpretation round-trip.
 		env := map[string]any{
 			"__mcp_interpret__": true,
 			"tool":              name,
@@ -158,30 +163,15 @@ func (p *Provider) callTool(ctx context.Context, host, model, name string, args 
 			"prompt":            interpretPart,
 		}
 		data, err := json.Marshal(env)
-		if err == nil {
-			return toolCallResponse{Output: string(data)}, nil
+			if err == nil {
+				return toolCallResponse{Output: string(data)}, nil
+			}
 		}
-		// If marshaling fails, fall back to the plain join below.
-	}
-	return toolCallResponse{Output: strings.Join(parts, "\n"), Retry: retryRequested}, nil
+		return toolCallResponse{Output: strings.Join(parts, "\n"), Retry: retryRequested}, nil
 }
 
-// fixWithLLMRoundTrip performs a one-off, non-streaming LLM request that asks the
-// model to correct and reissue the failing tool call. It threads the server's
-// fix instructions along with the original user prompt, enables tools, and
-// provides a ToolExecutor that executes the tool call without further retry
-// loops. The returned string is the aggregated assistant output of that round.
-// fixWithLLMRoundTrip requests the LLM to correct arguments and call the same
-// tool again. It returns:
-//   - output: the assistant output (either tool output when called, or raw text if no call happened)
-//   - called: whether a tools/call was actually executed
-//   - retryAgain: whether the tool's response indicated another retry is needed
-//   - err: transport or provider error during the round-trip
-//
-// nextAttempt should be the attempt number to stamp into __mcp_attempt for the
-// next tool invocation.
+// fixWithLLMRoundTrip performs a one-off, non-streaming LLM request to correct and reissue a failing tool call.
 func (p *Provider) fixWithLLMRoundTrip(ctx context.Context, req providers.StreamRequest, toolName, fixInstruction string, nextAttempt int) (output string, called bool, retryAgain bool, err error) {
-	// Compose a focused history to elicit a corrected tool call from the LLM.
 	if err := ctx.Err(); err != nil {
 		return "", false, false, err
 	}
@@ -196,14 +186,12 @@ func (p *Provider) fixWithLLMRoundTrip(ctx context.Context, req providers.Stream
 
 	fixReq := req
 	fixReq.DisableStreaming = true
-	// Re-enable tools so the LLM can produce a new tool call specification.
+
 	if len(p.toolDefs) > 0 {
 		fixReq.Tools = append([]providers.ToolDefinition(nil), p.toolDefs...)
 	}
 	fixReq.History = history
 
-	// Provide a ToolExecutor that executes exactly one call and reports whether
-	// the tool requested another retry. Attempt counting is handled by caller.
 	var tcResp toolCallResponse
 	var tcErr error
 	fixReq.ToolExecutor = func(execCtx context.Context, name string, args map[string]any) (string, error) {
@@ -234,12 +222,10 @@ func (p *Provider) fixWithLLMRoundTrip(ctx context.Context, req providers.Stream
 			p.log("[ERROR] Tool retry via LLM failed: tool=%s host=%s model=%s reason=%v", name, hostName, req.Model, err)
 			return "", err
 		}
-		// Defer interpretation to the outer retry controller; return raw output here.
 		p.logToolSuccess(name, resp.Output, hostName, req.Model)
 		return resp.Output, nil
 	}
 
-	// Capture the non-streaming assistant output of the corrective round-trip.
 	var out strings.Builder
 	cb := providers.StreamCallbacks{
 		OnChunk: func(msg providers.ChatMessage) error {
@@ -249,7 +235,7 @@ func (p *Provider) fixWithLLMRoundTrip(ctx context.Context, req providers.Stream
 		OnComplete: func(meta providers.StreamMetadata) error { return nil },
 	}
 	start := time.Now()
-	// Log what is being sent: the fix instruction, the user instruction, and enabled tools.
+
 	var toolNames []string
 	for _, td := range fixReq.Tools {
 		toolNames = append(toolNames, td.Name)
@@ -271,26 +257,22 @@ func (p *Provider) fixWithLLMRoundTrip(ctx context.Context, req providers.Stream
 	}
 	dur := time.Since(start)
 	fixed := strings.TrimSpace(out.String())
-	// Log what is received: the assistant text captured from the fix round-trip.
+
 	recvPreview := truncateForLog(fixed, 500)
 	logging.LogRequest("LLM->MCP", hostName, req.Model, toolName, map[string]any{
 		"characters": len(fixed),
 		"duration":   dur.String(),
 		"preview":    recvPreview,
 	})
-	// Report whether a tool call actually occurred and whether it asked for retry.
+
 	if tcErr == nil && (tcResp.Output != "" || tcResp.Retry) {
 		return tcResp.Output, true, tcResp.Retry, nil
 	}
 	return fixed, false, false, nil
 }
 
-// maybeInterpretResult inspects a tool result string for an MCP interpretation
-// envelope. If found, it performs a non-streaming LLM request to turn the JSON
-// into natural language and returns that text. The boolean indicates whether an
-// interpretation was performed.
+// maybeInterpretResult inspects a tool result for an MCP interpretation envelope and, if found, performs an LLM round-trip to generate a natural language summary.
 func (p *Provider) maybeInterpretResult(ctx context.Context, req providers.StreamRequest, toolName, result string) (string, bool) {
-	// Quick check for marker to avoid unnecessary JSON parse.
 	if !strings.Contains(result, "__mcp_interpret__") {
 		return "", false
 	}
@@ -303,11 +285,10 @@ func (p *Provider) maybeInterpretResult(ctx context.Context, req providers.Strea
 	if err := json.Unmarshal([]byte(result), &env); err != nil || !env.Marker {
 		return "", false
 	}
-	// Build a one-off, non-streaming chat to obtain a natural-language interpretation.
+
 	interpReq := req
 	interpReq.DisableStreaming = true
-	interpReq.Tools = nil // disable tools for the interpretation round
-	// Compose a short history: prior convo + assistant with JSON + user with prompt.
+	interpReq.Tools = nil
 	history := append([]providers.ChatMessage{}, req.History...)
 	jsonContent := strings.TrimSpace(env.JSON)
 	if jsonContent == "" {
@@ -321,7 +302,6 @@ func (p *Provider) maybeInterpretResult(ctx context.Context, req providers.Strea
 	history = append(history, providers.ChatMessage{Role: "user", Content: prompt})
 	interpReq.History = history
 
-	// Set up local capture for the response.
 	var out strings.Builder
 	start := time.Now()
 	hostName := hostLabel(req.Host)

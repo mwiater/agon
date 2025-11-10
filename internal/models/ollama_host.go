@@ -1,3 +1,4 @@
+// internal/models/ollama_host.go
 package models
 
 import (
@@ -13,7 +14,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// OllamaHost implements LLMHost for Ollama servers.
+// OllamaHost implements the LLMHost interface for Ollama servers.
 type OllamaHost struct {
 	Name           string
 	URL            string
@@ -47,7 +48,7 @@ func (h *OllamaHost) httpClient() *http.Client {
 
 // effectiveTimeout resolves the timeout to use for outbound HTTP requests.
 func (h *OllamaHost) effectiveTimeout() time.Duration {
-    return h.requestTimeout
+	return h.requestTimeout
 }
 
 // doRequest executes an HTTP request against the Ollama API with context cancellation support.
@@ -208,7 +209,7 @@ func (h *OllamaHost) ListModels() ([]string, error) {
 	return models, nil
 }
 
-// getRunningModels returns the set of currently running models on an Ollama host by querying /api/ps.
+// GetRunningModels returns the set of currently running models on an Ollama host by querying /api/ps.
 func (h *OllamaHost) GetRunningModels() (map[string]struct{}, error) {
 	runningModels := make(map[string]struct{})
 

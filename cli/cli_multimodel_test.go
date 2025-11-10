@@ -11,6 +11,7 @@ import (
 )
 
 // TestInitialMultimodelModel verifies the initial state of the multimodel view model.
+// It checks that the model is initialized with the correct state and assignments based on the provided configuration.
 func TestInitialMultimodelModel(t *testing.T) {
 	cfg := &Config{
 		Hosts: []Host{
@@ -39,6 +40,8 @@ func TestInitialMultimodelModel(t *testing.T) {
 }
 
 // TestMultimodelUpdate exercises key transitions in the multimodel update loop.
+// It simulates user interactions like navigation, model selection, and starting the chat,
+// verifying that the model's state changes as expected.
 func TestMultimodelUpdate(t *testing.T) {
 	cfg := &Config{
 		Hosts: []Host{
@@ -50,7 +53,7 @@ func TestMultimodelUpdate(t *testing.T) {
 		},
 	}
 	m := initialMultimodelModel(context.Background(), cfg, newTestProvider())
-		_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	if cmd == nil {
 		t.Error("Expected a quit command, but got nil")
 	}
@@ -92,6 +95,8 @@ func TestMultimodelUpdate(t *testing.T) {
 }
 
 // TestMultimodelView ensures the multimodel view renders expected states.
+// It checks that the view output changes correctly based on the model's state,
+// including initialization, error display, and the assignment view.
 func TestMultimodelView(t *testing.T) {
 	cfg := &Config{
 		Hosts: []Host{

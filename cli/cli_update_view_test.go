@@ -11,6 +11,8 @@ import (
 )
 
 // TestSingleModel_StateTransitions_And_View covers the single-model state machine and view rendering.
+// It verifies that the UI transitions correctly between host selection, model selection, loading,
+// and chat views, and that chat messages are processed and displayed as expected.
 func TestSingleModel_StateTransitions_And_View(t *testing.T) {
 	cfg := &Config{Hosts: []Host{{Name: "HostA", URL: "http://x", Models: []string{"m1", "m2"}}}}
 	provider := newTestProvider()
@@ -75,6 +77,8 @@ func TestSingleModel_StateTransitions_And_View(t *testing.T) {
 }
 
 // TestMultimodel_Assignment_And_Chat_Flow validates the multimodel assignment and chat flow.
+// It simulates host and model selection, verifies that assignments are correctly made,
+// and checks the chat interaction within the multimodel interface.
 func TestMultimodel_Assignment_And_Chat_Flow(t *testing.T) {
 	cfg := &Config{Hosts: []Host{
 		{Name: "H1", URL: "http://x", Models: []string{"m1", "m2"}},

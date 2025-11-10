@@ -1,3 +1,4 @@
+// internal/logging/logging.go
 package logging
 
 import (
@@ -16,58 +17,71 @@ var (
 	logFile *os.File
 )
 
+// Init initializes the logging system, setting the output to a file if a path is provided.
 func Init(logPath string) error {
-    mu.Lock()
-    defer mu.Unlock()
+	mu.Lock()
+	defer mu.Unlock()
 
+	// Close any existing log file
 	if logFile != nil {
 		_ = logFile.Close()
 		logFile = nil
 	}
 
-	var writers []io.Writer
-	writers = append(writers, os.Stdout)
+	// If no path is provided, set the logger to discard all output
+	if logPath == "" {
+		log.SetOutput(io.Discard)
+		return nil
+	}
 
-    if logPath != "" {
-		if dir := filepath.Dir(logPath); dir != "" && dir != "." {
-			if err := os.MkdirAll(dir, 0o755); err != nil {
-				return err
-			}
-		}
-		file, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-		if err != nil {
+	// --- A path was provided, so configure the file logger ---
+
+	// Create directory if it doesn't exist
+	if dir := filepath.Dir(logPath); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return err
 		}
-		logFile = file
-		writers = append(writers, logFile)
-    }
+	}
 
-	log.SetOutput(io.MultiWriter(writers...))
+	// Open the log file
+	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+
+	logFile = file
+
+	// Set the log output to *only* this file
+	log.SetOutput(logFile)
 	return nil
 }
 
+// Close closes the log file if it's open.
 func Close() error {
 	mu.Lock()
 	defer mu.Unlock()
 	if logFile == nil {
 		return nil
 	}
-	log.SetOutput(os.Stderr)
+	log.SetOutput(io.Discard)
 	err := logFile.Close()
 	logFile = nil
 	return err
 }
 
+// LogEvent logs a general event message.
 func LogEvent(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	log.Println(msg)
 }
 
+// LogRequest logs a request/response message with structured data.
 func LogRequest(direction, host, model, tool string, payload any) {
 	msg := buildRequestMessage(direction, host, model, tool, payload)
 	log.Println(msg)
 }
 
+// buildRequestMessage constructs a structured log message for a request.
 func buildRequestMessage(direction, host, model, tool string, payload any) string {
 	dir := strings.TrimSpace(direction)
 	if dir != "" {
@@ -91,6 +105,7 @@ func buildRequestMessage(direction, host, model, tool string, payload any) strin
 	return strings.Join(parts, " ")
 }
 
+// formatPayload formats a payload of any type into a string for logging.
 func formatPayload(payload any) string {
 	switch v := payload.(type) {
 	case nil:

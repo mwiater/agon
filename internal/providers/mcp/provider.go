@@ -1,3 +1,4 @@
+// internal/providers/mcp/provider.go
 package mcp
 
 import (
@@ -16,6 +17,8 @@ import (
 	"github.com/mwiater/agon/internal/providers"
 )
 
+// Provider implements the providers.ChatProvider interface by orchestrating
+// a separate Multi-Chat-Provider (MCP) process and a fallback provider.
 type Provider struct {
 	cfg       *appconfig.Config
 	cmd       *exec.Cmd
@@ -32,10 +35,12 @@ type Provider struct {
 	toolDefs  []providers.ToolDefinition
 }
 
+// log logs an event using the global logger.
 func (p *Provider) log(format string, args ...any) {
 	logging.LogEvent(format, args...)
 }
 
+// truncateForLog truncates a string to a maximum number of runes for logging.
 func truncateForLog(s string, max int) string {
 	runes := []rune(s)
 	if len(runes) <= max {
@@ -47,6 +52,7 @@ func truncateForLog(s string, max int) string {
 	return string(runes[:max]) + "…"
 }
 
+// formatArgs formats a map of arguments into a JSON string for logging.
 func formatArgs(args map[string]any) string {
 	if len(args) == 0 {
 		return "{}"
@@ -58,6 +64,7 @@ func formatArgs(args map[string]any) string {
 	return string(data)
 }
 
+// hostLabel returns a display label for a host, preferring the name over the URL.
 func hostLabel(host appconfig.Host) string {
 	name := strings.TrimSpace(host.Name)
 	if name != "" {
@@ -69,6 +76,7 @@ func hostLabel(host appconfig.Host) string {
 	return "local-mcp"
 }
 
+// lastUserPrompt extracts the content of the last user message from the chat history.
 func lastUserPrompt(history []providers.ChatMessage) string {
 	for i := len(history) - 1; i >= 0; i-- {
 		if strings.ToLower(history[i].Role) == "user" {
@@ -78,16 +86,19 @@ func lastUserPrompt(history []providers.ChatMessage) string {
 	return ""
 }
 
+// logToolRequest logs a tool request event.
 func (p *Provider) logToolRequest(name, host, model string, args map[string]any) {
 	payload := formatArgs(args)
 	logging.LogEvent("Tool requested: tool=%s host=%s model=%s args=%s", name, host, model, payload)
 }
 
+// logToolSuccess logs a successful tool execution event.
 func (p *Provider) logToolSuccess(name, result, host, model string) {
 	truncated := truncateForLog(result, 160)
 	logging.LogEvent("Tool executed: tool=%s host=%s model=%s output=%s", name, host, model, truncated)
 }
 
+// defaultMCPHost returns the default MCP host identifier.
 func (p *Provider) defaultMCPHost() string {
 	if p.cfg != nil {
 		if strings.TrimSpace(p.cfg.MCPBinary) != "" {
@@ -100,8 +111,7 @@ func (p *Provider) defaultMCPHost() string {
 	return "local-mcp"
 }
 
-// LoadedModels currently delegates to the underlying Ollama provider while the
-// MCP toolchain is being fleshed out.
+// LoadedModels delegates to the underlying fallback provider to get the list of loaded models.
 func (p *Provider) LoadedModels(ctx context.Context, host appconfig.Host) ([]string, error) {
 	p.log("Tool invoked: tool=loaded_models host=%s", host.Name)
 	models, err := p.fallback.LoadedModels(ctx, host)
@@ -113,7 +123,7 @@ func (p *Provider) LoadedModels(ctx context.Context, host appconfig.Host) ([]str
 	return models, nil
 }
 
-// EnsureModelReady currently proxies to the Ollama provider.
+// EnsureModelReady delegates to the underlying fallback provider to ensure a model is ready.
 func (p *Provider) EnsureModelReady(ctx context.Context, host appconfig.Host, model string) error {
 	p.log("Tool invoked: tool=ensure_model host=%s model=%s", host.Name, model)
 	if err := p.fallback.EnsureModelReady(ctx, host, model); err != nil {
@@ -124,7 +134,7 @@ func (p *Provider) EnsureModelReady(ctx context.Context, host appconfig.Host, mo
 	return nil
 }
 
-// Stream proxies chat traffic through MCP tools before delegating to the Ollama backend.
+// Stream orchestrates the chat flow, deciding whether to invoke a tool via MCP or delegate to the fallback provider.
 func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, callbacks providers.StreamCallbacks) error {
 	userPrompt := lastUserPrompt(req.History)
 	systemPrompt := req.SystemPrompt
@@ -137,7 +147,6 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 		forwardReq.Tools = append([]providers.ToolDefinition(nil), p.toolDefs...)
 	}
 
-	// Replace system prompt for MCP mode
 	newSystemPrompt := "You are a helpful assistant with access to the following tools. When the user asks a question, first determine if one of the tools can help."
 	foundSystemPrompt := false
 	for i, msg := range forwardReq.History {
@@ -148,7 +157,6 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 		}
 	}
 	if !foundSystemPrompt {
-		// Prepend if not found
 		forwardReq.History = append([]providers.ChatMessage{{Role: "system", Content: newSystemPrompt}}, forwardReq.History...)
 	}
 
@@ -182,12 +190,10 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 				return "", err
 			}
 			if result.Retry && attempt < retryLimit {
-				// Enter strict retry loop: only exit on success or reaching max attempts.
 				for attempt < retryLimit {
 					nextAttempt := attempt + 1
 					fixedOut, called, retryAgain, fixErr := p.fixWithLLMRoundTrip(execCtx, req, name, result.Output, nextAttempt)
 					if fixErr != nil {
-						// If the context is done we should propagate the cancellation instead of retrying.
 						if ctxErr := execCtx.Err(); ctxErr != nil {
 							return "", ctxErr
 						}
@@ -197,22 +203,17 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 						if errors.Is(fixErr, context.Canceled) || errors.Is(fixErr, context.DeadlineExceeded) {
 							return "", fixErr
 						}
-						// Fix round-trip failed (no call executed). Try again without consuming attempts.
 						continue
 					}
 					if !called {
-						// LLM did not issue a valid tool call; ask again.
 						continue
 					}
-					// A tool call occurred; consume the attempt.
 					attempt = nextAttempt
 					retryState[name] = attempt
 					if retryAgain && attempt < retryLimit {
-						// Tool requested another retry; loop to elicit corrected args again.
 						result.Output = fixedOut
 						continue
 					}
-					// Either success or max reached; return output (interpreting if requested).
 					retryState[name] = 0
 					if interp, ok := p.maybeInterpretResult(execCtx, req, name, fixedOut); ok {
 						p.logToolSuccess(name, interp, hostName, req.Model)
@@ -221,10 +222,8 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 					p.logToolSuccess(name, fixedOut, hostName, req.Model)
 					return fixedOut, nil
 				}
-				// Max attempts reached without success; fall through to return last known message.
 			}
 			retryState[name] = 0
-			// Potentially interpret via LLM if server requested it.
 			if interp, ok := p.maybeInterpretResult(execCtx, req, name, result.Output); ok {
 				p.logToolSuccess(name, interp, hostName, req.Model)
 				return interp, nil
@@ -256,42 +255,33 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 				break
 			}
 			if result.Retry && attempt < retryLimit {
-				// Strict retry: loop until a successful tool call or max attempts.
 				for attempt < retryLimit {
 					nextAttempt := attempt + 1
 					fixedOut, called, retryAgain, fixErr := p.fixWithLLMRoundTrip(ctx, req, toolName, result.Output, nextAttempt)
 					if fixErr != nil {
-						// Stop retrying when the context has already been cancelled.
 						if ctxErr := ctx.Err(); ctxErr != nil {
 							return ctxErr
 						}
 						if errors.Is(fixErr, context.Canceled) || errors.Is(fixErr, context.DeadlineExceeded) {
 							return fixErr
 						}
-						// Fix round-trip failed; try again without consuming attempts.
 						continue
 					}
 					if !called {
-						// No tool call executed; elicit again.
 						continue
 					}
-					// Tool call executed; consume attempt and stash output for final handling.
 					attempt = nextAttempt
 					retryState[toolName] = attempt
 					result.Output = fixedOut
 					if retryAgain && attempt < retryLimit {
-						// Tool asked to retry again; continue loop for another corrective round-trip.
 						continue
 					}
-					// Either success or max reached; stop retrying.
 					retryState[toolName] = 0
 					break
 				}
-				// Continue with forwarding after loop.
 			}
 			retryState[toolName] = 0
 			executed = true
-			// If the result is an interpret envelope, perform the interpretation round-trip first.
 			if interp, ok := p.maybeInterpretResult(ctx, req, toolName, result.Output); ok {
 				p.logToolSuccess(toolName, interp, hostName, req.Model)
 				output := fmt.Sprintf("[MCP %s] %s", toolName, strings.TrimSpace(interp))
@@ -319,7 +309,6 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 		}
 	}
 
-	//p.log("Last Message: %s", forwardReq.History[len(forwardReq.History)-1].Content)
 	p.log("Forwarding request: host=%s model=%s messages=%d tools=%d", hostName, forwardReq.Model, len(forwardReq.History), len(forwardReq.Tools))
 	err := p.fallback.Stream(ctx, forwardReq, callbacks)
 	if err != nil {

@@ -2,12 +2,31 @@
 package main
 
 import (
+	"log"
+
+	"github.com/mwiater/agon/internal/appconfig"
 	cmd "github.com/mwiater/agon/internal/cli"
+	"github.com/mwiater/agon/internal/metrics"
 )
 
-// main starts the agon CLI application by delegating to the
-// cobra root command defined in the agon package. It does not
-// take any arguments and does not return a value.
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
+// main is the entry point for the agon CLI application.
 func main() {
+	cfg, err := appconfig.Load("")
+	if err != nil {
+		log.Printf("could not load config: %v", err)
+	}
+
+	if cfg.Metrics {
+		metrics.GetInstance()
+		defer metrics.Close()
+	}
+
+	cmd.SetVersionInfo(version, commit, date)
 	cmd.Execute()
 }

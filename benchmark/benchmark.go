@@ -1,3 +1,4 @@
+// benchmark/benchmark.go
 package benchmark
 
 import (
@@ -9,14 +10,20 @@ import (
 	"sync"
 	"time"
 
+	"log"
+
 	"github.com/mwiater/agon/internal/appconfig"
+	"github.com/mwiater/agon/internal/models"
 	"github.com/mwiater/agon/internal/providerfactory"
 	"github.com/mwiater/agon/internal/providers"
-	"log"
 )
 
-const userPrompt = "What are the 5 largest cities in the world by population?"
+const userPrompt = "List 3 different fruits in alphabetical order? None of the three can be an apple."
 
+// agonCLIPath is the path to the agon CLI executable for the current OS.
+const agonCLIPath = "dist/agon_linux_amd64_v1/agon"
+
+// BenchmarkModels runs benchmarks for models defined in the configuration.
 func BenchmarkModels(cfg *appconfig.Config) error {
 	if !cfg.BenchmarkMode {
 		return fmt.Errorf("benchmark mode is not enabled in the configuration")
@@ -31,6 +38,8 @@ func BenchmarkModels(cfg *appconfig.Config) error {
 			return fmt.Errorf("each host in benchmark mode must have exactly one model")
 		}
 	}
+
+	models.UnloadModels(cfg)
 
 	var modelNames []string
 	for _, host := range cfg.Hosts {
@@ -75,8 +84,8 @@ func BenchmarkModels(cfg *appconfig.Config) error {
 				var inputTokens int
 
 				req := providers.StreamRequest{
-					Host:    host,
-					Model:   host.Models[0],
+					Host:  host,
+					Model: host.Models[0],
 					History: []providers.ChatMessage{{
 						Role:    "user",
 						Content: userPrompt,
@@ -140,12 +149,12 @@ func BenchmarkModels(cfg *appconfig.Config) error {
 	return writeResults(results, cfg.BenchmarkCount)
 }
 
+// calculateAggregates calculates the average, min, and max statistics for a benchmark result.
 func calculateAggregates(result *BenchmarkResult) {
 	if len(result.Iterations) == 0 {
 		return
 	}
 
-	// Initialize min/max with the first iteration's stats
 	result.MinStats = result.Iterations[0].Stats
 	result.MaxStats = result.Iterations[0].Stats
 
@@ -186,6 +195,7 @@ func calculateAggregates(result *BenchmarkResult) {
 	result.AverageStats.TokensPerSecond = tokensPerSecond / count
 }
 
+// writeResults writes the benchmark results to a JSON file.
 func writeResults(results map[string]*BenchmarkResult, benchmarkCount int) error {
 	var modelNames []string
 	for name := range results {

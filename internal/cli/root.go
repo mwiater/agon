@@ -1,4 +1,4 @@
-// cmd/agon/root.go
+// internal/cli/root.go
 package agon
 
 import (
@@ -6,8 +6,8 @@ import (
 	"os"
 	"strconv"
 
-    "github.com/mwiater/agon/internal/appconfig"
-    "github.com/mwiater/agon/internal/logging"
+	"github.com/mwiater/agon/internal/appconfig"
+	"github.com/mwiater/agon/internal/logging"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -15,19 +15,20 @@ import (
 var (
 	cfgFile       string
 	currentConfig *appconfig.Config
+	appVersion    = "dev"
+	appCommit     = "none"
+	appDate       = "unknown"
 )
 
+// rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "agon",
 	Short: "agon — terminal-first companion for multi-host Ollama workflows",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// 1) Load config (file or defaults)
 		if err := ensureConfigLoaded(); err != nil {
 			return err
 		}
 
-		// 2) If user did NOT set a flag, copy the config value into the flag so
-		//    both pflags and viper reflect the same, final value.
 		for _, name := range []string{"debug", "multimodelMode", "pipelineMode", "jsonMode", "mcpMode"} {
 			if !cmd.Flags().Changed(name) {
 				val := viper.GetBool(name)
@@ -43,8 +44,6 @@ var rootCmd = &cobra.Command{
 			_ = cmd.Flags().Set("mcpInitTimeout", strconv.Itoa(viper.GetInt("mcpInitTimeout")))
 		}
 
-		// 3) Materialize the fully merged configuration into currentConfig
-		//    (flags > config > defaults). This gives other packages a stable snapshot.
 		var cfg appconfig.Config
 		if err := viper.Unmarshal(&cfg); err != nil {
 			return fmt.Errorf("unmarshal config: %w", err)
@@ -55,15 +54,19 @@ var rootCmd = &cobra.Command{
 		}
 		currentConfig = &cfg
 
-        if err := logging.Init(currentConfig.LogFilePath()); err != nil {
-            return fmt.Errorf("failed to initialize logger: %w", err)
-        }
+		if err := logging.Init(currentConfig.LogFilePath()); err != nil {
+			return fmt.Errorf("failed to initialize logger: %w", err)
+		}
 
 		return nil
 	},
 }
 
+// Execute adds all child commands to the root command and sets flags appropriately.
+// This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
+	rootCmd.Version = fmt.Sprintf("%s (commit: %s, built: %s)", appVersion, appCommit, appDate)
+
 	defer logging.Close()
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
@@ -73,22 +76,19 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	// --config (defaults to your existing path)
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "config/config.json", "config file (e.g., config/config.json)")
 
-	// Persistent flags available to all commands
 	rootCmd.PersistentFlags().Bool("debug", false, "enable debug logging")
 	rootCmd.PersistentFlags().Bool("multimodelMode", false, "enable multi-model mode")
 	rootCmd.PersistentFlags().Bool("pipelineMode", false, "enable pipeline mode")
 	rootCmd.PersistentFlags().Bool("jsonMode", false, "enable JSON output mode")
-    rootCmd.PersistentFlags().Bool("mcpMode", false, "proxy LLM traffic through the MCP server")
-    rootCmd.PersistentFlags().String("mcpBinary", "", "path to the MCP server binary (defaults per OS)")
-    rootCmd.PersistentFlags().Int("mcpInitTimeout", 0, "seconds to wait for MCP startup (0 = default)")
+	rootCmd.PersistentFlags().Bool("mcpMode", false, "proxy LLM traffic through the MCP server")
+	rootCmd.PersistentFlags().String("mcpBinary", "", "path to the MCP server binary (defaults per OS)")
+	rootCmd.PersistentFlags().Int("mcpInitTimeout", 0, "seconds to wait for MCP startup (0 = default)")
 	rootCmd.PersistentFlags().String("export", "", "write pipeline runs to this JSON file")
 	rootCmd.PersistentFlags().String("exportMarkdown", "", "write pipeline runs to this Markdown file")
 	rootCmd.PersistentFlags().String("logFile", "", "path to the log file")
 
-	// Bind flags to Viper keys (flags override config)
 	_ = viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
 	_ = viper.BindPFlag("multimodelMode", rootCmd.PersistentFlags().Lookup("multimodelMode"))
 	_ = viper.BindPFlag("pipelineMode", rootCmd.PersistentFlags().Lookup("pipelineMode"))
@@ -101,6 +101,7 @@ func init() {
 	_ = viper.BindPFlag("logFile", rootCmd.PersistentFlags().Lookup("logFile"))
 }
 
+// initConfig reads in config file and ENV variables if set.
 func initConfig() {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
@@ -109,14 +110,13 @@ func initConfig() {
 
 // ensureConfigLoaded reads the config and sets safe defaults.
 func ensureConfigLoaded() error {
-    if err := viper.ReadInConfig(); err != nil {
-        if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-            // No file: fine, we'll use defaults/flags
-            return nil
-        }
-        return fmt.Errorf("failed to load config: %w", err)
-    }
-    return nil
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			return nil
+		}
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+	return nil
 }
 
 // GetConfig returns the loaded application configuration for other packages.
@@ -124,8 +124,21 @@ func GetConfig() *appconfig.Config {
 	return currentConfig
 }
 
-// Helper accessors (reflect merged Viper state)
-func DebugEnabled() bool        { return viper.GetBool("debug") }
-func MultiModelEnabled() bool   { return viper.GetBool("multimodelMode") }
+// DebugEnabled returns true if debug mode is enabled.
+func DebugEnabled() bool { return viper.GetBool("debug") }
+
+// MultiModelEnabled returns true if multi-model mode is enabled.
+func MultiModelEnabled() bool { return viper.GetBool("multimodelMode") }
+
+// PipelineModeEnabled returns true if pipeline mode is enabled.
 func PipelineModeEnabled() bool { return viper.GetBool("pipelineMode") }
-func JSONModeEnabled() bool     { return viper.GetBool("jsonMode") }
+
+// JSONModeEnabled returns true if JSON mode is enabled.
+func JSONModeEnabled() bool { return viper.GetBool("jsonMode") }
+
+// SetVersionInfo allows the main package to inject build-time variables.
+func SetVersionInfo(version, commit, date string) {
+	appVersion = version
+	appCommit = commit
+	appDate = date
+}

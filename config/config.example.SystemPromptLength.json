@@ -103,5 +103,6 @@
   "mcpInitTimeout": 10,
   "mcpRetryCount": 1,
   "export": "",
-  "exportMarkdown": ""
+  "exportMarkdown": "",
+  "metrics": true
 }

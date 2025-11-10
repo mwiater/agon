@@ -1,3 +1,4 @@
+// internal/providers/ollama/tools.go
 package ollama
 
 import (
@@ -15,6 +16,7 @@ import (
 	"github.com/mwiater/agon/internal/providers"
 )
 
+// logTools logs the available tool names if debug mode is enabled.
 func logTools(debug bool, tools []providers.ToolDefinition) {
 	if !debug {
 		return
@@ -36,6 +38,7 @@ func logTools(debug bool, tools []providers.ToolDefinition) {
 	log.Printf("Tools: {%s}", strings.Join(names, ", "))
 }
 
+// formatToolsForPayload converts a slice of ToolDefinition into a format suitable for the Ollama API payload.
 func formatToolsForPayload(tools []providers.ToolDefinition) []map[string]any {
 	formatted := make([]map[string]any, 0, len(tools))
 	for _, tool := range tools {
@@ -56,6 +59,7 @@ func formatToolsForPayload(tools []providers.ToolDefinition) []map[string]any {
 	return formatted
 }
 
+// hostIdentifier returns a string identifier for a given host, preferring the name over the URL.
 func hostIdentifier(host appconfig.Host) string {
 	name := strings.TrimSpace(host.Name)
 	if name != "" {
@@ -67,6 +71,7 @@ func hostIdentifier(host appconfig.Host) string {
 	return "ollama-host"
 }
 
+// toolCall represents a structured tool call from the Ollama API.
 type toolCall struct {
 	Type     string `json:"type"`
 	Function struct {
@@ -75,6 +80,7 @@ type toolCall struct {
 	} `json:"function"`
 }
 
+// normalizeToolArgs standardizes tool arguments, for example, by creating a 'location' from city, state, and country for the 'current_weather' tool.
 func normalizeToolArgs(toolName string, args map[string]any, availableTools []providers.ToolDefinition) map[string]any {
 	normalized := make(map[string]any, len(args))
 	for k, v := range args {
@@ -101,6 +107,7 @@ func normalizeToolArgs(toolName string, args map[string]any, availableTools []pr
 	return normalized
 }
 
+// parseToolArguments attempts to parse a raw JSON message into a map of tool arguments.
 func parseToolArguments(raw json.RawMessage) (map[string]any, error) {
 	args := map[string]any{}
 	trimmed := strings.TrimSpace(string(raw))
@@ -112,17 +119,17 @@ func parseToolArguments(raw json.RawMessage) (map[string]any, error) {
 	}
 	var argString string
 	if err := json.Unmarshal(raw, &argString); err == nil {
-		argStringTrimmed := strings.TrimSpace(argString)
-		if argStringTrimmed == "" {
+		argStringtrimmed := strings.TrimSpace(argString)
+		if argStringtrimmed == "" {
 			return args, nil
 		}
 		var lastErr error
-		if err := json.Unmarshal([]byte(argStringTrimmed), &args); err == nil {
+		if err := json.Unmarshal([]byte(argStringtrimmed), &args); err == nil {
 			return args, nil
 		} else {
 			lastErr = err
-			sanitized := sanitizeLegacyJSON(argStringTrimmed)
-			if sanitized != argStringTrimmed {
+			sanitized := sanitizeLegacyJSON(argStringtrimmed)
+			if sanitized != argStringtrimmed {
 				if err := json.Unmarshal([]byte(sanitized), &args); err == nil {
 					return args, nil
 				}
@@ -139,8 +146,9 @@ var (
 	trailingCommaPattern      = regexp.MustCompile(`,\s*([}\]])`)
 )
 
-var legacyArgsBareValuePattern = regexp.MustCompile(`"arguments"\s*:\s*{\s*"[^":}]+"\s*\}`)
+var legacyArgsBareValuePattern = regexp.MustCompile(`"arguments"\s*:\s*{\s*"[^":}]+"\s*}\n?`)
 
+// sanitizeLegacyJSON cleans up common JSON-like syntax errors, such as single quotes and trailing commas.
 func sanitizeLegacyJSON(input string) string {
 	s := strings.TrimSpace(input)
 	if s == "" {
@@ -158,6 +166,7 @@ func sanitizeLegacyJSON(input string) string {
 	return cleaned
 }
 
+// parseLegacyToolCalls extracts tool calls from a string that uses legacy <tool_call> tags.
 func parseLegacyToolCalls(content string, available []providers.ToolDefinition) ([]toolCall, string) {
 	lower := strings.ToLower(content)
 	idx := strings.Index(lower, "<tool_call>")
@@ -198,6 +207,7 @@ func parseLegacyToolCalls(content string, available []providers.ToolDefinition) 
 	return calls, cleaned
 }
 
+// buildLegacyToolCalls constructs a slice of toolCall from a raw payload string.
 func buildLegacyToolCalls(payload string, available []providers.ToolDefinition, content string) []toolCall {
 	if payload == "" {
 		return nil
@@ -235,6 +245,7 @@ func buildLegacyToolCalls(payload string, available []providers.ToolDefinition, 
 	return calls
 }
 
+// legacyEntryToToolCall converts a single legacy tool call entry into a structured toolCall.
 func legacyEntryToToolCall(entry any, available []providers.ToolDefinition, content string) (toolCall, bool) {
 	data, ok := entry.(map[string]any)
 	if !ok {
@@ -273,6 +284,7 @@ func legacyEntryToToolCall(entry any, available []providers.ToolDefinition, cont
 	return call, true
 }
 
+// extractLegacyToolName finds a tool name from a map of data, checking common keys.
 func extractLegacyToolName(data map[string]any) string {
 	candidates := []string{"name", "tool", "tool_name", "function"}
 	for _, key := range candidates {
@@ -285,6 +297,7 @@ func extractLegacyToolName(data map[string]any) string {
 	return ""
 }
 
+// extractLegacyArguments finds tool arguments from a map of data, checking common keys.
 func extractLegacyArguments(data map[string]any) map[string]any {
 	for _, key := range []string{"arguments", "params", "parameters"} {
 		if raw, ok := data[key]; ok {
@@ -296,6 +309,7 @@ func extractLegacyArguments(data map[string]any) map[string]any {
 	return nil
 }
 
+// coerceLegacyArguments attempts to convert a value of unknown type into a map of arguments.
 func coerceLegacyArguments(value any) (map[string]any, bool) {
 	switch v := value.(type) {
 	case map[string]any:
@@ -330,6 +344,7 @@ func coerceLegacyArguments(value any) (map[string]any, bool) {
 	return nil, false
 }
 
+// resolveToolName attempts to find the correct tool name from the available tools based on a candidate name.
 func resolveToolName(candidate string, available []providers.ToolDefinition, content string) string {
 	candidate = strings.TrimSpace(candidate)
 	if candidate != "" {
@@ -358,6 +373,7 @@ func resolveToolName(candidate string, available []providers.ToolDefinition, con
 	return candidate
 }
 
+// executeToolCalls executes a slice of tool calls and returns the combined output.
 func executeToolCalls(ctx context.Context, req providers.StreamRequest, calls []toolCall) (string, error) {
 	if len(calls) == 0 {
 		return "", nil
@@ -406,33 +422,21 @@ func executeToolCalls(ctx context.Context, req providers.StreamRequest, calls []
 	return strings.Join(outputs, "\n\n"), nil
 }
 
-// findValidJSON searches a string for the first valid JSON object or array
-// and returns it. If no valid JSON is found, it returns an empty string.
+// findValidJSON searches a string for the first valid JSON object or array and returns it.
 func findValidJSON(text string) string {
-	// Iterate through the string to find a potential start of JSON
 	for i := 0; i < len(text); i++ {
 		char := text[i]
-
-		// A valid JSON structure must start with '{' or '['
 		if char == '{' || char == '[' {
-			// Found a potential start, try to extract the full structure
 			candidate := extractJSONStructure(text[i:])
-
-			// If we got a non-empty candidate, check if it's valid JSON
 			if candidate != "" && json.Valid([]byte(candidate)) {
 				return candidate
 			}
-			// If it's not valid, the outer loop will continue searching
-			// for the *next* '{' or '['
 		}
 	}
-	// No valid JSON found in the entire string
 	return ""
 }
 
-// extractJSONStructure attempts to find one complete, balanced JSON object or array
-// starting from the beginning of the input string.
-// It assumes the string starts with '{' or '['.
+// extractJSONStructure extracts a complete JSON object or array from the beginning of a string.
 func extractJSONStructure(text string) string {
 	if len(text) == 0 {
 		return ""
@@ -446,27 +450,19 @@ func extractJSONStructure(text string) string {
 		startChar = '['
 		endChar = ']'
 	} else {
-		// Not a valid start
 		return ""
 	}
 
-	// level tracks the nesting of braces or brackets
 	level := 0
-	// inString tracks whether we are inside a string literal
 	inString := false
 
 	for i := 0; i < len(text); i++ {
 		char := text[i]
-
-		// Check for string literal boundaries
 		if char == '"' {
-			// We only toggle inString if the quote is not escaped
 			if i == 0 || text[i-1] != '\\' {
 				inString = !inString
 			}
 		}
-
-		// Only count braces/brackets if we are not inside a string
 		if !inString {
 			if char == startChar {
 				level++
@@ -474,18 +470,14 @@ func extractJSONStructure(text string) string {
 				level--
 			}
 		}
-
-		// If level returns to 0, we've found the matching end
 		if level == 0 {
-			// Return the substring from the start to this point
 			return text[0 : i+1]
 		}
 	}
-
-	// If we finish the loop and level is not 0, the JSON is incomplete
 	return ""
 }
 
+// isNoToolCapabilityResponse checks if the response body indicates that the model does not support tools.
 func isNoToolCapabilityResponse(body []byte) bool {
 	if len(body) == 0 {
 		return false
@@ -509,6 +501,7 @@ func isNoToolCapabilityResponse(body []byte) bool {
 
 var errNoToolJSONFound = errors.New("no tool json found in response")
 
+// rebuildToolCallFromContent attempts to reconstruct a tool call from a string of content.
 func rebuildToolCallFromContent(content string, tools []providers.ToolDefinition) (*toolCall, error) {
 	if len(tools) == 0 {
 		return nil, errNoToolJSONFound
@@ -582,6 +575,7 @@ func rebuildToolCallFromContent(content string, tools []providers.ToolDefinition
 	return nil, errNoToolJSONFound
 }
 
+// parseJSONAnyWithSanitize parses a JSON string into an 'any' type, attempting to sanitize it first if the initial parse fails.
 func parseJSONAnyWithSanitize(input string) (any, error) {
 	trimmed := strings.TrimSpace(input)
 	if trimmed == "" {
@@ -600,6 +594,7 @@ func parseJSONAnyWithSanitize(input string) (any, error) {
 	return value, nil
 }
 
+// locateArgumentsWrapper traverses a nested data structure to find the map containing tool arguments.
 func locateArgumentsWrapper(root any) (map[string]any, string, error) {
 	type queueItem struct {
 		value    any
@@ -666,6 +661,7 @@ func locateArgumentsWrapper(root any) (map[string]any, string, error) {
 	return nil, "", errNoToolJSONFound
 }
 
+// matchToolDefinition finds the best matching tool definition for a given candidate name and arguments.
 func matchToolDefinition(tools []providers.ToolDefinition, candidateName string, args map[string]any) (providers.ToolDefinition, error) {
 	if len(tools) == 0 {
 		return providers.ToolDefinition{}, errNoToolJSONFound
@@ -686,6 +682,7 @@ func matchToolDefinition(tools []providers.ToolDefinition, candidateName string,
 	return providers.ToolDefinition{}, firstErr
 }
 
+// prioritizeTools returns a slice of tool indices, prioritized by how well they match the candidate name.
 func prioritizeTools(tools []providers.ToolDefinition, candidateName string) []int {
 	indices := make([]int, 0, len(tools))
 	seen := make(map[int]struct{}, len(tools))
@@ -710,6 +707,7 @@ func prioritizeTools(tools []providers.ToolDefinition, candidateName string) []i
 	return indices
 }
 
+// validateArgumentsAgainstTool checks if the given arguments are valid for the specified tool definition.
 func validateArgumentsAgainstTool(def providers.ToolDefinition, args map[string]any) error {
 	if len(def.Parameters) == 0 {
 		return nil
@@ -733,6 +731,7 @@ func validateArgumentsAgainstTool(def providers.ToolDefinition, args map[string]
 	return fmt.Errorf("arguments failed validation: %s", strings.Join(details, "; "))
 }
 
+// extractToolCallCandidates finds all potential tool call payloads within <tool_call> tags.
 func extractToolCallCandidates(content string) []string {
 	var candidates []string
 	lower := strings.ToLower(content)
@@ -764,6 +763,7 @@ func extractToolCallCandidates(content string) []string {
 	return candidates
 }
 
+// normalizeLegacyToolCallPayload makes a simple correction to a legacy tool call payload.
 func normalizeLegacyToolCallPayload(input string) string {
 	if strings.TrimSpace(input) == "" {
 		return input
@@ -771,6 +771,7 @@ func normalizeLegacyToolCallPayload(input string) string {
 	return legacyArgsBareValuePattern.ReplaceAllString(input, "\"arguments\":{}\n")
 }
 
+// parseLooseLegacyToolCalls parses a string containing loosely-formatted legacy tool calls.
 func parseLooseLegacyToolCalls(payload string, available []providers.ToolDefinition, content string) []toolCall {
 	entries := splitLooseLegacyEntries(payload)
 	if len(entries) == 0 {
@@ -785,6 +786,7 @@ func parseLooseLegacyToolCalls(payload string, available []providers.ToolDefinit
 	return calls
 }
 
+// splitLooseLegacyEntries splits a string into multiple, loosely-formatted JSON-like entries.
 func splitLooseLegacyEntries(payload string) []string {
 	s := strings.TrimSpace(payload)
 	if s == "" {
@@ -815,6 +817,7 @@ func splitLooseLegacyEntries(payload string) []string {
 	return entries
 }
 
+// parseLooseLegacyEntry parses a single, loosely-formatted legacy tool call entry.
 func parseLooseLegacyEntry(entry string, available []providers.ToolDefinition, content string) (toolCall, bool) {
 	text := strings.TrimSpace(entry)
 	if text == "" {
@@ -849,9 +852,12 @@ func parseLooseLegacyEntry(entry string, available []providers.ToolDefinition, c
 	return call, true
 }
 
+// extractFirstMatch finds the first value associated with a list of keys in a string.
 func extractFirstMatch(entry string, keys []string) string {
 	for _, key := range keys {
-		pattern := fmt.Sprintf("`%s`\\s*:\\s*\"([^\"]+)\"", key)
+		safeKey := regexp.QuoteMeta(key)
+		pattern := fmt.Sprintf("`%s`%s", safeKey, `\s*:\s*"([^"]+)"`)
+
 		re := regexp.MustCompile(pattern)
 		if matches := re.FindStringSubmatch(entry); len(matches) == 2 {
 			return matches[1]
@@ -860,6 +866,7 @@ func extractFirstMatch(entry string, keys []string) string {
 	return ""
 }
 
+// parseLooseArguments extracts arguments from a loosely-formatted string.
 func parseLooseArguments(entry string) map[string]any {
 	idx := strings.Index(strings.ToLower(entry), "`arguments`")
 	if idx == -1 {

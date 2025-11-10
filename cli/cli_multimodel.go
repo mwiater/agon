@@ -50,7 +50,6 @@ type multimodelColumnResponse struct {
 
 // multimodelModel is the Bubble Tea model for multimodel mode.
 type multimodelModel struct {
-	// ctx is the application-wide context for cancellation.
 	ctx context.Context
 	// config stores the shared application configuration.
 	config *Config
@@ -303,10 +302,10 @@ func (m *multimodelModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							}
 						}
 						if combinedResponse.Len() > 0 {
-							m.chatHistory = append(m.chatHistory, chatMessage{
-								Role:    "assistant",
-								Content: combinedResponse.String(),
-							})
+								m.chatHistory = append(m.chatHistory, chatMessage{
+										Role:    "assistant",
+										Content: combinedResponse.String(),
+									})
 						}
 						break
 					}
@@ -429,7 +428,6 @@ func (m *multimodelModel) updateChat(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == "enter" {
 		userInput := strings.TrimSpace(m.textArea.Value())
 		if userInput != "" {
-			// Record the user message for each assigned column and start timers
 			userMsg := chatMessage{Role: "user", Content: userInput}
 			for i := range m.columnResponses {
 				if m.assignments[i].isAssigned {
@@ -442,14 +440,12 @@ func (m *multimodelModel) updateChat(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.columnResponses[i].error = nil
 			}
 
-			// Global UI state for the request
 			m.requestStartTime = time.Now()
 			m.err = nil
 			m.isLoading = true
 			m.textArea.Reset()
 			m.textArea.Blur()
 
-			// Kick off spinner/ticks and start streaming across assigned models
 			cmds = append(cmds, m.spinner.Tick, multimodelStreamChatCmd(m.program, m))
 		}
 	}
@@ -615,7 +611,7 @@ func (m *multimodelModel) multimodelChatView() string {
 						content = msg.Content
 					}
 					wrappedContent := lipgloss.NewStyle().Width(colWidth - 2).Render(content)
-					colChatHistory.WriteString(role + "\n  " + wrappedContent + "\n\n")
+					colChatHistory.WriteString(role + "\n" + wrappedContent + "\n\n")
 				}
 			}
 		}
@@ -649,8 +645,6 @@ func (m *multimodelModel) multimodelChatView() string {
 }
 
 // StartMultimodelGUI initializes and runs the four-column multimodel chat UI.
-// It accepts a parsed Config and provider, sets up the Bubble Tea program, and blocks until
-// the UI exits. StartMultimodelGUI returns an error if the TUI cannot be run.
 func StartMultimodelGUI(ctx context.Context, cfg *Config, provider providers.ChatProvider, cancel context.CancelFunc) error {
 	m := initialMultimodelModel(ctx, cfg, provider)
 

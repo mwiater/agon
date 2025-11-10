@@ -20,7 +20,7 @@
         "qwen3:1.7b",
         "embeddinggemma:300m"
       ],
-      "systemprompt": "Take user input as subject; return valid JSON: {\"subject\":\"{subject}\"} only.",
+      "systemprompt": "Take user input as subject. Return valid JSON: {\"subject\":\"{user_input}\"} only.",
       "parameters": {}
     },
     {
@@ -43,7 +43,7 @@
         "qwen3:1.7b",
         "embeddinggemma:300m"
       ],
-      "systemprompt": "Return one measurable property/value as JSON: {\"subject\":\"{subject}\",\"{property}\":\"{value}\"}.",
+      "systemprompt": "Input is JSON. Add one 'category' key/value categorizing the 'subject'. Return full valid JSON only.",
       "parameters": {}
     },
     {
@@ -66,7 +66,7 @@
         "qwen3:1.7b",
         "embeddinggemma:300m"
       ],
-      "systemprompt": "Ensure clean keys/values, no extras; return valid JSON: {\"subject\":\"{subject}\",\"{property}\":\"{value}\"}.",
+      "systemprompt": "Input is JSON. Add 'properties' key. Value: object of 3 factual key/value pairs for 'subject'. Return full valid JSON only.",
       "parameters": {}
     },
     {
@@ -89,7 +89,7 @@
         "qwen3:1.7b",
         "embeddinggemma:300m"
       ],
-      "systemprompt": "Validate fact; return full JSON with added key 'validated': true or false, nothing else.",
+      "systemprompt": "Input is JSON. Fact-check 'properties' values. Add boolean 'valid' key (true/false). Return full valid JSON only.",
       "parameters": {}
     }
   ],
@@ -103,5 +103,6 @@
   "mcpInitTimeout": 10,
   "mcpRetryCount": 1,
   "export": "",
-  "exportMarkdown": ""
+  "exportMarkdown": "",
+  "metrics": true
 }

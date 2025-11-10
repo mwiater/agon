@@ -1,3 +1,4 @@
+// internal/providers/ollama/provider.go
 // Package ollama provides a ChatProvider backed by Ollama-compatible HTTP endpoints.
 package ollama
 
@@ -38,12 +39,14 @@ func New(cfg *appconfig.Config) *Provider {
 	}
 }
 
+// ollamaPsResponse defines the structure of the response from the /api/ps endpoint.
 type ollamaPsResponse struct {
 	Models []struct {
 		Name string `json:"name"`
 	} `json:"models"`
 }
 
+// streamChunk defines the structure of a single chunk in a streaming response.
 type streamChunk struct {
 	Model   string `json:"model"`
 	Message struct {
@@ -105,8 +108,6 @@ func (p *Provider) EnsureModelReady(ctx context.Context, host appconfig.Host, mo
 	logTools(p.debug, nil)
 	payload := map[string]any{
 		"model": model,
-		//"prompt": ".",
-		//"stream": false,
 	}
 
 	body, err := json.Marshal(payload)
@@ -150,9 +151,7 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 	}
 	hostID := hostIdentifier(req.Host)
 
-	if len(messages) > 0 {
-		//messages = []providers.ChatMessage{messages[len(messages)-1]}
-	} else {
+	if len(messages) == 0 {
 		messages = []providers.ChatMessage{}
 	}
 
@@ -178,7 +177,7 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 	if err != nil {
 		return err
 	}
-	// Pretty-print the JSON payload for easier inspection in logs
+
 	if pretty, perr := json.MarshalIndent(payload, "", "  "); perr == nil {
 		logging.LogRequest("AGON->LLM", hostID, req.Model, "", pretty)
 	} else {
@@ -336,6 +335,7 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 	return nil
 }
 
+// Close releases any resources held by the provider.
 func (p *Provider) Close() error {
 	return nil
 }

@@ -1,3 +1,4 @@
+// internal/providers/mcp/process.go
 package mcp
 
 import (
@@ -21,7 +22,7 @@ func New(ctx context.Context, cfg *appconfig.Config) (*Provider, error) {
 		return nil, fmt.Errorf("mcp provider requires non-nil config")
 	}
 
-    binary := cfg.MCPBinaryPath()
+	binary := cfg.MCPBinaryPath()
 
 	if _, err := os.Stat(binary); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -83,6 +84,7 @@ func New(ctx context.Context, cfg *appconfig.Config) (*Provider, error) {
 	return provider, nil
 }
 
+// initialize performs the JSON-RPC initialize handshake with the MCP server.
 func (p *Provider) initialize(ctx context.Context) error {
 	params := map[string]any{
 		"clientInfo": map[string]any{

@@ -1,3 +1,4 @@
+// internal/util/util.go
 package util
 
 import (
@@ -6,10 +7,13 @@ import (
 	"unicode/utf8"
 )
 
+// WriteFile writes data to a file with 0o644 permissions.
 func WriteFile(path string, data []byte) error {
 	return os.WriteFile(path, data, 0o644)
 }
 
+// TruncateRunes truncates a string to a maximum number of runes,
+// appending an ellipsis if truncated.
 func TruncateRunes(text string, maxRunes int) string {
 	if utf8.RuneCountInString(text) <= maxRunes {
 		return text
@@ -18,6 +22,7 @@ func TruncateRunes(text string, maxRunes int) string {
 	return string(runes[:maxRunes]) + "…"
 }
 
+// TruncateToWidth truncates each line of a string to a specified width in runes.
 func TruncateToWidth(text string, width int) string {
 	lines := strings.Split(text, "\n")
 	for i, line := range lines {
@@ -28,6 +33,7 @@ func TruncateToWidth(text string, width int) string {
 	return strings.Join(lines, "\n")
 }
 
+// WrapToWidth wraps the given text to a specified width, breaking long words.
 func WrapToWidth(text string, width int) string {
 	if width <= 0 {
 		return text
@@ -84,6 +90,7 @@ func WrapToWidth(text string, width int) string {
 	return strings.Join(out, "\n")
 }
 
+// Min returns the smaller of two integers.
 func Min(a, b int) int {
 	if a < b {
 		return a
@@ -91,6 +98,7 @@ func Min(a, b int) int {
 	return b
 }
 
+// Max returns the larger of two integers.
 func Max(a, b int) int {
 	if a > b {
 		return a
@@ -98,6 +106,7 @@ func Max(a, b int) int {
 	return b
 }
 
+// BoolToInt converts a boolean to an integer (1 for true, 0 for false).
 func BoolToInt(v bool) int {
 	if v {
 		return 1

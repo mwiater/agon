@@ -1,3 +1,4 @@
+// internal/providers/mcp/rpc.go
 package mcp
 
 import (
@@ -11,6 +12,7 @@ import (
 	"github.com/mwiater/agon/internal/logging"
 )
 
+// jsonrpcResponse represents a JSON-RPC 2.0 response.
 type jsonrpcResponse struct {
 	JSONRPC string          `json:"jsonrpc"`
 	ID      json.RawMessage `json:"id,omitempty"`
@@ -18,11 +20,13 @@ type jsonrpcResponse struct {
 	Error   *jsonrpcError   `json:"error,omitempty"`
 }
 
+// jsonrpcError represents a JSON-RPC 2.0 error object.
 type jsonrpcError struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
 
+// rpcMetadata stores metadata associated with an RPC call for logging and tracking.
 type rpcMetadata struct {
 	method string
 	host   string
@@ -30,6 +34,7 @@ type rpcMetadata struct {
 	tool   string
 }
 
+// storeRPCMeta stores metadata for an RPC call, keyed by its ID.
 func (p *Provider) storeRPCMeta(id string, meta rpcMetadata) {
 	p.rpcMetaMu.Lock()
 	if p.rpcMeta == nil {
@@ -39,6 +44,7 @@ func (p *Provider) storeRPCMeta(id string, meta rpcMetadata) {
 	p.rpcMetaMu.Unlock()
 }
 
+// popRPCMeta retrieves and deletes metadata for an RPC call by its ID.
 func (p *Provider) popRPCMeta(id string) (rpcMetadata, bool) {
 	p.rpcMetaMu.Lock()
 	defer p.rpcMetaMu.Unlock()
@@ -52,6 +58,7 @@ func (p *Provider) popRPCMeta(id string) (rpcMetadata, bool) {
 	return meta, ok
 }
 
+// normalizeID converts a raw JSON message ID to a string.
 func normalizeID(raw json.RawMessage) string {
 	if len(raw) == 0 {
 		return ""
@@ -64,11 +71,12 @@ func normalizeID(raw json.RawMessage) string {
 		if unquoted, err := strconv.Unquote(trimmed); err == nil {
 			return unquoted
 		}
-		trimmed = strings.Trim(trimmed, "\"")
+		return strings.Trim(trimmed, "\"")
 	}
 	return trimmed
 }
 
+// nextID generates the next sequential ID for an RPC call.
 func (p *Provider) nextID() int64 {
 	p.seqMu.Lock()
 	defer p.seqMu.Unlock()
@@ -76,6 +84,7 @@ func (p *Provider) nextID() int64 {
 	return p.seq
 }
 
+// writeRawFrame writes a raw data frame with a Content-Length header.
 func (p *Provider) writeRawFrame(data []byte) error {
 	if _, err := fmt.Fprintf(p.writer, "Content-Length: %d\r\n\r\n", len(data)); err != nil {
 		return err
@@ -86,6 +95,7 @@ func (p *Provider) writeRawFrame(data []byte) error {
 	return p.writer.Flush()
 }
 
+// readResponse reads an RPC response with a timeout.
 func (p *Provider) readResponse(ctx context.Context) (jsonrpcResponse, []byte, error) {
 	type result struct {
 		resp jsonrpcResponse
@@ -106,6 +116,7 @@ func (p *Provider) readResponse(ctx context.Context) (jsonrpcResponse, []byte, e
 	}
 }
 
+// readResponseBlocking reads a single JSON-RPC response frame from the underlying reader.
 func (p *Provider) readResponseBlocking() (jsonrpcResponse, []byte, error) {
 	headers := make(map[string]string)
 	for {
@@ -147,6 +158,7 @@ func (p *Provider) readResponseBlocking() (jsonrpcResponse, []byte, error) {
 	return resp, body, nil
 }
 
+// rpcCall performs a JSON-RPC call by sending a request and waiting for a response.
 func (p *Provider) rpcCall(ctx context.Context, method string, params map[string]any, meta rpcMetadata) (jsonrpcResponse, error) {
 	p.rpcMu.Lock()
 	defer p.rpcMu.Unlock()

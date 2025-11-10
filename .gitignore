@@ -1,8 +1,5 @@
 .coverage/*
-.RELEASE.md
 agon.log
-agon-mcp-server.log
-CODEX.md
 dist/*
 internal/harness/*
 internal/cli/harness.go

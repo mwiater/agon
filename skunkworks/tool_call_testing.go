@@ -8,13 +8,13 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/fatih/color"
 	"github.com/k0kubun/pp"
 	"github.com/mwiater/agon/internal/appconfig"
+	"github.com/mwiater/agon/internal/models"
 )
 
 // --- Configuration ---
@@ -23,8 +23,7 @@ import (
 const interactionCount = 5
 
 // Set the path to your agon CLI tool.
-//const agonCLIPath = "dist/agon_windows_amd64_v1/agon.exe"
-
+// const agonCLIPath = "dist/agon_windows_amd64_v1/agon.exe"
 const agonCLIPath = "dist/agon_linux_amd64_v1/agon"
 
 // Set the output filename for the final JSON report.
@@ -38,7 +37,7 @@ var (
 	hosts = []string{}
 
 	// Set your models to be tested.
-	models = []string{
+	toolModels = []string{
 		//"llama3.2:3b",
 		"granite4:350m",
 		//"granite4:1b",
@@ -268,17 +267,17 @@ func main() {
 	}
 
 	log.Println("Starting request runner...")
-	log.Printf("Total Models: %d", len(models))
+	log.Printf("Total Models: %d", len(toolModels))
 	log.Printf("Parallel Hosts (Batch Size): %d", len(hosts))
 	log.Printf("Total Iterations: %d", interactionCount)
-	log.Printf("Total Requests to be made: %d", len(models)*interactionCount*len(payloadModes))
+	log.Printf("Total Requests to be made: %d", len(toolModels)*interactionCount*len(payloadModes))
 	log.Println("----------------------------------------")
 
 	// successCounts will store the total number of successful responses for each model.
 	successCounts := make(map[payloadMode]map[string]int)
 	for _, mode := range payloadModes {
 		successCounts[mode] = make(map[string]int)
-		for _, model := range models {
+		for _, model := range toolModels {
 			successCounts[mode][model] = 0
 		}
 	}
@@ -288,7 +287,7 @@ func main() {
 	// --- Initial Unload ---
 	// Unload models once before the entire test run starts.
 	log.Println("--- Initial Model Unload ---")
-	runUnloadCommand()
+	models.UnloadModels(&loadedCfg)
 	log.Println("----------------------------------------")
 
 	// Create response files for streaming writes
@@ -321,14 +320,14 @@ func main() {
 			log.Printf("===> Running mode: %s", mode)
 
 			// Loop through models in batches of numHosts
-			totalBatches := (len(models) + numHosts - 1) / numHosts
-			for j := 0; j < len(models); j += numHosts {
+			totalBatches := (len(toolModels) + numHosts - 1) / numHosts
+			for j := 0; j < len(toolModels); j += numHosts {
 				// Determine the models for this specific batch
 				batchEnd := j + numHosts
-				if batchEnd > len(models) {
-					batchEnd = len(models)
+				if batchEnd > len(toolModels) {
+					batchEnd = len(toolModels)
 				}
-				batchModels := models[j:batchEnd]
+				batchModels := toolModels[j:batchEnd]
 				numInBatch := len(batchModels)
 
 				logline := fmt.Sprintf("[Iter %d | Mode %s] Processing batch %d/%d (Models %d-%d)...", i+1, mode, (j/numHosts)+1, totalBatches, j+1, batchEnd)
@@ -398,7 +397,7 @@ func main() {
 				logline = fmt.Sprintf("[Iter %d | Mode %s | Batch %d] Batch complete. Unloading models...", i+1, mode, (j/numHosts)+1)
 				log.Print(successfulResult(logline))
 
-				runUnloadCommand()
+				models.UnloadModels(&loadedCfg)
 				logline = fmt.Sprintf("[Iter %d | Mode %s | Batch %d] Model unload complete. Moving to next batch.", i+1, mode, (j/numHosts)+1)
 				log.Print(successfulResult(logline))
 			}
@@ -531,20 +530,6 @@ func buildPayload(mode payloadMode, modelName string) (io.Reader, error) {
 		return bytes.NewBuffer([]byte(payload)), nil
 	default:
 		return nil, fmt.Errorf("unsupported payload mode: %s", mode)
-	}
-}
-
-// runUnloadCommand shells out to the agon CLI to unload models.
-func runUnloadCommand() {
-	log.Println("Attempting to unload models via agon CLI...")
-	cmd := exec.Command(agonCLIPath, "unload", "models")
-
-	// Capture combined stdout/stderr.
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Printf("ERROR running agon unload: %v\nOutput: %s", err, string(output))
-	} else {
-		log.Println("Agon unload command successful.")
 	}
 }
 
@@ -741,9 +726,9 @@ func processResults(counts map[payloadMode]map[string]int, totalInteractions int
 func printReport(report map[payloadMode]map[string]interface{}, totalInteractions int) {
 	fmt.Println("\n--- FINAL REPORT ---")
 	fmt.Printf("Based on %d interaction(s) per model.\n\n", totalInteractions)
-	for mode, models := range report {
+	for mode, toolModels := range report {
 		fmt.Printf("Mode: %s\n", mode)
-		for model, raw := range models {
+		for model, raw := range toolModels {
 			stats := raw.(map[string]interface{})
 			count := stats["success_count"].(int)
 			percent := stats["percent_success"].(float64)

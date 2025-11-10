@@ -1,3 +1,4 @@
+// internal/models/commands.go
 package models
 
 import (
@@ -37,7 +38,6 @@ func createHosts(config appconfig.Config) []LLMHost {
 }
 
 // PullModels reads models from the provided configuration and pulls them to each supported host.
-// For Ollama hosts, it issues /api/pull requests for each configured model.
 func PullModels(config *appconfig.Config) {
 	if config == nil {
 		fmt.Println("configuration is not initialized")
@@ -69,6 +69,11 @@ func PullModels(config *appconfig.Config) {
 func DeleteModels(config *appconfig.Config) {
 	if config == nil {
 		fmt.Println("configuration is not initialized")
+		return
+	}
+
+	if config.BenchmarkMode {
+		fmt.Println("Benchmark mode is enabled; skipping model deletion.")
 		return
 	}
 
@@ -147,18 +152,25 @@ func UnloadModels(config *appconfig.Config) {
 	fmt.Println("All model unload commands have finished.")
 }
 
-// function aliases allow tests to spy call order.
 var (
-	// deleteModelsFunc proxies DeleteModels to allow tests to substitute behavior.
 	deleteModelsFunc = DeleteModels
-	// pullModelsFunc proxies PullModels to allow tests to substitute behavior.
-	pullModelsFunc = PullModels
+	pullModelsFunc   = PullModels
 )
 
 // SyncModels deletes any models not in config and then pulls missing models.
 func SyncModels(config *appconfig.Config) {
+	if config.BenchmarkMode {
+		fmt.Println("Benchmark mode is enabled; skipping model sync.")
+		return
+	}
+
 	deleteModelsFunc(config)
 	pullModelsFunc(config)
+}
+
+// SyncConfigs prints the current configuration.
+func SyncConfigs(config *appconfig.Config) {
+	pp.Println(config)
 }
 
 // ListModels lists models on each configured host, indicating which are currently loaded for Ollama hosts.

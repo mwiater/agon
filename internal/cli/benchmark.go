@@ -1,3 +1,4 @@
+// internal/cli/benchmark.go
 package agon
 
 import (
@@ -7,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// benchmarkCmd represents the benchmark command.
 var benchmarkCmd = &cobra.Command{
 	Use:   "benchmark",
 	Short: "Run benchmarks for models defined in the config file",

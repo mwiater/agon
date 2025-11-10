@@ -1,3 +1,4 @@
+// internal/providers/ollama/provider_test.go
 package ollama
 
 import (
@@ -12,6 +13,8 @@ import (
 	"github.com/mwiater/agon/internal/providers"
 )
 
+// TestProviderStreamDisableStreaming verifies that when streaming is disabled, the provider
+// makes a single request and correctly processes the non-streaming response.
 func TestProviderStreamDisableStreaming(t *testing.T) {
 	t.Parallel()
 
@@ -39,7 +42,7 @@ func TestProviderStreamDisableStreaming(t *testing.T) {
 		Host:             host,
 		Model:            "test-model",
 		DisableStreaming: true,
-		Tools: []providers.ToolDefinition{{
+		Tools: []providers.ToolDefinition{{ 
 			Name:        "weather",
 			Description: "fetches weather",
 		}},
@@ -75,11 +78,13 @@ func TestProviderStreamDisableStreaming(t *testing.T) {
 	if stream, ok := payload["stream"].(bool); !ok || stream {
 		t.Fatalf("expected stream=false, got %v", payload["stream"])
 	}
-	tools, ok := payload["tools"].([]any)
+
+tools, ok := payload["tools"].([]any)
 	if !ok || len(tools) != 1 {
 		t.Fatalf("expected tools in payload, got %T", payload["tools"])
 	}
-	toolObj, ok := tools[0].(map[string]any)
+
+toolObj, ok := tools[0].(map[string]any)
 	if !ok {
 		t.Fatalf("expected tool object to be map, got %T", tools[0])
 	}
@@ -98,6 +103,8 @@ func TestProviderStreamDisableStreaming(t *testing.T) {
 	}
 }
 
+// TestProviderStreamNoToolCapability tests the provider's handling of a response
+// indicating the model does not support tools.
 func TestProviderStreamNoToolCapability(t *testing.T) {
 	t.Parallel()
 
@@ -142,6 +149,8 @@ func TestProviderStreamNoToolCapability(t *testing.T) {
 	}
 }
 
+// TestIsNoToolCapabilityResponse checks the helper function that determines if a
+// response body indicates a lack of tool support.
 func TestIsNoToolCapabilityResponse(t *testing.T) {
 	cases := []struct {
 		name string
@@ -163,6 +172,8 @@ func TestIsNoToolCapabilityResponse(t *testing.T) {
 	}
 }
 
+// TestProviderStreamToolCallExecutes ensures that a tool call in the response
+// triggers the provided tool executor function.
 func TestProviderStreamToolCallExecutes(t *testing.T) {
 	t.Parallel()
 
@@ -224,6 +235,8 @@ func TestProviderStreamToolCallExecutes(t *testing.T) {
 	}
 }
 
+// TestProviderStreamToolCallObjectArgs tests the provider's ability to handle tool
+// call arguments provided as a JSON object.
 func TestProviderStreamToolCallObjectArgs(t *testing.T) {
 	t.Parallel()
 
@@ -285,6 +298,8 @@ func TestProviderStreamToolCallObjectArgs(t *testing.T) {
 	}
 }
 
+// TestProviderStreamToolCallCityCountry verifies that the provider can synthesize
+// a 'location' argument from 'city' and 'country' for weather tools.
 func TestProviderStreamToolCallCityCountry(t *testing.T) {
 	t.Parallel()
 
@@ -331,11 +346,12 @@ func TestProviderStreamToolCallCityCountry(t *testing.T) {
 	}
 }
 
+// TestProviderStreamLegacyToolCallMarkup tests parsing of legacy tool call markup.
 func TestProviderStreamLegacyToolCallMarkup(t *testing.T) {
 	t.Parallel()
 
 	content := `<tool_call>[{"arguments":{"location":"Portland, OR"}}]</tool_call>`
-	tools := []providers.ToolDefinition{{
+	tools := []providers.ToolDefinition{{ 
 		Name:        "current_weather",
 		Description: "fetches weather",
 	}}
@@ -362,11 +378,13 @@ func TestProviderStreamLegacyToolCallMarkup(t *testing.T) {
 	}
 }
 
+// TestProviderStreamLegacyToolCallSingleQuoteArgs tests parsing of legacy tool calls
+// where arguments are enclosed in single quotes.
 func TestProviderStreamLegacyToolCallSingleQuoteArgs(t *testing.T) {
 	t.Parallel()
 
 	content := `<tool_call>[{"function":"weather","parameters":"{ 'city': 'Portland', 'country': 'USA' }"}]</tool_call>`
-	tools := []providers.ToolDefinition{{
+	tools := []providers.ToolDefinition{{ 
 		Name:        "current_weather",
 		Description: "fetches weather",
 	}}
@@ -394,11 +412,13 @@ func TestProviderStreamLegacyToolCallSingleQuoteArgs(t *testing.T) {
 	}
 }
 
+// TestParseLegacyToolCallMarkupBareArguments tests parsing of legacy tool calls
+// with bare or unusual argument formats.
 func TestParseLegacyToolCallMarkupBareArguments(t *testing.T) {
 	t.Parallel()
 
 	content := `<tool_call>[{"arguments":{"none"},"name":"get_time"}]</tool_call>`
-	tools := []providers.ToolDefinition{{
+	tools := []providers.ToolDefinition{{ 
 		Name:        "current_time",
 		Description: "reports time",
 		Parameters:  map[string]any{"type": "object"},
@@ -424,11 +444,13 @@ func TestParseLegacyToolCallMarkupBareArguments(t *testing.T) {
 	}
 }
 
+// TestParseLegacyToolCallMarkupDuplicateArguments tests robustness against duplicate
+// 'arguments' keys in legacy tool call markup.
 func TestParseLegacyToolCallMarkupDuplicateArguments(t *testing.T) {
 	t.Parallel()
 
 	content := `<tool_call>[{"arguments":{"none"},"name":"datetime","arguments":{"none"}}]</tool_call>`
-	tools := []providers.ToolDefinition{{
+	tools := []providers.ToolDefinition{{ 
 		Name:        "current_time",
 		Description: "reports time",
 		Parameters:  map[string]any{"type": "object"},
@@ -454,11 +476,13 @@ func TestParseLegacyToolCallMarkupDuplicateArguments(t *testing.T) {
 	}
 }
 
+// TestParseLegacyToolCallMarkupTrailingBrace tests robustness against trailing
+// braces in legacy tool call markup.
 func TestParseLegacyToolCallMarkupTrailingBrace(t *testing.T) {
 	t.Parallel()
 
 	content := `<tool_call>[{"arguments":{"none"},"name":"None"}}]</tool_call>`
-	tools := []providers.ToolDefinition{{
+	tools := []providers.ToolDefinition{{ 
 		Name:        "current_time",
 		Description: "reports time",
 		Parameters:  map[string]any{"type": "object"},

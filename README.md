@@ -2,9 +2,21 @@
 
 ![gollama](.screens/gollama.png)
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/mwiater/agon@v0.2.0.svg)](https://pkg.go.dev/github.com/mwiater/agon@v0.2.0)
+
 > **Note:** This is a personal project. I will do my best to keep the main branch functional and up to date with the time I have available.
 
 `agon` is a terminal-first companion for interacting with large language models that expose the Ollama API. It helps you browse available hosts, launch an immersive chat session, and keep model inventories aligned across machines, whether you are experimenting locally or coordinating a distributed cluster.
+
+**I created this application in order to compare small LLMs in parallel** (usually between 1b and 3b parameters): I have 4 distinct nodes running Ollama on non-gpu SBCs. While speed was never a priority, I needed some questions answered:
+
+* Which small LLMs are most responsive and accurate when using tools through an MCP server?
+* Which small LLMs are most efficient **and** accurate?
+* Which small LLMs produce consistently valid JSON output when Ollama's JSON format is set?
+* How do different models compare when handing off responses as inputs to the next model in an agentic pipeline flow?
+
+Overall, `agon` was created to efficiently evaluate different scenarios with small LLMs and try to better understand how to make small LLMs work for various home lab projects.
+
 
 ## Table of Contents
 

@@ -43,14 +43,17 @@ type chatMessage = providers.ChatMessage
 type viewState int
 
 const (
+	// viewHostSelector is the state where the user selects a host.
 	viewHostSelector viewState = iota
+	// viewModelSelector is the state where the user selects a model.
 	viewModelSelector
+	// viewLoadingChat is the state where the chat interface is loading.
 	viewLoadingChat
+	// viewChat is the state where the user is interacting with the chat.
 	viewChat
 )
 
-// model is the main application model for the Bubble Tea UI. It holds all the
-// state necessary for the chat application to function.
+// model is the main application model for the Bubble Tea UI.
 type model struct {
 	ctx              context.Context
 	config           *Config
@@ -75,9 +78,7 @@ type model struct {
 	requestStartTime time.Time
 }
 
-// initialModel creates and initializes a new model with default values. It sets
-// up the necessary Bubble Tea components, such as the spinner, textarea, and lists,
-// and configures the HTTP client with the appropriate timeout.
+// initialModel creates and initializes a new model with default values.
 func initialModel(ctx context.Context, cfg *Config, provider providers.ChatProvider) *model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
@@ -116,19 +117,17 @@ func initialModel(ctx context.Context, cfg *Config, provider providers.ChatProvi
 	}
 }
 
-// item represents a selectable item in a Bubble Tea list. It is used for both
-// hosts and models, and implements the list.Item interface.
+// item represents a selectable item in a Bubble Tea list.
 type item struct {
 	title  string
 	desc   string
 	loaded bool
 }
 
-// Title returns the title of the list item, satisfying the list.Item interface.
+// Title returns the title of the list item.
 func (i item) Title() string { return i.title }
 
-// Description returns the description of the list item. If the item represents a
-// loaded model, it returns "Currently loaded". This satisfies the list.Item interface.
+// Description returns the description of the list item.
 func (i item) Description() string {
 	if i.loaded {
 		return "Currently loaded"
@@ -136,12 +135,10 @@ func (i item) Description() string {
 	return i.desc
 }
 
-// FilterValue returns the title of the item, which is used for filtering the list.
-// This satisfies the list.Item interface.
+// FilterValue returns the title of the item, used for filtering.
 func (i item) FilterValue() string { return i.title }
 
-// modelsReadyMsg is a message sent when the list of models has been successfully
-// fetched and processed.
+// modelsReadyMsg is a message sent when the list of models has been successfully fetched and processed.
 type modelsReadyMsg struct {
 	models       []list.Item
 	loadedModels []string
@@ -168,6 +165,7 @@ type streamErr struct{ error }
 // tickMsg is a message sent at regular intervals, used for animations and timed updates.
 type tickMsg time.Time
 
+// lastUserPrompt retrieves the content of the last user message from the chat history.
 func lastUserPrompt(history []chatMessage) string {
 	for i := len(history) - 1; i >= 0; i-- {
 		if strings.ToLower(history[i].Role) == "user" {
@@ -178,8 +176,7 @@ func lastUserPrompt(history []chatMessage) string {
 }
 
 // fetchAndSelectModelsCmd creates a Bubble Tea command that fetches the list of
-// loaded models and then all available models for a given host. It prepares the
-// model list for selection, prioritizing loaded models by placing them at the top.
+// loaded models and then all available models for a given host.
 func fetchAndSelectModelsCmd(host Host, provider providers.ChatProvider) tea.Cmd {
 	return func() tea.Msg {
 		loadedModels, err := provider.LoadedModels(context.Background(), host)
@@ -216,8 +213,7 @@ func fetchAndSelectModelsCmd(host Host, provider providers.ChatProvider) tea.Cmd
 }
 
 // loadModelCmd creates a Bubble Tea command that attempts to load a specified
-// model onto the given host by delegating to the active chat provider. It
-// returns a tea.Msg indicating success (chatReadyMsg) or failure (chatReadyErr).
+// model onto the given host by delegating to the active chat provider.
 func loadModelCmd(host Host, modelName string, provider providers.ChatProvider) tea.Cmd {
 	return func() tea.Msg {
 		if err := provider.EnsureModelReady(context.Background(), host, modelName); err != nil {
@@ -228,8 +224,7 @@ func loadModelCmd(host Host, modelName string, provider providers.ChatProvider) 
 }
 
 // streamChatCmd creates a Bubble Tea command that initiates a streaming chat
-// conversation with the selected language model. It delegates streaming to the
-// configured provider and relays chunk and completion events back to the UI.
+// conversation with the selected language model.
 func streamChatCmd(ctx context.Context, p *tea.Program, provider providers.ChatProvider, host Host, modelName string, history []chatMessage, systemPrompt string, JSONFormat bool, parameters Parameters) tea.Cmd {
 	return func() tea.Msg {
 		req := providers.StreamRequest{
@@ -265,7 +260,6 @@ func streamChatCmd(ctx context.Context, p *tea.Program, provider providers.ChatP
 }
 
 // tickCmd creates a Bubble Tea command that sends a tickMsg at a regular interval.
-// This is used to drive animations and other periodic UI updates.
 func tickCmd() tea.Cmd {
 	return tea.Tick(time.Millisecond*100, func(t time.Time) tea.Msg {
 		return tickMsg(t)
@@ -277,9 +271,7 @@ func (m *model) Init() tea.Cmd {
 	return m.spinner.Tick
 }
 
-// Update is the central update function for the Bubble Tea model. It handles all
-// incoming messages and updates the application's state accordingly. It is called
-// by the Bubble Tea runtime when a message is received.
+// Update is the central update function for the Bubble Tea model.
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var (
 		cmd  tea.Cmd
@@ -425,7 +417,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View renders the application's UI based on the current state of the model.
-// It is called by the Bubble Tea runtime whenever the UI needs to be redrawn.
 func (m *model) View() string {
 	if m.width == 0 {
 		return "Initializing..."
@@ -657,8 +648,7 @@ func (m *model) chatView() string {
 	return builder.String()
 }
 
-// formatMeta formats the LLMResponseMeta into a human-readable string,
-// displaying various performance metrics of the language model response.
+// formatMeta formats the LLMResponseMeta into a human-readable string.
 func formatMeta(meta LLMResponseMeta) string {
 	style := lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
 
@@ -679,9 +669,6 @@ func formatMeta(meta LLMResponseMeta) string {
 }
 
 // StartGUI initializes and runs the interactive TUI for single-model chat.
-// It reads configuration from config/config.json by default, optionally switches to multimodel
-// mode, and blocks until the UI exits. It logs diagnostic output to agon.log
-// when enabled. StartGUI does not return a value.
 func StartGUI(ctx context.Context, cfg *appconfig.Config, cancel context.CancelFunc) {
 	f, err := tea.LogToFile("agon.log", "debug")
 	if err != nil {

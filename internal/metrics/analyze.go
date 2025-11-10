@@ -1,0 +1,929 @@
+// internal/metrics/analyze.go
+package metrics
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"html/template"
+	"math"
+	"sort"
+	"time"
+)
+
+// Stats mirrors the per-iteration statistics captured in benchmark JSON.
+type Stats struct {
+	TotalExecutionTime int64   `json:"totalExecutionTime"`
+	TimeToFirstToken   int64   `json:"timeToFirstToken"`
+	TokensPerSecond    float64 `json:"tokensPerSecond"`
+	InputTokenCount    int     `json:"inputTokenCount"`
+	OutputTokenCount   int     `json:"outputTokenCount"`
+}
+
+// Iteration captures a single benchmark run for a model.
+type Iteration struct {
+	Iteration int   `json:"iteration"`
+	Stats     Stats `json:"stats"`
+}
+
+// ModelBenchmark is the root payload for a model's benchmark record.
+type ModelBenchmark struct {
+	ModelName      string      `json:"modelName"`
+	BenchmarkCount int         `json:"benchmarkCount"`
+	AverageStats   Stats       `json:"averageStats"`
+	MinStats       Stats       `json:"minStats"`
+	MaxStats       Stats       `json:"maxStats"`
+	Iterations     []Iteration `json:"iterations"`
+}
+
+// BenchmarkResults stores the entire benchmark document keyed by model name.
+type BenchmarkResults map[string]ModelBenchmark
+
+// AggregatedStats stores derived aggregate values for a model.
+type AggregatedStats struct {
+	TokensPerSecond           float64 `json:"tokensPerSecond"`
+	TimeToFirstTokenSeconds   float64 `json:"timeToFirstTokenSeconds"`
+	TotalExecutionTimeSeconds float64 `json:"totalExecutionTimeSeconds"`
+	InputTokens               float64 `json:"inputTokens"`
+	OutputTokens              float64 `json:"outputTokens"`
+}
+
+// VarianceStats stores standard deviation metrics for key values.
+type VarianceStats struct {
+	TokensPerSecondStdDev         float64 `json:"tokensPerSecondStdDev"`
+	TimeToFirstTokenStdDevSeconds float64 `json:"timeToFirstTokenStdDevSeconds"`
+	OutputTokensStdDev            float64 `json:"outputTokensStdDev"`
+}
+
+// ScoreStats contains normalized scores for each model.
+type ScoreStats struct {
+	ThroughputScore float64 `json:"throughputScore"`
+	LatencyScore    float64 `json:"latencyScore"`
+	EfficiencyScore float64 `json:"efficiencyScore"`
+}
+
+// LabelStats captures qualitative assessments for a model.
+type LabelStats struct {
+	RelativeSpeedTier      string `json:"relativeSpeedTier"`
+	LatencyProfile         string `json:"latencyProfile"`
+	Stability              string `json:"stability"`
+	InteractiveSuitability string `json:"interactiveSuitability"`
+}
+
+// DerivedRatios stores ratio-based comparisons for a model.
+type DerivedRatios struct {
+	LatencyShareOfTotal float64 `json:"latencyShareOfTotal"`
+	RelativeToFastest   float64 `json:"relativeToFastest"`
+}
+
+// ModelAnalysis is the top-level entry for each model in the analysis.
+type ModelAnalysis struct {
+	ModelName      string          `json:"modelName"`
+	BenchmarkCount int             `json:"benchmarkCount"`
+	Avg            AggregatedStats `json:"avg"`
+	Min            AggregatedStats `json:"min"`
+	Max            AggregatedStats `json:"max"`
+	Variance       VarianceStats   `json:"variance"`
+	Scores         ScoreStats      `json:"scores"`
+	Labels         LabelStats      `json:"labels"`
+	DerivedRatios  DerivedRatios   `json:"derivedRatios"`
+	Notes          []string        `json:"notes"`
+}
+
+// ThroughputRankingEntry captures ordering by throughput.
+type ThroughputRankingEntry struct {
+	ModelName          string  `json:"modelName"`
+	AvgTokensPerSecond float64 `json:"avgTokensPerSecond"`
+}
+
+// LatencyRankingEntry captures ordering by latency.
+type LatencyRankingEntry struct {
+	ModelName                  string  `json:"modelName"`
+	AvgTimeToFirstTokenSeconds float64 `json:"avgTimeToFirstTokenSeconds"`
+}
+
+// EfficiencyRankingEntry captures ordering by efficiency score.
+type EfficiencyRankingEntry struct {
+	ModelName       string  `json:"modelName"`
+	EfficiencyScore float64 `json:"efficiencyScore"`
+}
+
+// Rankings groups the sorted ranking lists.
+type Rankings struct {
+	ByThroughput      []ThroughputRankingEntry `json:"byThroughput"`
+	ByLatency         []LatencyRankingEntry    `json:"byLatency"`
+	ByEfficiencyScore []EfficiencyRankingEntry `json:"byEfficiencyScore"`
+}
+
+// Anomaly describes any notable outlier detected in the analysis.
+type Anomaly struct {
+	Type      string `json:"type"`
+	ModelName string `json:"modelName"`
+	Severity  string `json:"severity"`
+	Message   string `json:"message"`
+}
+
+// OverallSummary provides a concise overview for the report header.
+type OverallSummary struct {
+	FastestModel       string   `json:"fastestModel"`
+	BestLatencyModel   string   `json:"bestLatencyModel"`
+	MostEfficientModel string   `json:"mostEfficientModel"`
+	SummaryNotes       []string `json:"summaryNotes"`
+}
+
+// HostInfo is optional metadata describing the environment.
+type HostInfo struct {
+	ClusterName string `json:"clusterName"`
+	Notes       string `json:"notes"`
+}
+
+// Analysis is the root document returned by AnalyzeMetrics and consumed by GenerateReport.
+type Analysis struct {
+	GeneratedAt     time.Time       `json:"generatedAt"`
+	HostInfo        HostInfo        `json:"hostInfo"`
+	Overall         OverallSummary  `json:"overall"`
+	Models          []ModelAnalysis `json:"models"`
+	Rankings        Rankings        `json:"rankings"`
+	Anomalies       []Anomaly       `json:"anomalies"`
+	Recommendations []string        `json:"recommendations"`
+}
+
+// ReportTemplateData feeds the HTML template for metric reports.
+type ReportTemplateData struct {
+	Title        string
+	AnalysisJSON template.JS
+}
+
+// AnalyzeMetrics transforms raw benchmark results into a structured Analysis object.
+func AnalyzeMetrics(results BenchmarkResults, host HostInfo) Analysis {
+	analysis := Analysis{
+		GeneratedAt: time.Now().UTC(),
+		HostInfo:    host,
+	}
+
+	if len(results) == 0 {
+		analysis.Models = []ModelAnalysis{}
+		analysis.Recommendations = []string{"Consider keeping sessions warm and reducing context size to minimize TTFT across all models."}
+		return analysis
+	}
+
+	modelNames := make([]string, 0, len(results))
+	for name := range results {
+		modelNames = append(modelNames, name)
+	}
+	sort.Strings(modelNames)
+
+	globalMaxAvgTPS := 0.0
+	globalMinAvgTTFT := math.MaxFloat64
+
+	modelAnalyses := make([]*ModelAnalysis, 0, len(modelNames))
+
+	for _, name := range modelNames {
+		bench := results[name]
+		ma := &ModelAnalysis{
+			ModelName:      name,
+			BenchmarkCount: bench.BenchmarkCount,
+		}
+		if ma.BenchmarkCount == 0 {
+			ma.BenchmarkCount = len(bench.Iterations)
+		}
+
+		iterTPS := make([]float64, 0, len(bench.Iterations))
+		iterTTFT := make([]float64, 0, len(bench.Iterations))
+		iterOutputTokens := make([]float64, 0, len(bench.Iterations))
+		iterInputTokens := make([]float64, 0, len(bench.Iterations))
+		iterTotalExec := make([]float64, 0, len(bench.Iterations))
+
+		for _, iter := range bench.Iterations {
+			iterTPS = append(iterTPS, iter.Stats.TokensPerSecond)
+			iterTTFT = append(iterTTFT, nsToSeconds(iter.Stats.TimeToFirstToken))
+			iterOutputTokens = append(iterOutputTokens, float64(iter.Stats.OutputTokenCount))
+			iterInputTokens = append(iterInputTokens, float64(iter.Stats.InputTokenCount))
+			iterTotalExec = append(iterTotalExec, nsToSeconds(iter.Stats.TotalExecutionTime))
+		}
+
+		avgTPS := bench.AverageStats.TokensPerSecond
+		if avgTPS == 0 {
+			avgTPS = meanFloat64(iterTPS)
+		}
+
+		avgTTFT := nsToSeconds(bench.AverageStats.TimeToFirstToken)
+		if avgTTFT == 0 {
+			avgTTFT = meanFloat64(iterTTFT)
+		}
+
+		avgTotalExec := nsToSeconds(bench.AverageStats.TotalExecutionTime)
+		if avgTotalExec == 0 {
+			avgTotalExec = meanFloat64(iterTotalExec)
+		}
+
+		avgInputTokens := fallbackAverage(float64(bench.AverageStats.InputTokenCount), iterInputTokens)
+		avgOutputTokens := fallbackAverage(float64(bench.AverageStats.OutputTokenCount), iterOutputTokens)
+
+		ma.Avg = AggregatedStats{
+			TokensPerSecond:           avgTPS,
+			TimeToFirstTokenSeconds:   avgTTFT,
+			TotalExecutionTimeSeconds: avgTotalExec,
+			InputTokens:               avgInputTokens,
+			OutputTokens:              avgOutputTokens,
+		}
+
+		ma.Min = AggregatedStats{
+			TokensPerSecond:           bench.MinStats.TokensPerSecond,
+			TimeToFirstTokenSeconds:   nsToSeconds(bench.MinStats.TimeToFirstToken),
+			TotalExecutionTimeSeconds: nsToSeconds(bench.MinStats.TotalExecutionTime),
+			InputTokens:               float64(bench.MinStats.InputTokenCount),
+			OutputTokens:              float64(bench.MinStats.OutputTokenCount),
+		}
+
+		ma.Max = AggregatedStats{
+			TokensPerSecond:           bench.MaxStats.TokensPerSecond,
+			TimeToFirstTokenSeconds:   nsToSeconds(bench.MaxStats.TimeToFirstToken),
+			TotalExecutionTimeSeconds: nsToSeconds(bench.MaxStats.TotalExecutionTime),
+			InputTokens:               float64(bench.MaxStats.InputTokenCount),
+			OutputTokens:              float64(bench.MaxStats.OutputTokenCount),
+		}
+
+		ma.Variance = VarianceStats{
+			TokensPerSecondStdDev:         stddevFromValues(iterTPS, ma.Avg.TokensPerSecond),
+			TimeToFirstTokenStdDevSeconds: stddevFromValues(iterTTFT, ma.Avg.TimeToFirstTokenSeconds),
+			OutputTokensStdDev:            stddevFromValues(iterOutputTokens, ma.Avg.OutputTokens),
+		}
+
+		if ma.Avg.TokensPerSecond > globalMaxAvgTPS {
+			globalMaxAvgTPS = ma.Avg.TokensPerSecond
+		}
+		if ma.Avg.TimeToFirstTokenSeconds > 0 && ma.Avg.TimeToFirstTokenSeconds < globalMinAvgTTFT {
+			globalMinAvgTTFT = ma.Avg.TimeToFirstTokenSeconds
+		}
+
+		modelAnalyses = append(modelAnalyses, ma)
+	}
+
+	if globalMinAvgTTFT == math.MaxFloat64 {
+		globalMinAvgTTFT = 0
+	}
+
+	rankThroughput := make([]ThroughputRankingEntry, 0, len(modelAnalyses))
+	rankLatency := make([]LatencyRankingEntry, 0, len(modelAnalyses))
+	rankEfficiency := make([]EfficiencyRankingEntry, 0, len(modelAnalyses))
+
+	multiModel := len(modelAnalyses) > 1
+
+	for _, ma := range modelAnalyses {
+		if multiModel && globalMaxAvgTPS > 0 {
+			ma.Scores.ThroughputScore = clampFloat((ma.Avg.TokensPerSecond/globalMaxAvgTPS)*100, 0, 100)
+		} else if !multiModel {
+			ma.Scores.ThroughputScore = 100
+		}
+
+		if multiModel && ma.Avg.TimeToFirstTokenSeconds > 0 && globalMinAvgTTFT > 0 {
+			ma.Scores.LatencyScore = clampFloat((globalMinAvgTTFT/ma.Avg.TimeToFirstTokenSeconds)*100, 0, 100)
+		} else if !multiModel {
+			ma.Scores.LatencyScore = 100
+		} else if ma.Avg.TimeToFirstTokenSeconds == 0 {
+			ma.Scores.LatencyScore = 100
+		}
+
+		ma.Scores.EfficiencyScore = 0.6*ma.Scores.ThroughputScore + 0.4*ma.Scores.LatencyScore
+
+		if globalMaxAvgTPS > 0 {
+			ma.DerivedRatios.RelativeToFastest = ma.Avg.TokensPerSecond / globalMaxAvgTPS
+		}
+
+		if ma.Avg.TotalExecutionTimeSeconds > 0 {
+			ratio := ma.Avg.TimeToFirstTokenSeconds / ma.Avg.TotalExecutionTimeSeconds
+			ma.DerivedRatios.LatencyShareOfTotal = clampFloat(ratio, 0, 1)
+		}
+
+		ma.Labels.RelativeSpeedTier = classifySpeedTier(ma.DerivedRatios.RelativeToFastest)
+		ma.Labels.LatencyProfile = classifyLatencyProfile(ma.Avg.TimeToFirstTokenSeconds)
+		ma.Labels.Stability = classifyStability(ma.Variance.TokensPerSecondStdDev, ma.Avg.TokensPerSecond)
+		ma.Labels.InteractiveSuitability = classifyInteractiveSuitability(ma.Avg.TimeToFirstTokenSeconds, ma.Avg.TokensPerSecond)
+
+		ma.Notes = buildModelNotes(*ma)
+
+		rankThroughput = append(rankThroughput, ThroughputRankingEntry{
+			ModelName:          ma.ModelName,
+			AvgTokensPerSecond: ma.Avg.TokensPerSecond,
+		})
+		rankLatency = append(rankLatency, LatencyRankingEntry{
+			ModelName:                  ma.ModelName,
+			AvgTimeToFirstTokenSeconds: ma.Avg.TimeToFirstTokenSeconds,
+		})
+		rankEfficiency = append(rankEfficiency, EfficiencyRankingEntry{
+			ModelName:       ma.ModelName,
+			EfficiencyScore: ma.Scores.EfficiencyScore,
+		})
+	}
+
+	sort.Slice(rankThroughput, func(i, j int) bool {
+		return rankThroughput[i].AvgTokensPerSecond > rankThroughput[j].AvgTokensPerSecond
+	})
+	sort.Slice(rankLatency, func(i, j int) bool {
+		return rankLatency[i].AvgTimeToFirstTokenSeconds < rankLatency[j].AvgTimeToFirstTokenSeconds
+	})
+	sort.Slice(rankEfficiency, func(i, j int) bool {
+		return rankEfficiency[i].EfficiencyScore > rankEfficiency[j].EfficiencyScore
+	})
+
+	finalModels := make([]ModelAnalysis, len(modelAnalyses))
+	for i, ma := range modelAnalyses {
+		finalModels[i] = *ma
+	}
+
+	analysis.Models = finalModels
+	analysis.Rankings = Rankings{
+		ByThroughput:      rankThroughput,
+		ByLatency:         rankLatency,
+		ByEfficiencyScore: rankEfficiency,
+	}
+
+	analysis.Overall = buildOverallSummary(analysis.Rankings)
+	analysis.Anomalies = detectAnomalies(analysis.Models)
+	analysis.Recommendations = buildRecommendations(analysis.Models)
+
+	return analysis
+}
+
+// GenerateReport renders a standalone HTML dashboard powered by the Analysis payload.
+func GenerateReport(analysis Analysis) (string, error) {
+	data, err := json.Marshal(analysis)
+	if err != nil {
+		return "", err
+	}
+
+	viewModel := ReportTemplateData{
+		Title:        "LLM Benchmark Report",
+		AnalysisJSON: template.JS(data),
+	}
+
+	var buf bytes.Buffer
+	if err := reportTemplate.Execute(&buf, viewModel); err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
+}
+
+// buildOverallSummary creates a summary of the benchmark results.
+func buildOverallSummary(rankings Rankings) OverallSummary {
+	var summary OverallSummary
+	if len(rankings.ByThroughput) > 0 {
+		entry := rankings.ByThroughput[0]
+		summary.FastestModel = entry.ModelName
+		summary.SummaryNotes = append(summary.SummaryNotes, fmt.Sprintf("Fastest model by throughput is %s with %.2f tokens/sec.", entry.ModelName, entry.AvgTokensPerSecond))
+	}
+	if len(rankings.ByLatency) > 0 {
+		entry := rankings.ByLatency[0]
+		summary.BestLatencyModel = entry.ModelName
+		summary.SummaryNotes = append(summary.SummaryNotes, fmt.Sprintf("Best latency model is %s with time to first token ≈ %.2fs.", entry.ModelName, entry.AvgTimeToFirstTokenSeconds))
+	}
+	if len(rankings.ByEfficiencyScore) > 0 {
+		entry := rankings.ByEfficiencyScore[0]
+		summary.MostEfficientModel = entry.ModelName
+		summary.SummaryNotes = append(summary.SummaryNotes, fmt.Sprintf("Most efficient model is %s with an efficiency score of %.1f.", entry.ModelName, entry.EfficiencyScore))
+	}
+	return summary
+}
+
+// detectAnomalies identifies any notable outliers in the analysis.
+func detectAnomalies(models []ModelAnalysis) []Anomaly {
+	anomalies := make([]Anomaly, 0)
+	for _, model := range models {
+		if model.Avg.TimeToFirstTokenSeconds > 120 {
+			anomalies = append(anomalies, Anomaly{
+				Type:      "very_high_latency",
+				ModelName: model.ModelName,
+				Severity:  "critical",
+				Message:   fmt.Sprintf("%s has extremely high time to first token, making it unsuitable for interactive workloads.", model.ModelName),
+			})
+		}
+		if model.Labels.RelativeSpeedTier == "slow" && hasFasterModelWithSimilarOutputs(model, models) {
+			anomalies = append(anomalies, Anomaly{
+				Type:      "slow_small_model",
+				ModelName: model.ModelName,
+				Severity:  "warning",
+				Message:   fmt.Sprintf("%s is significantly slower than other models despite similar or smaller outputs; fixed overhead may dominate on this hardware.", model.ModelName),
+			})
+		}
+		if model.Labels.Stability == "unstable" {
+			anomalies = append(anomalies, Anomaly{
+				Type:      "high_variance",
+				ModelName: model.ModelName,
+				Severity:  "warning",
+				Message:   fmt.Sprintf("%s shows high variability across runs; may indicate contention or thermal throttling.", model.ModelName),
+			})
+		}
+	}
+	return anomalies
+}
+
+// buildRecommendations generates a list of recommendations based on the analysis.
+func buildRecommendations(models []ModelAnalysis) []string {
+	recs := make([]string, 0)
+	for _, model := range models {
+		if model.Labels.InteractiveSuitability == "good" && model.Labels.RelativeSpeedTier == "top" {
+			recs = append(recs, fmt.Sprintf("Use %s as the default interactive model on this hardware.", model.ModelName))
+		}
+		if model.Labels.InteractiveSuitability == "unusable" {
+			recs = append(recs, fmt.Sprintf("Avoid %s for interactive usage; reserve it for batch-style or very small outputs.", model.ModelName))
+		}
+	}
+	recs = append(recs, "Consider keeping sessions warm and reducing context size to minimize TTFT across all models.")
+	return recs
+}
+
+// classifySpeedTier categorizes a model's speed based on its performance relative to the fastest model.
+func classifySpeedTier(relative float64) string {
+	switch {
+	case relative >= 0.75:
+		return "top"
+	case relative >= 0.4:
+		return "mid"
+	default:
+		return "slow"
+	}
+}
+
+// classifyLatencyProfile categorizes a model's latency profile based on its time to first token.
+func classifyLatencyProfile(seconds float64) string {
+	switch {
+	case seconds < 10:
+		return "low"
+	case seconds <= 60:
+		return "medium"
+	default:
+		return "high"
+	}
+}
+
+// classifyStability categorizes a model's performance stability based on its coefficient of variation.
+func classifyStability(stddev, avg float64) string {
+	if avg <= 0 {
+		if stddev == 0 {
+			return "stable"
+		}
+		return "unstable"
+	}
+	cv := stddev / avg
+	switch {
+	case cv < 0.1:
+		return "stable"
+	case cv < 0.25:
+		return "moderate"
+	default:
+		return "unstable"
+	}
+}
+
+// classifyInteractiveSuitability determines a model's suitability for interactive use cases.
+func classifyInteractiveSuitability(ttftSeconds, tokensPerSecond float64) string {
+	switch {
+	case ttftSeconds > 120:
+		return "unusable"
+	case ttftSeconds > 60:
+		return "borderline"
+	case tokensPerSecond < 2.0:
+		return "borderline"
+	default:
+		return "good"
+	}
+}
+
+// buildModelNotes creates a list of human-readable notes for a model based on its performance characteristics.
+func buildModelNotes(model ModelAnalysis) []string {
+	notes := make([]string, 0, 3)
+	if model.Labels.LatencyProfile == "high" {
+		notes = append(notes, "Very high time to first token; most of the time is spent before streaming.")
+	}
+	if model.Labels.RelativeSpeedTier == "top" {
+		notes = append(notes, "This is one of the fastest models by throughput.")
+	}
+	if model.Labels.Stability == "unstable" {
+		notes = append(notes, "Performance is highly variable across runs.")
+	}
+	return notes
+}
+
+// hasFasterModelWithSimilarOutputs checks if there is a faster model with a similar or smaller output size.
+func hasFasterModelWithSimilarOutputs(target ModelAnalysis, models []ModelAnalysis) bool {
+	if target.Avg.OutputTokens <= 0 {
+		return false
+	}
+	const tolerance = 1.1
+	for _, other := range models {
+		if other.ModelName == target.ModelName {
+			continue
+		}
+		if other.Avg.TokensPerSecond <= target.Avg.TokensPerSecond {
+			continue
+		}
+		if other.Avg.OutputTokens <= 0 {
+			continue
+		}
+		if target.Avg.OutputTokens <= other.Avg.OutputTokens*tolerance {
+			return true
+		}
+	}
+	return false
+}
+
+// fallbackAverage returns the primary value if it's positive, otherwise it calculates the mean of the fallback values.
+func fallbackAverage(primary float64, fallback []float64) float64 {
+	if primary > 0 {
+		return primary
+	}
+	return meanFloat64(fallback)
+}
+
+// meanFloat64 calculates the mean of a slice of float64 values.
+func meanFloat64(values []float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+	total := 0.0
+	for _, v := range values {
+		total += v
+	}
+	return total / float64(len(values))
+}
+
+// stddevFromValues calculates the standard deviation of a slice of float64 values given their mean.
+func stddevFromValues(values []float64, mean float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+	sum := 0.0
+	for _, v := range values {
+		diff := v - mean
+		sum += diff * diff
+	}
+	return math.Sqrt(sum / float64(len(values)))
+}
+
+// nsToSeconds converts nanoseconds to seconds.
+func nsToSeconds(ns int64) float64 {
+	return float64(ns) / 1e9
+}
+
+// clampFloat restricts a float64 value to a given range.
+func clampFloat(val, min, max float64) float64 {
+	if val < min {
+		return min
+	}
+	if val > max {
+		return max
+	}
+	return val
+}
+
+var reportTemplate = template.Must(template.New("metrics-report").Parse(reportTemplateHTML))
+
+const reportTemplateHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ .Title }}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+	    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Two+Tone" rel="stylesheet">
+  <style>
+    body { background-color: #f5f7fb; }
+    .card { border: none; }
+    .table thead th { cursor: pointer; }
+    .sort-icon { font-size: 0.8rem; margin-left: 0.25rem; }
+    .accordion-button .badge { margin-left: 0.5rem; }
+    .list-group-item { display: flex; align-items: center; justify-content: space-between; }
+    .notes-list li { margin-bottom: 0.25rem; }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-dark bg-dark">
+    <div class="container-fluid">
+      <span class="navbar-brand mb-0 h1">{{ .Title }}</span>
+      <span class="text-light">Generated: <span id="generatedAt">—</span></span>
+    </div>
+  </nav>
+  <main class="container-fluid my-4">
+    <div class="row g-3">
+      <div class="col-sm-6 col-lg-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <p style="font-size: 1.5em;" class="text-muted mb-1"><span style="display: inline-block;font-size: 1.5em;vertical-align: top;" class="material-icons-two-tone">speed</span> Fastest Model</p>
+            <h5 class="card-title" id="fastestModel">—</h5>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <p style="font-size: 1.5em;" class="text-muted mb-1"><span style="display: inline-block;font-size: 1.5em;vertical-align: top;" class="material-icons-two-tone">speed</span> Best Latency</p>
+            <h5 class="card-title" id="bestLatencyModel">—</h5>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <p style="font-size: 1.5em;" class="text-muted mb-1"><span style="display: inline-block;font-size: 1.5em;vertical-align: top;" class="material-icons-two-tone">speed</span> Most Efficient</p>
+            <h5 class="card-title" id="mostEfficientModel">—</h5>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <p style="font-size: 1.5em;" class="text-muted mb-1"><span style="display: inline-block;font-size: 1.5em;vertical-align: top;" class="material-icons-two-tone">speed</span> Interactive-Ready Models</p>
+            <h5 class="card-title" id="interactiveCount">0</h5>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section class="mt-4">
+      <div class="card shadow-sm">
+        <div class="card-header bg-white">
+          <h5 class="mb-0">Model Comparison</h5>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-striped table-hover table-bordered table-sm" id="modelsTable">
+              <thead class="table-light">
+                <tr>
+                  <th class="sortable" data-type="text">Model <span class="material-icons-two-tone sort">import_export</span></th>
+                  <th class="sortable" data-type="number">Avg TPS <span class="material-icons-two-tone sort">import_export</span></th>
+                  <th class="sortable" data-type="number">Avg TTFT (s) <span class="material-icons-two-tone sort">import_export</span></th>
+                  <th class="sortable" data-type="number">Avg Total (s) <span class="material-icons-two-tone sort">import_export</span></th>
+                  <th class="sortable" data-type="number">Avg Output Tokens <span class="material-icons-two-tone sort">import_export</span></th>
+                  <th class="sortable" data-type="number">Throughput Score <span class="material-icons-two-tone sort">import_export</span></th>
+                  <th class="sortable" data-type="number">Latency Score <span class="material-icons-two-tone sort">import_export</span></th>
+                  <th class="sortable" data-type="number">Efficiency Score <span class="material-icons-two-tone sort">import_export</span></th>
+                  <th class="sortable" data-type="text">Speed Tier <span class="material-icons-two-tone sort">import_export</span></th>
+                  <th class="sortable" data-type="text">Suitability <span class="material-icons-two-tone sort">import_export</span></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mt-4">
+      <div class="card shadow-sm">
+        <div class="card-header bg-white">
+          <h5 class="mb-0">Per-Model Details</h5>
+        </div>
+        <div class="card-body">
+          <div class="accordion" id="modelAccordion"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mt-4">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="card shadow-sm h-100">
+            <div class="card-header bg-white">
+              <h5 class="mb-0">Anomalies</h5>
+            </div>
+            <div class="card-body">
+              <div class="list-group" id="anomaliesList"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card shadow-sm h-100">
+            <div class="card-header bg-white">
+              <h5 class="mb-0">Recommendations</h5>
+            </div>
+            <div class="card-body">
+              <ol class="list-group list-group-numbered" id="recommendationsList"></ol>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    var analysis = {{ .AnalysisJSON }};
+  </script>
+  <script>
+    (function($) {
+      function formatNumber(value, decimals) {
+        if (value === null || value === undefined || isNaN(value)) {
+          return '—';
+        }
+        return Number(value).toFixed(decimals);
+      }
+
+      function createNumericCell(value, decimals) {
+        var display = formatNumber(value, decimals);
+        var $td = $('<td></td>').text(display);
+        if (!isNaN(value)) {
+          $td.attr('data-value', value);
+        }
+        return $td;
+      }
+
+      function updateSortIcons($header, direction) {
+				$header.closest('tr').find('.sort').each(function() {
+					$(this)[0].innerHTML = 'import_export'
+				});
+
+        if (direction === 'asc') {
+					$header.find('.sort')[0].innerHTML = 'keyboard_double_arrow_up'
+        } else if (direction === 'desc') {
+          $header.find('.sort')[0].innerHTML = 'keyboard_double_arrow_down'
+        }
+      }
+
+      function populateTable(models) {
+        var $tbody = $('#modelsTable tbody').empty();
+        models.forEach(function(model) {
+          var $row = $('<tr></tr>');
+          $row.append($('<td><span class="material-icons-two-tone">smart_toy</span> '+model.modelName+'</td>'))
+          $row.append(createNumericCell(model.avg.tokensPerSecond, 2));
+          $row.append(createNumericCell(model.avg.timeToFirstTokenSeconds, 2));
+          $row.append(createNumericCell(model.avg.totalExecutionTimeSeconds, 2));
+          $row.append(createNumericCell(model.avg.outputTokens, 1));
+          $row.append(createNumericCell(model.scores.throughputScore, 1));
+          $row.append(createNumericCell(model.scores.latencyScore, 1));
+          $row.append(createNumericCell(model.scores.efficiencyScore, 1));
+          $row.append($('<td></td>').text(model.labels.relativeSpeedTier || '—'));
+          $row.append($('<td></td>').text(model.labels.interactiveSuitability || '—'));
+          $tbody.append($row);
+        });
+      }
+
+      function buildAccordion(models) {
+        var $accordion = $('#modelAccordion').empty();
+        models.forEach(function(model, index) {
+          var collapseID = 'model-details-' + index;
+          var headerID = 'heading-' + index;
+          var $item = $('<div class="accordion-item"></div>');
+          var badges = '';
+          if (model.labels.relativeSpeedTier) {
+            badges += '<span class="badge bg-primary text-uppercase">' + model.labels.relativeSpeedTier + '</span>';
+          }
+          if (model.labels.interactiveSuitability) {
+            var badgeClass = 'bg-success';
+            if (model.labels.interactiveSuitability === 'borderline') {
+              badgeClass = 'bg-warning text-dark';
+            } else if (model.labels.interactiveSuitability === 'unusable') {
+              badgeClass = 'bg-danger';
+            }
+            badges += '<span class="badge ' + badgeClass + ' text-uppercase">' + model.labels.interactiveSuitability + '</span>';
+          }
+          var header = ''
+            + '<h2 class="accordion-header" id="' + headerID + '">'
+            + '<button class="accordion-button ' + (index !== 0 ? 'collapsed' : '') + '" type="button" data-bs-toggle="collapse"'
+            + ' data-bs-target="#' + collapseID + '" aria-expanded="' + (index === 0 ? 'true' : 'false') + '"'
+            + ' aria-controls="' + collapseID + '">'
+            + model.modelName + ' ' + badges
+            + '</button>'
+            + '</h2>';
+          var notes = (model.notes || []).map(function(note) {
+            return '<li>' + note + '</li>';
+          }).join('');
+          if (!notes) {
+            notes = '<li>No significant notes for this model.</li>';
+          }
+          var bodyParts = [];
+          bodyParts.push('<div id="' + collapseID + '" class="accordion-collapse collapse ' + (index === 0 ? 'show' : '') + '" aria-labelledby="' + headerID + '" data-bs-parent="#modelAccordion">');
+          bodyParts.push('<div class="accordion-body"><div class="row g-3">');
+          bodyParts.push('<div class="col-md-6">');
+          bodyParts.push('<h6>Average Stats</h6><ul class="list-unstyled mb-3">');
+          bodyParts.push('<li><strong>Tokens/sec:</strong> ' + formatNumber(model.avg.tokensPerSecond, 2) + '</li>');
+          bodyParts.push('<li><strong>TTFT (s):</strong> ' + formatNumber(model.avg.timeToFirstTokenSeconds, 2) + '</li>');
+          bodyParts.push('<li><strong>Total (s):</strong> ' + formatNumber(model.avg.totalExecutionTimeSeconds, 2) + '</li>');
+          bodyParts.push('<li><strong>Output tokens:</strong> ' + formatNumber(model.avg.outputTokens, 1) + '</li>');
+          bodyParts.push('</ul><h6>Variance</h6><ul class="list-unstyled mb-3">');
+          bodyParts.push('<li><strong>TPS σ:</strong> ' + formatNumber(model.variance.tokensPerSecondStdDev, 2) + '</li>');
+          bodyParts.push('<li><strong>TTFT σ (s):</strong> ' + formatNumber(model.variance.timeToFirstTokenStdDevSeconds, 2) + '</li>');
+          bodyParts.push('<li><strong>Output σ:</strong> ' + formatNumber(model.variance.outputTokensStdDev, 2) + '</li>');
+          bodyParts.push('</ul></div>');
+          bodyParts.push('<div class="col-md-6">');
+          bodyParts.push('<h6>Extremes</h6><ul class="list-unstyled mb-3">');
+          bodyParts.push('<li><strong>Min TPS:</strong> ' + formatNumber(model.min.tokensPerSecond, 2) + '</li>');
+          bodyParts.push('<li><strong>Max TPS:</strong> ' + formatNumber(model.max.tokensPerSecond, 2) + '</li>');
+          bodyParts.push('<li><strong>Min TTFT (s):</strong> ' + formatNumber(model.min.timeToFirstTokenSeconds, 2) + '</li>');
+          bodyParts.push('<li><strong>Max TTFT (s):</strong> ' + formatNumber(model.max.timeToFirstTokenSeconds, 2) + '</li>');
+          bodyParts.push('</ul><h6>Ratios &amp; Notes</h6><ul class="list-unstyled mb-3">');
+          bodyParts.push('<li><strong>Latency share:</strong> ' + formatNumber((model.derivedRatios.latencyShareOfTotal || 0) * 100, 1) + '%</li>');
+          bodyParts.push('<li><strong>Relative to fastest:</strong> ' + formatNumber((model.derivedRatios.relativeToFastest || 0) * 100, 1) + '%</li>');
+          bodyParts.push('</ul><ul class="notes-list">' + notes + '</ul>');
+          bodyParts.push('</div></div></div></div>');
+          var body = bodyParts.join('');
+          $item.append(header);
+          $item.append(body);
+          $accordion.append($item);
+        });
+      }
+
+      function populateAnomalies(anomalies) {
+        var $container = $('#anomaliesList').empty();
+        if (!anomalies || anomalies.length === 0) {
+          $container.append('<div class="list-group-item text-muted">No anomalies detected.</div>');
+          return;
+        }
+        anomalies.forEach(function(anomaly) {
+          var badgeClass = 'bg-secondary';
+          if (anomaly.severity === 'warning') {
+            badgeClass = 'bg-warning text-dark';
+          } else if (anomaly.severity === 'critical') {
+            badgeClass = 'bg-danger';
+          }
+          var item = ''
+            + '<div class="list-group-item">'
+            + '<div>'
+            + '<span class="badge ' + badgeClass + ' text-uppercase me-2">' + (anomaly.severity || 'info') + '</span>'
+            + '<strong>' + (anomaly.modelName || '—') + '</strong>'
+            + '</div>'
+            + '<p class="mb-0 small">' + (anomaly.message || '') + '</p>'
+            + '</div>';
+          $container.append(item);
+        });
+      }
+
+      function populateRecommendations(recommendations) {
+        var $list = $('#recommendationsList').empty();
+        if (!recommendations || recommendations.length === 0) {
+          $list.append('<li class="list-group-item">No recommendations generated.</li>');
+          return;
+        }
+        recommendations.forEach(function(rec) {
+          $list.append('<li class="list-group-item">' + rec + '</li>');
+        });
+      }
+
+      function attachSorting() {
+        $('#modelsTable thead th.sortable').each(function(index) {
+          var direction = 'none';
+          $(this).on('click', function() {
+            var type = $(this).data('type');
+            direction = direction === 'asc' ? 'desc' : 'asc';
+            sortTable(index, type, direction);
+            updateSortIcons($(this), direction);
+          });
+        });
+      }
+
+      function sortTable(columnIndex, type, direction) {
+        var $tbody = $('#modelsTable tbody');
+        var rows = $tbody.find('tr').get();
+        rows.sort(function(a, b) {
+          var A = $(a).children().eq(columnIndex).text();
+          var B = $(b).children().eq(columnIndex).text();
+          if (type === 'number') {
+            A = parseFloat($(a).children().eq(columnIndex).attr('data-value')) || 0;
+            B = parseFloat($(b).children().eq(columnIndex).attr('data-value')) || 0;
+          }
+          if (A < B) {
+            return direction === 'asc' ? -1 : 1;
+          }
+          if (A > B) {
+            return direction === 'asc' ? 1 : -1;
+          }
+          return 0;
+        });
+        $.each(rows, function(_, row) {
+          $tbody.append(row);
+        });
+      }
+
+      $(function() {
+        if (!analysis) {
+          return;
+        }
+        var generatedAt = analysis.generatedAt ? new Date(analysis.generatedAt) : null;
+        if (generatedAt) {
+          $('#generatedAt').text(generatedAt.toLocaleString());
+        }
+
+        var summary = analysis.overall || {};
+        $('#fastestModel').text(summary.fastestModel || '—');
+        $('#bestLatencyModel').text(summary.bestLatencyModel || '—');
+        $('#mostEfficientModel').text(summary.mostEfficientModel || '—');
+
+        var models = analysis.models || [];
+        var interactiveCount = models.filter(function(model) {
+          return model.labels && model.labels.interactiveSuitability === 'good';
+        }).length;
+        $('#interactiveCount').text(interactiveCount);
+
+        populateTable(models);
+        attachSorting();
+        buildAccordion(models);
+        populateAnomalies(analysis.anomalies || []);
+        populateRecommendations(analysis.recommendations || []);
+      });
+    })(jQuery);
+  </script>
+</body>
+</html>`
