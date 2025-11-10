@@ -17,6 +17,8 @@
 
 Overall, `agon` was created to efficiently evaluate different scenarios with small LLMs and try to better understand how to make small LLMs work for various home lab projects.
 
+## Requirements
+You'll need to setup and have 1-4 Ollama endpoints available.
 
 ## Table of Contents
 
