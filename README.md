@@ -1,6 +1,6 @@
 # agon
 
-![gollama](.screens/gollama.png)
+![gollama](.screens/agon_gollama.png)
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/mwiater/agon@v0.2.0.svg)](https://pkg.go.dev/github.com/mwiater/agon@v0.2.0)
 
@@ -22,6 +22,7 @@ You'll need to setup and have 1-4 Ollama endpoints available.
 
 ## Table of Contents
 
+*   [Example Setup](#example-setup)
 *   [Introduction & Features](#introduction--features)
 *   [Installation](#installation)
 *   [Configuration](#configuration)
@@ -32,6 +33,53 @@ You'll need to setup and have 1-4 Ollama endpoints available.
 *   [Building from Source](#building-from-source)
 *   [Testing](#testing)
 *   [License](#license)
+
+## Example Setup
+
+I had an unused cluster of 4 Udoo x86 Ultra SBCs. I was curious about experimenting with non-GPU hardware to run inferences in my home network. Since speed is not an option in this setup, these nodes are specifically for generating data in the background throughout the day. For example:
+
+* Random data for fuzz tests
+* Fetch and evaluate the current weather and traffic via an MCP server for my home dashboard
+* Generate -> Format -> Expand -> Validate data in a pipeline of models
+
+I have several models availble on each of my 4 Ollama nodes
+```
+Ollama01:
+  >>>  embeddinggemma:300m
+  >>>  qwen3:1.7b
+  >>>  smollm2:1.7b
+  >>>  smollm2:360m
+  >>>  phi4mini:3.8b
+  >>>  llama3.2:1b
+  >>>  granite3.1moe:1b
+  >>>  deepseekr1:1.5b
+  >>>  gemma3:1b
+  >>>  granite3.1moe:3b
+  >>>  granite4:micro
+  >>>  granite4:1b
+  >>>  granite4:350m
+  >>>  llama3.2:3b
+
+Ollama02:
+  >>>  embeddinggemma:300m
+  >>>  qwen3:1.7b
+  >>>  smollm2:1.7b
+  >>>  smollm2:360m
+  >>>  phi4mini:3.8b
+  >>>  llama3.2:1b
+  >>>  granite3.1moe:1b
+  >>>  deepseekr1:1.5b
+  >>>  granite3.1moe:3b
+  >>>  gemma3:1b
+  >>>  granite4:1b
+  >>>  granite4:micro
+  >>>  granite4:350m
+  >>>  llama3.2:3b
+
+...
+
+```
+
 
 ## Introduction & Features
 
@@ -121,35 +169,45 @@ For example configurations, see the `config/` directory. Each file demonstrates 
 *   `config.example.PipelineMode.json`: An example of how to set up Pipeline mode.
 *   `config.example.SystemPromptLength.json`: An example of how to set up a system prompt with a specific length.
 
+## Model / Host Selection
+
+![Model Selection](.screens/agon_multimodelMode_model_selection.gif)
+
 ## Operating Modes
 
 ### Single-Model Mode
 
 This is the standard, default mode for `agon`, providing a classic, one-on-one chat session with a single language model. It works by having you first select a host and then a model to interact with. The user interface is a clean, scrollable conversation history, focusing on a direct and uninterrupted dialogue. This mode differs from others by its simplicity and focus on a single line of conversation, whereas Multimodel and Pipeline modes orchestrate multiple models. It is most useful for direct, focused tasks, creative writing, or any scenario where you want a traditional chatbot experience without the complexity of multiple models. Single-Model mode can be combined with both `JSONMode` to enforce structured output and `MCPMode` to enable tool use.
 
-![Singlechat Mode](.screens/singlechat_01.png)
+![Singlechat Mode](.screens/agon_singlemodelMode_01.png)
 
 ### Multimodel Mode
 
 Multimodel mode is a powerful feature for comparative analysis, allowing you to chat with up to four different language models simultaneously in a side-by-side interface. When you send a prompt, it is dispatched to all assigned models at the same time, and their responses are streamed back into their respective columns. This parallel processing is the key differentiator from Pipeline mode, which is sequential. This mode is incredibly useful for comparing the performance, tone, or factual accuracy of different models, A/B testing various system prompts with the same model, or observing how different parameters affect a model's output. Multimodel mode is mutually exclusive with Pipeline mode but can be run in conjunction with `JSONMode` and `MCPMode`.
 
-![Multichat Mode](.screens/multichat_01.png)
+![Multichat Mode](.screens/agon_multimodelMode_01.png)
 
 ### Pipeline Mode
 
 Pipeline mode is designed for complex, multi-step workflows by chaining up to four models together in a sequence. In this mode, the output from one model (a "stage") is automatically passed as the input to the next, allowing you to build sophisticated processing chains. For example, you could use the first stage to brainstorm ideas, the second to structure them into an outline, the third to write content, and the fourth to proofread it. This sequential execution is the primary difference from Multimodel mode's parallel nature. It is most useful for tasks that can be broken down into discrete steps, such as data transformation, progressive summarization, or creative writing where each stage builds upon the last. Pipeline mode is mutually exclusive with Multimodel mode but can be combined with `JSONMode` and `MCPMode`.
 
-### Benchmark Mode
-
-Benchmark mode is a new feature that allows you to run a suite of benchmarks against a model to evaluate its performance. To use benchmark mode, you must first create a benchmark configuration file. See the `benchmark/` directory for examples.
+![Multichat Mode](.screens/agon_pipelineMode_01.png)
 
 ### JSON Mode
 
 JSON mode is a constraint that can be applied to any of the other operating modes to force the language model to return its response in a valid JSON format. It works by adding a `format: json` parameter to the underlying Ollama API request. This differs from other modes as it doesn't change the user interface or workflow but rather dictates the structure of the model's output. This is extremely useful for any task that requires structured data, such as data extraction, classification, or when the output of `agon` is intended to be consumed by another program or script that expects a predictable JSON structure. It can be enabled alongside Single-Model, Multimodel, Pipeline, and MCP modes.
 
+![Multichat Mode](.screens/agon_jsonMode_01.png)
+
 ### MCP (Multi-Chat Provider) Mode
 
 MCP mode is an advanced feature that enables language models to use external tools by proxying requests through a local `agon-mcp` server process. When enabled, `agon` starts and manages this server in the background. If the language model determines that a user's request can be fulfilled by one of the available tools (like fetching the current weather), it can issue a `tool_calls` request. `agon` intercepts this, executes the tool via the MCP server, and feeds the result back to the model to formulate a final answer. This mode is not a distinct UI but rather a capability that enhances other modes by giving them access to real-time information or other external actions. It is useful for breaking the model out of its static knowledge base and allowing it to interact with the outside world. MCP mode can be used in combination with Single-Model, Multimodel, and Pipeline modes, as well as `JSONMode`.
+
+![Multichat Mode](.screens/agon_mcpMode_01.png)
+
+### Benchmark Mode
+
+Benchmark mode is a new feature that allows you to run a suite of benchmarks against a model to evaluate its performance. To use benchmark mode, you must first create a benchmark configuration file. See the `benchmark/` directory for examples.
 
 ## CLI Commands
 
