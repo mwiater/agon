@@ -205,7 +205,22 @@ MCP mode is an advanced feature that enables language models to use external too
 
 ### Benchmark Mode
 
-_(IN PROGRESS)_ Benchmark mode is a new feature that allows you to run a suite of benchmarks against a model to evaluate its performance. To use benchmark mode, you must first create a benchmark configuration file. See the `benchmark/` directory for examples.
+Benchmark mode is a feature that allows you to run a common user prompt against models in parallel for n iteration. For this to run, your configuration file **must only have one model per host.** There is no UI with this mode, it is just meant to repeat the same requests against models several times in order to get a more complete average response time. If you have one model assigned to each host, it will run the benchmark requests against those models automatically. See the `config/config.example.BenchmarkMode.json` example.
+
+Benchmark mode uses the following definitions:
+
+```
+  "benchmarkMode": true,
+  "benchmarkCount": 10,
+```
+
+## Metrics
+
+If `metrics: true` in a config file you run, all response metrics are aggregated and saved in: `reports/data/model_performance_metrics.json`. This way, over time, as you use the tool, model metrics are caprtured under different sceanrios, hopefully giving some long-term insights on models over time. I have `metrics: true` in all of my configs in order to collect this data over time for a different perspective on model metrics.
+
+You can run: `agon analyze metrics` which will output a standalone html file (`reports/metrics-report.html`) containing model metric details, comparison leaderboard, and recommendations:
+
+![Multichat Mode](.screens/agon_benchmark_report.png)
 
 ## CLI Commands
 
@@ -270,11 +285,26 @@ Starts the main interactive chat UI. The UI mode is determined by the configurat
     {
       "hosts": [
         {
-          "name": "Local Llama",
-          "url": "http://localhost:11434",
+          "name": "Ollama01",
+          "url": "http://192.168.0.101:11434",
           "type": "ollama",
           "models": [
-            "llama3.2:3b"
+            "qwen3:1.7b",
+            "llama3.2:1b",
+            "smollm2:1.7b",
+            "granite3.1moe:1b"
+          ],
+          "systemprompt": "You are a helpful and concise assistant."
+        },
+        {
+          "name": "Ollama02",
+          "url": "http://192.168.0.102:11434",
+          "type": "ollama",
+          "models": [
+            "qwen3:1.7b",
+            "llama3.2:1b",
+            "smollm2:1.7b",
+            "granite3.1moe:1b"
           ],
           "systemprompt": "You are a helpful and concise assistant."
         }
@@ -296,13 +326,28 @@ Starts the main interactive chat UI. The UI mode is determined by the configurat
     {
       "hosts": [
         {
-          "name": "Local Llama",
-          "url": "http://localhost:11434",
+          "name": "Ollama01",
+          "url": "http://192.168.0.101:11434",
           "type": "ollama",
           "models": [
-            "llama3.2:3b",
-            "gemma3:270m"
-          ]
+            "qwen3:1.7b",
+            "llama3.2:1b",
+            "smollm2:1.7b",
+            "granite3.1moe:1b"
+          ],
+          "systemprompt": "You are a helpful and concise assistant."
+        },
+        {
+          "name": "Ollama02",
+          "url": "http://192.168.0.102:11434",
+          "type": "ollama",
+          "models": [
+            "qwen3:1.7b",
+            "llama3.2:1b",
+            "smollm2:1.7b",
+            "granite3.1moe:1b"
+          ],
+          "systemprompt": "You are a helpful and concise assistant."
         }
       ],
       "multimodelMode": true
@@ -323,12 +368,28 @@ Starts the main interactive chat UI. The UI mode is determined by the configurat
     {
       "hosts": [
         {
-          "name": "Local Llama",
-          "url": "http://localhost:11434",
+          "name": "Ollama01",
+          "url": "http://192.168.0.101:11434",
           "type": "ollama",
           "models": [
-            "llama3.2:3b"
-          ]
+            "qwen3:1.7b",
+            "llama3.2:1b",
+            "smollm2:1.7b",
+            "granite3.1moe:1b"
+          ],
+          "systemprompt": "You are a helpful and concise assistant."
+        },
+        {
+          "name": "Ollama02",
+          "url": "http://192.168.0.102:11434",
+          "type": "ollama",
+          "models": [
+            "qwen3:1.7b",
+            "llama3.2:1b",
+            "smollm2:1.7b",
+            "granite3.1moe:1b"
+          ],
+          "systemprompt": "You are a helpful and concise assistant."
         }
       ],
       "jsonMode": true
@@ -349,12 +410,28 @@ Starts the main interactive chat UI. The UI mode is determined by the configurat
     {
       "hosts": [
         {
-          "name": "Local Llama",
-          "url": "http://localhost:11434",
+          "name": "Ollama01",
+          "url": "http://192.168.0.101:11434",
           "type": "ollama",
           "models": [
-            "llama3.2:3b"
-          ]
+            "qwen3:1.7b",
+            "llama3.2:1b",
+            "smollm2:1.7b",
+            "granite3.1moe:1b"
+          ],
+          "systemprompt": "You are a helpful and concise assistant."
+        },
+        {
+          "name": "Ollama02",
+          "url": "http://192.168.0.102:11434",
+          "type": "ollama",
+          "models": [
+            "qwen3:1.7b",
+            "llama3.2:1b",
+            "smollm2:1.7b",
+            "granite3.1moe:1b"
+          ],
+          "systemprompt": "You are a helpful and concise assistant."
         }
       ],
       "mcpMode": true
@@ -408,7 +485,14 @@ goreleaser release --snapshot --clean --skip=publish
 *   `--clean`: Ensures the `dist/` directory is cleared of old artifacts.
 *   `--skip=publish`: Prevents any attempt to publish the release to GitHub.
 
-The binaries will be placed in the `dist/` directory, organized by architecture.
+The binaries will be placed in the `dist/` directory, organized by architecture, e.g.:
+
+```
+dist/agon_linux_amd64_v1/agon
+dist/agon_windows_amd64_v1/agon.exe
+dist/agon-mcp_linux_amd64_v1/agon-mcp
+dist/agon-mcp_windows_amd64_v1/agon-mcp.exe
+```
 
 ## Testing
 

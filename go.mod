@@ -6,7 +6,6 @@ require (
 	github.com/charmbracelet/bubbles v0.21.0
 	github.com/charmbracelet/bubbletea v1.3.6
 	github.com/charmbracelet/lipgloss v1.1.0
-	github.com/fatih/color v1.18.0
 	github.com/k0kubun/pp v3.0.1+incompatible
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/viper v1.21.0

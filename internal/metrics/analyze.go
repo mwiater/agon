@@ -354,7 +354,7 @@ func GenerateReport(analysis Analysis) (string, error) {
 	}
 
 	viewModel := ReportTemplateData{
-		Title:        "LLM Benchmark Report",
+		Title:        "agon: LLM Benchmark Report",
 		AnalysisJSON: template.JS(data),
 	}
 
