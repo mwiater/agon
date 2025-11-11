@@ -2,7 +2,7 @@
 
 ![gollama](.screens/agon_gollama.png)
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/mwiater/agon@v0.2.0.svg)](https://pkg.go.dev/github.com/mwiater/agon@v0.2.0)
+[![Go Reference](https://pkg.go.dev/badge/github.com/mwiater/agon@v0.2.1.svg)](https://pkg.go.dev/github.com/mwiater/agon@v0.2.1)
 
 > **Note:** This is a personal project. I will do my best to keep the main branch functional and up to date with the time I have available.
 
@@ -29,7 +29,7 @@ You'll need to setup and have 1-4 Ollama endpoints available.
 *   [Operating Modes](#operating-modes)
 *   [CLI Commands](#cli-commands)
 *   [Examples](#examples)
-*   [MCP (Multi-Chat Provider) Mode](#mcp-multi-chat-provider-mode)
+*   [MCPMode](#mcpmode)
 *   [Building from Source](#building-from-source)
 *   [Testing](#testing)
 *   [License](#license)
@@ -42,7 +42,8 @@ I had an unused cluster of 4 Udoo x86 Ultra SBCs. I was curious about experiment
 * Fetch and evaluate the current weather and traffic via an MCP server for my home dashboard
 * Generate -> Format -> Expand -> Validate data in a pipeline of models
 
-I have several models availble on each of my 4 Ollama nodes
+I have several models availble on each of my 4 Ollama nodes: `agon list models`
+
 ```
 Ollama01:
   >>>  embeddinggemma:300m
@@ -80,6 +81,10 @@ Ollama02:
 
 ```
 
+These become the host/models to select from when running a chat in `multimidelMode`:
+
+![Model Selection](.screens/agon_multimodelMode_model_selection.gif)
+
 
 ## Introduction & Features
 
@@ -88,7 +93,7 @@ Ollama02:
 *   **Multimodel Chat Mode**: Compare up to four models side-by-side in a single chat interface to evaluate their responses to the same prompt.
 *   **Pipeline Mode**: Chain up to four models together in a sequence, where the output of one stage becomes the input for the next.
 *   **Benchmark Mode**: Run a suite of benchmarks against a model to evaluate its performance.
-*   **MCP (Multi-Chat Provider) Mode**: Enables advanced functionality like tool usage by proxying requests through a local `agon-mcp` server.
+*   **MCPMode**: Enables advanced functionality like tool usage by proxying requests through a local `agon-mcp` server.
 *   **Comprehensive Model Management**: A suite of commands to `list`, `pull`, `delete`, `sync`, and `unload` models across all configured hosts.
 *   **Detailed Configuration**: Fine-tune model parameters, system prompts, and application behavior through a simple JSON configuration.
 *   **Debug & Performance Instrumentation**: Surface detailed timing and token metrics in the UI and log files to understand model performance.
@@ -152,7 +157,7 @@ Each object in the `hosts` array defines an Ollama instance:
 
 ### MCP Mode Settings
 
-*   `mcpMode`: (Boolean) If `true`, enables the Multi-Chat Provider mode.
+*   `mcpMode`: (Boolean) If `true`, enables the MCPmode.
 *   `mcpBinary`: (String) The path to the `agon-mcp` server binary (default: `dist/agon-mcp`).
 *   `mcpInitTimeout`: (Integer) Timeout in seconds for MCP server initialization.
 
@@ -160,18 +165,11 @@ Each object in the `hosts` array defines an Ollama instance:
 
 For example configurations, see the `config/` directory. Each file demonstrates a different mode or feature:
 
-*   `config.example.Authors.json`: An example of how to set up different author personas.
 *   `config.example.BenchmarkMode.json`: An example of how to set up Benchmark mode.
-*   `config.example.Facts.json`: An example of how to set up facts.
 *   `config.example.JSONMode.json`: An example of how to set up JSON mode.
 *   `config.example.MCPMode.json`: An example of how to set up MCP mode.
 *   `config.example.ModelParameters.json`: An example of how to set up model parameters.
 *   `config.example.PipelineMode.json`: An example of how to set up Pipeline mode.
-*   `config.example.SystemPromptLength.json`: An example of how to set up a system prompt with a specific length.
-
-## Model / Host Selection
-
-![Model Selection](.screens/agon_multimodelMode_model_selection.gif)
 
 ## Operating Modes
 
@@ -199,7 +197,7 @@ JSON mode is a constraint that can be applied to any of the other operating mode
 
 ![Multichat Mode](.screens/agon_jsonMode_01.png)
 
-### MCP (Multi-Chat Provider) Mode
+### MCPMode
 
 MCP mode is an advanced feature that enables language models to use external tools by proxying requests through a local `agon-mcp` server process. When enabled, `agon` starts and manages this server in the background. If the language model determines that a user's request can be fulfilled by one of the available tools (like fetching the current weather), it can issue a `tool_calls` request. `agon` intercepts this, executes the tool via the MCP server, and feeds the result back to the model to formulate a final answer. This mode is not a distinct UI but rather a capability that enhances other modes by giving them access to real-time information or other external actions. It is useful for breaking the model out of its static knowledge base and allowing it to interact with the outside world. MCP mode can be used in combination with Single-Model, Multimodel, and Pipeline modes, as well as `JSONMode`.
 
@@ -207,7 +205,7 @@ MCP mode is an advanced feature that enables language models to use external too
 
 ### Benchmark Mode
 
-Benchmark mode is a new feature that allows you to run a suite of benchmarks against a model to evaluate its performance. To use benchmark mode, you must first create a benchmark configuration file. See the `benchmark/` directory for examples.
+_(IN PROGRESS)_ Benchmark mode is a new feature that allows you to run a suite of benchmarks against a model to evaluate its performance. To use benchmark mode, you must first create a benchmark configuration file. See the `benchmark/` directory for examples.
 
 ## CLI Commands
 
@@ -376,7 +374,7 @@ When using `pipelineMode`, you can export the results of the pipeline to a JSON 
 *   `--export`: Path to a JSON file to export the results to.
 *   `--exportMarkdown`: Path to a Markdown file to export the results to.
 
-## MCP (Multi-Chat Provider) Mode
+## MCPMode
 
 MCP mode is an advanced feature that enables language models to use external tools by proxying requests through a local `agon-mcp` server process. When enabled, `agon` starts and manages this server in the background. If the language model determines that a user's request can be fulfilled by one of the available tools (like fetching the current weather), it can issue a `tool_calls` request. `agon` intercepts this, executes the tool via the MCP server, and feeds the result back to the model to formulate a final answer.
 
@@ -391,17 +389,12 @@ MCP mode is an advanced feature that enables language models to use external too
     }
     ```
 
-### Available Tools
+### Current Available MCP Tools for Testing
 
 *   `current_time`: Returns the current time.
 *   `current_weather`: Returns the current weather for a given location.
 
-## Building from Source
-
-### Prerequisites
-
-*   Go toolchain installed.
-*   [GoReleaser](https://goreleaser.com/install/) installed.
+## Building
 
 ### Build Command
 
