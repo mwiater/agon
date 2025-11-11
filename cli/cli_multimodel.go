@@ -302,10 +302,10 @@ func (m *multimodelModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							}
 						}
 						if combinedResponse.Len() > 0 {
-								m.chatHistory = append(m.chatHistory, chatMessage{
-										Role:    "assistant",
-										Content: combinedResponse.String(),
-									})
+							m.chatHistory = append(m.chatHistory, chatMessage{
+								Role:    "assistant",
+								Content: combinedResponse.String(),
+							})
 						}
 						break
 					}
@@ -558,7 +558,19 @@ func (m *multimodelModel) multimodelChatView() string {
 					if totalSecs > 0 {
 						tps = float64(meta.EvalCount) / totalSecs
 					}
-					stats = fmt.Sprintf("T/S: %.1f | Time: %.1fs", tps, totalSecs)
+
+					promptSecs := time.Duration(meta.PromptEvalDuration).Seconds()
+					evalSecs := time.Duration(meta.EvalDuration).Seconds()
+
+					stats = fmt.Sprintf(
+						"T/S: %.1f | Time: %.1fs\nTokens (IN): %d | %.1fs\nTokens (OUT): %d | %.1fs",
+						tps,
+						totalSecs,
+						int(meta.PromptEvalCount),
+						promptSecs,
+						int(meta.EvalCount),
+						evalSecs,
+					)
 				}
 			}
 			hostStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("62"))
