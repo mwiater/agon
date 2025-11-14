@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/mwiater/agon/cli"
+	"github.com/mwiater/agon/internal/metrics"
 	"github.com/spf13/cobra"
 )
 
@@ -25,6 +26,7 @@ var chatCmd = &cobra.Command{
 		ctx, cancel := context.WithCancel(context.Background())
 
 		cfg := GetConfig()
+		metrics.GetInstance().SetMetricsEnabled(true) // Enable metrics for chat mode
 		if cfg == nil {
 			startGUI(ctx, cfg, cancel)
 			return

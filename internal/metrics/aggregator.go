@@ -17,6 +17,7 @@ type Aggregator struct {
 	metrics  map[string]*ModelMetrics
 	filePath string
 	ticker   *time.Ticker
+	metricsEnabled bool
 }
 
 var (
@@ -37,16 +38,11 @@ func NewAggregator() *Aggregator {
 	agg := &Aggregator{
 		metrics:  make(map[string]*ModelMetrics),
 		filePath: "reports/data/model_performance_metrics.json",
+		metricsEnabled: false, // Metrics are disabled by default
 	}
 
+	// Ticker and periodic saving will be started by SetMetricsEnabled if needed.
 	agg.load()
-
-	agg.ticker = time.NewTicker(1 * time.Minute)
-	go func() {
-		for range agg.ticker.C {
-			agg.save()
-		}
-	}()
 
 	return agg
 }
@@ -71,9 +67,40 @@ func (a *Aggregator) load() {
 	}
 }
 
+// SetMetricsEnabled enables or disables metrics collection and periodic saving.
+func (a *Aggregator) SetMetricsEnabled(enabled bool) {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
+	if enabled == a.metricsEnabled {
+		return // No change needed
+	}
+
+	a.metricsEnabled = enabled
+
+	if enabled {
+		// Enable metrics: start ticker and periodic saving
+		a.ticker = time.NewTicker(1 * time.Minute)
+		go func() {
+			for range a.ticker.C {
+				a.save()
+			}
+		}()
+	} else {
+		// Disable metrics: stop ticker
+		if a.ticker != nil {
+			a.ticker.Stop()
+			a.ticker = nil
+		}
+	}
+}
+
 // save writes the current metrics from memory to the JSON file.
 func (a *Aggregator) save() {
-	logging.LogEvent("[METRICS] Saving metrics to %s", a.filePath)
+	if !a.metricsEnabled {
+		return
+	}
+	logging.LogMetricsEvent("[METRICS] Saving metrics to %s", a.filePath)
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
@@ -87,12 +114,17 @@ func (a *Aggregator) save() {
 		return
 	}
 
-	os.WriteFile(a.filePath, data, 0644)
+	if err := os.WriteFile(a.filePath, data, 0644); err != nil {
+		logging.LogMetricsEvent("[METRICS] Error saving metrics to %s: %v", a.filePath, err)
+	}
 }
 
 // Record updates the metrics for a given model with new data.
 func (a *Aggregator) Record(meta providers.StreamMetadata, ttft int64) {
-	logging.LogEvent("[METRICS] Record called for model %s", meta.Model)
+	if !a.metricsEnabled {
+		return
+	}
+	logging.LogMetricsEvent("[METRICS] Record called for model %s", meta.Model)
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
@@ -183,7 +215,9 @@ func getBucket(inputTokens int) string {
 
 // Close stops the ticker and saves the metrics.
 func (a *Aggregator) Close() {
-	a.ticker.Stop()
+	if a.ticker != nil {
+		a.ticker.Stop()
+	}
 	a.save()
 }
 

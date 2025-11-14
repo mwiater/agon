@@ -12,21 +12,21 @@ import (
 
 // Provider is a decorator that wraps a ChatProvider to record metrics.
 type Provider struct {
-	wrapped          providers.ChatProvider
-	aggregator       *Aggregator
-	startTime        time.Time
-	firstChunkTime   time.Time
+	wrapped        providers.ChatProvider
+	aggregator     *Aggregator
+	startTime      time.Time
+	firstChunkTime time.Time
 }
 
 // NewProvider creates a new metrics-enabled provider that wraps an existing ChatProvider.
 func NewProvider(wrapped providers.ChatProvider, aggregator *Aggregator) *Provider {
-	logging.LogEvent("[METRICS] Wrapping provider with metrics provider")
+	logging.LogMetricsEvent("[METRICS] Wrapping provider with metrics provider")
 	return &Provider{wrapped: wrapped, aggregator: aggregator}
 }
 
 // Stream intercepts the call to the wrapped provider's Stream method to record performance metrics.
 func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, callbacks providers.StreamCallbacks) error {
-	logging.LogEvent("[METRICS] Stream called on metrics provider for model %s", req.Model)
+	logging.LogMetricsEvent("[METRICS] Stream called on metrics provider for model %s", req.Model)
 	p.startTime = time.Now()
 	firstChunkReceived := false
 
@@ -42,7 +42,7 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 	}
 
 	onComplete := func(meta providers.StreamMetadata) error {
-		logging.LogEvent("[METRICS] onComplete called for model %s", meta.Model)
+		logging.LogMetricsEvent("[METRICS] onComplete called for model %s", meta.Model)
 		if p.aggregator != nil {
 			ttft := int64(0)
 			if firstChunkReceived {

@@ -27,23 +27,23 @@ const (
 
 // Config represents the top-level application configuration.
 type Config struct {
-	Hosts              []Host        `json:"hosts"`
-	Debug              bool          `json:"debug"`
-	MultimodelMode     bool          `json:"multimodelMode"`
-	PipelineMode       bool          `json:"pipelineMode"`
-	JSONMode           bool          `json:"jsonMode"`
-	MCPMode            bool          `json:"mcpMode"`
-	MCPBinary          string        `json:"mcpBinary,omitempty"`
-	MCPInitTimeout     int           `json:"mcpInitTimeout,omitempty"`
-	MCPRetryCount      int           `json:"mcpRetryCount,omitempty"`
-	TimeoutSeconds     int           `json:"timeout,omitempty"`
-	ExportPath         string        `json:"export,omitempty"`
-	ExportMarkdownPath string        `json:"exportMarkdown,omitempty"`
-	LogFile            string        `json:"logFile,omitempty"`
-	BenchmarkMode      bool          `json:"benchmarkMode"`
-	BenchmarkCount     int           `json:"benchmarkCount"`
-	Metrics            bool          `json:"metrics"`
-	ConfigPath         string        `json:"-"`
+	Hosts              []Host `json:"hosts"`
+	Debug              bool   `json:"debug"`
+	MultimodelMode     bool   `json:"multimodelMode"`
+	PipelineMode       bool   `json:"pipelineMode"`
+	JSONMode           bool   `json:"jsonMode"`
+	MCPMode            bool   `json:"mcpMode"`
+	MCPBinary          string `json:"mcpBinary,omitempty"`
+	MCPInitTimeout     int    `json:"mcpInitTimeout,omitempty"`
+	MCPRetryCount      int    `json:"mcpRetryCount,omitempty"`
+	TimeoutSeconds     int    `json:"timeout,omitempty"`
+	ExportPath         string `json:"export,omitempty"`
+	ExportMarkdownPath string `json:"exportMarkdown,omitempty"`
+	LogFile            string `json:"logFile,omitempty"`
+	BenchmarkMode      bool   `json:"benchmarkMode"`
+	BenchmarkCount     int    `json:"benchmarkCount"`
+	Metrics            bool   `json:"metrics"`
+	ConfigPath         string `json:"-"`
 }
 
 // Host represents a single host that can serve language models.

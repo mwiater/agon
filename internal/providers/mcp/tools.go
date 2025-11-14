@@ -163,11 +163,11 @@ func (p *Provider) callTool(ctx context.Context, host, model, name string, args 
 			"prompt":            interpretPart,
 		}
 		data, err := json.Marshal(env)
-			if err == nil {
-				return toolCallResponse{Output: string(data)}, nil
-			}
+		if err == nil {
+			return toolCallResponse{Output: string(data)}, nil
 		}
-		return toolCallResponse{Output: strings.Join(parts, "\n"), Retry: retryRequested}, nil
+	}
+	return toolCallResponse{Output: strings.Join(parts, "\n"), Retry: retryRequested}, nil
 }
 
 // fixWithLLMRoundTrip performs a one-off, non-streaming LLM request to correct and reissue a failing tool call.

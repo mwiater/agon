@@ -15,7 +15,7 @@ type BenchmarkResult struct {
 
 // IterationResult holds the statistics for a single benchmark iteration.
 type IterationResult struct {
-	Iteration int           `json:"iteration"`
+	Iteration int            `json:"iteration"`
 	Stats     IterationStats `json:"stats"`
 }
 

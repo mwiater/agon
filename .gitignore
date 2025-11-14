@@ -1,7 +1,5 @@
 .coverage/*
 agon.log
 dist/*
-internal/harness/*
-internal/cli/harness.go
-internal/cli/harness_run.go
 skunkworks/*
+TEST-IMPLEMENTAION.md

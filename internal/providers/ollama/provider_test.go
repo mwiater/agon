@@ -42,7 +42,7 @@ func TestProviderStreamDisableStreaming(t *testing.T) {
 		Host:             host,
 		Model:            "test-model",
 		DisableStreaming: true,
-		Tools: []providers.ToolDefinition{{ 
+		Tools: []providers.ToolDefinition{{
 			Name:        "weather",
 			Description: "fetches weather",
 		}},
@@ -79,12 +79,12 @@ func TestProviderStreamDisableStreaming(t *testing.T) {
 		t.Fatalf("expected stream=false, got %v", payload["stream"])
 	}
 
-tools, ok := payload["tools"].([]any)
+	tools, ok := payload["tools"].([]any)
 	if !ok || len(tools) != 1 {
 		t.Fatalf("expected tools in payload, got %T", payload["tools"])
 	}
 
-toolObj, ok := tools[0].(map[string]any)
+	toolObj, ok := tools[0].(map[string]any)
 	if !ok {
 		t.Fatalf("expected tool object to be map, got %T", tools[0])
 	}
@@ -351,7 +351,7 @@ func TestProviderStreamLegacyToolCallMarkup(t *testing.T) {
 	t.Parallel()
 
 	content := `<tool_call>[{"arguments":{"location":"Portland, OR"}}]</tool_call>`
-	tools := []providers.ToolDefinition{{ 
+	tools := []providers.ToolDefinition{{
 		Name:        "current_weather",
 		Description: "fetches weather",
 	}}
@@ -384,7 +384,7 @@ func TestProviderStreamLegacyToolCallSingleQuoteArgs(t *testing.T) {
 	t.Parallel()
 
 	content := `<tool_call>[{"function":"weather","parameters":"{ 'city': 'Portland', 'country': 'USA' }"}]</tool_call>`
-	tools := []providers.ToolDefinition{{ 
+	tools := []providers.ToolDefinition{{
 		Name:        "current_weather",
 		Description: "fetches weather",
 	}}
@@ -418,7 +418,7 @@ func TestParseLegacyToolCallMarkupBareArguments(t *testing.T) {
 	t.Parallel()
 
 	content := `<tool_call>[{"arguments":{"none"},"name":"get_time"}]</tool_call>`
-	tools := []providers.ToolDefinition{{ 
+	tools := []providers.ToolDefinition{{
 		Name:        "current_time",
 		Description: "reports time",
 		Parameters:  map[string]any{"type": "object"},
@@ -450,7 +450,7 @@ func TestParseLegacyToolCallMarkupDuplicateArguments(t *testing.T) {
 	t.Parallel()
 
 	content := `<tool_call>[{"arguments":{"none"},"name":"datetime","arguments":{"none"}}]</tool_call>`
-	tools := []providers.ToolDefinition{{ 
+	tools := []providers.ToolDefinition{{
 		Name:        "current_time",
 		Description: "reports time",
 		Parameters:  map[string]any{"type": "object"},
@@ -482,7 +482,7 @@ func TestParseLegacyToolCallMarkupTrailingBrace(t *testing.T) {
 	t.Parallel()
 
 	content := `<tool_call>[{"arguments":{"none"},"name":"None"}}]</tool_call>`
-	tools := []providers.ToolDefinition{{ 
+	tools := []providers.ToolDefinition{{
 		Name:        "current_time",
 		Description: "reports time",
 		Parameters:  map[string]any{"type": "object"},

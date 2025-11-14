@@ -75,6 +75,19 @@ func LogEvent(format string, args ...any) {
 	log.Println(msg)
 }
 
+// LogMetricsEvent logs a metrics-specific event message only to the log file, if configured.
+func LogMetricsEvent(format string, args ...any) {
+	mu.Lock()
+	defer mu.Unlock()
+	if logFile != nil {
+		msg := fmt.Sprintf(format, args...)
+		// Use a new logger that writes directly to logFile, bypassing the global log.SetOutput
+		// This ensures metrics logs only go to the file and not potentially to stdout/stderr
+		metricsLogger := log.New(logFile, "", log.LstdFlags)
+		metricsLogger.Println(msg)
+	}
+}
+
 // LogRequest logs a request/response message with structured data.
 func LogRequest(direction, host, model, tool string, payload any) {
 	msg := buildRequestMessage(direction, host, model, tool, payload)

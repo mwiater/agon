@@ -251,9 +251,9 @@ type pipelineModel struct {
 	selectingModel bool
 	selectedStage  int
 
-	width, height      int
-	program            *tea.Program
-	requestStartTime   time.Time
+	width, height    int
+	program          *tea.Program
+	requestStartTime time.Time
 
 	statusBanner  string
 	runInProgress bool
@@ -299,9 +299,9 @@ func initialPipelineModel(ctx context.Context, cfg *Config, provider providers.C
 			index:  i,
 			view:   pipelineStageViewOutput,
 			status: pipelineStageStatusUnassigned,
-		handoff: pipelineHandoff{
-			mode: pipelineHandoffRaw,
-		},
+			handoff: pipelineHandoff{
+				mode: pipelineHandoffRaw,
+			},
 		}
 	}
 
@@ -328,15 +328,15 @@ func initialPipelineModel(ctx context.Context, cfg *Config, provider providers.C
 		spinner:            s,
 		textArea:           ta,
 		viewport:           vp,
-	hostList:           hostList,
-	modelList:          modelList,
-	selectedStage:      0,
-	overlayStageIndex:  -1,
-	memoCache:          make(map[string]pipelineCacheEntry),
-	exportPath:         cfg.ExportPath,
-	exportMarkdownPath: cfg.ExportMarkdownPath,
-	nextHostIndex:      0,
-	defaultModelByHost: make(map[string]string),
+		hostList:           hostList,
+		modelList:          modelList,
+		selectedStage:      0,
+		overlayStageIndex:  -1,
+		memoCache:          make(map[string]pipelineCacheEntry),
+		exportPath:         cfg.ExportPath,
+		exportMarkdownPath: cfg.ExportMarkdownPath,
+		nextHostIndex:      0,
+		defaultModelByHost: make(map[string]string),
 	}
 }
 
@@ -479,7 +479,7 @@ func (m *pipelineModel) updateAssignment(msg tea.Msg) tea.Cmd {
 							}
 						}
 						m.modelList.Select(sel)
-						}
+					}
 					m.selectingHost = false
 					m.selectingModel = len(modelItems) > 0
 				}

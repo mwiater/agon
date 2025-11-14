@@ -271,8 +271,12 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 			}
 		}
 		if callbacks.OnComplete != nil {
+			modelName := result.Model
+			if modelName == "" {
+				modelName = req.Model
+			}
 			meta := providers.StreamMetadata{
-				Model:              result.Model,
+				Model:              modelName,
 				CreatedAt:          time.Now(),
 				Done:               true,
 				TotalDuration:      result.TotalDuration,
@@ -316,8 +320,12 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 	}
 
 	if callbacks.OnComplete != nil {
+		modelName := final.Model
+		if modelName == "" {
+			modelName = req.Model
+		}
 		meta := providers.StreamMetadata{
-			Model:              final.Model,
+			Model:              modelName,
 			CreatedAt:          time.Now(),
 			Done:               final.Done,
 			TotalDuration:      final.TotalDuration,

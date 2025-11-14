@@ -4,6 +4,7 @@ package models
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -259,5 +260,71 @@ func ListModelParameters(config *appconfig.Config) {
 			fmt.Printf("      min_p: %s\n", settings["min_p"])
 		}
 		fmt.Println()
+	}
+}
+
+func ShowModelInfo(config *appconfig.Config) {
+	hosts := createHosts(*config)
+	var wg sync.WaitGroup
+
+	allModels := make(map[string]struct{})
+
+	var mu sync.Mutex
+
+	messagesChan := make(chan string, len(hosts))
+
+	for _, host := range hosts {
+		wg.Add(1)
+		go func(h LLMHost) {
+			defer wg.Done()
+			if h.GetType() != "ollama" {
+				messagesChan <- fmt.Sprintf("Skipping %s: Not an 'ollama' host type (%s)", h.GetName(), h.GetType())
+				return
+			}
+
+			modelParams, err := h.GetModelParameters()
+			if err != nil {
+				fmt.Println("Error fetching model parameters from ", h.GetName(), ": ", err)
+				os.Exit(1)
+			}
+
+			pp.Println(modelParams)
+
+			messagesChan <- fmt.Sprintf("Fetching models from %s...", h.GetName())
+			models, err := h.ListRawModels()
+			if err != nil {
+				messagesChan <- fmt.Sprintf("Error from %s: %v", h.GetName(), err)
+				return
+			}
+
+			mu.Lock()
+			for _, model := range models {
+				allModels[model] = struct{}{}
+			}
+			mu.Unlock()
+
+		}(host)
+	}
+
+	go func() {
+		wg.Wait()
+		close(messagesChan)
+	}()
+
+	fmt.Println("--- Host Status & Errors ---")
+	for msg := range messagesChan {
+		fmt.Println(msg)
+	}
+	fmt.Println("----------------------------")
+
+	uniqueModels := make([]string, 0, len(allModels))
+	for modelName := range allModels {
+		uniqueModels = append(uniqueModels, modelName)
+	}
+
+	sort.Strings(uniqueModels)
+
+	for _, modelName := range uniqueModels {
+		pp.Println(modelName)
 	}
 }
