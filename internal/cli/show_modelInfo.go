@@ -3,7 +3,8 @@
 package agon
 
 import (
-	"github.com/mwiater/agon/internal/models"
+	"fmt"
+
 	"github.com/spf13/cobra"
 )
 
@@ -13,7 +14,8 @@ var showModelInfoCmd = &cobra.Command{
 	Short: "Show model detailed information from the configuration file",
 	Long:  `Show model detailed information from the configuration file`,
 	Run: func(cmd *cobra.Command, args []string) {
-		models.ShowModelInfo(GetConfig())
+		fmt.Println("This command is under construction!")
+		//models.ShowModelInfo(GetConfig())
 	},
 }
 
