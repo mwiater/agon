@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -202,7 +203,7 @@ func writeResults(results map[string]*BenchmarkResult, benchmarkCount int) error
 		modelNames = append(modelNames, name)
 	}
 
-	fileName := fmt.Sprintf("benchmark/benchmarks/%s-%d.json", strings.Join(modelNames, "-"), benchmarkCount)
+	fileName := fmt.Sprintf("benchmark/benchmarks/%s-%d.json", Slugify(strings.Join(modelNames, "-")), benchmarkCount)
 
 	file, err := os.Create(fileName)
 	if err != nil {
@@ -219,4 +220,17 @@ func writeResults(results map[string]*BenchmarkResult, benchmarkCount int) error
 	log.Printf("Benchmark results written to %s", fileName)
 
 	return nil
+}
+
+// Slugify converts a string into a "slug" format,
+// including replacing colons (:) with underscores (_).
+func Slugify(s string) string {
+	s = strings.ToLower(s)
+	s = strings.ReplaceAll(s, ":", "_")
+	re := regexp.MustCompile(`[^a-z0-9_]+`)
+	s = re.ReplaceAllString(s, "-")
+	s = regexp.MustCompile(`-+`).ReplaceAllString(s, "-")
+	s = strings.Trim(s, "-_")
+
+	return s
 }
