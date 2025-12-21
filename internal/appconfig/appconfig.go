@@ -42,6 +42,7 @@ type Config struct {
 	LogFile            string `json:"logFile,omitempty"`
 	BenchmarkMode      bool   `json:"benchmarkMode"`
 	BenchmarkCount     int    `json:"benchmarkCount"`
+	AccuracyMode       bool   `json:"accuracyMode"`
 	Metrics            bool   `json:"metrics"`
 	ConfigPath         string `json:"-"`
 }

@@ -1,0 +1,65 @@
+{
+  "system_prompt": "You are a precise calculator. Output ONLY the final numerical answer as a single integer. No text, no explanation, no units.",
+  "tests": [
+    {
+      "id": 1,
+      "prompt": "Calculate (14 * 8) + (23 * 3) - 15.",
+      "expected_answer": 166,
+      "category": "Arithmetic"
+    },
+    {
+      "id": 2,
+      "prompt": "How many 'n's are in the word 'environmentally'?",
+      "expected_answer": 3,
+      "category": "Tokenization"
+    },
+    {
+      "id": 3,
+      "prompt": "What is (4^3 + 11) mod 7?",
+      "expected_answer": 5,
+      "category": "Modular Arithmetic"
+    },
+    {
+      "id": 4,
+      "prompt": "If A=5, B=12, C=A+B, and D=C*2, what is D?",
+      "expected_answer": 34,
+      "category": "Logic/Substitution"
+    },
+    {
+      "id": 5,
+      "prompt": "Multiply the number of vowels in 'MOUNTAIN' by 12.",
+      "expected_answer": 48,
+      "category": "Linguistic Logic"
+    },
+    {
+      "id": 6,
+      "prompt": "Find the sum of all prime numbers between 10 and 20.",
+      "expected_answer": 60,
+      "category": "Knowledge Retrieval"
+    },
+    {
+      "id": 7,
+      "prompt": "A car travels 15 miles in 20 minutes. What is its MPH?",
+      "expected_answer": 45,
+      "category": "Ratio Reasoning"
+    },
+    {
+      "id": 8,
+      "prompt": "What is 15% of 840?",
+      "expected_answer": 126,
+      "category": "Percentages"
+    },
+    {
+      "id": 9,
+      "prompt": "Count the total letters in 'Grateful Dead' (ignore spaces).",
+      "expected_answer": 12,
+      "category": "Character Accuracy"
+    },
+    {
+      "id": 10,
+      "prompt": "Calculate 121 divided by 11, then square the result.",
+      "expected_answer": 121,
+      "category": "Sequential Math"
+    }
+  ]
+}

@@ -10,3 +10,4 @@
 !config.example.PipelineMode.json
 !config.example.SystemPromptLength.json
 !config.example.BenchmarkMode.json
+!config.example.AccuracyMode.json
