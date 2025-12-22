@@ -1,75 +1,165 @@
 {
-  "system_prompt": "You are a precise facts and math engine. Output ONLY the final numerical answer as a single integer. No text, no explanation, no units, no commas.",
+  "system_prompt": "You are a precise facts and logic engine. Output ONLY the final numerical answer as a single integer. No text, no explanation, no units, no commas.",
   "tests": [
     {
       "id": 1,
-      "prompt": "What is the diameter of the moon in kilometers?",
-      "expected_answer": 3474,
-      "tolerance": 2,
-      "category": "Astronomy"
+      "prompt": "What is the atomic number of Helium?",
+      "expected_answer": 2,
+      "category": "Basic Retrieval",
+      "difficulty": 2,
+      "marginOfError": 0
     },
     {
       "id": 2,
-      "prompt": "How many hearts does an octopus have?",
-      "expected_answer": 3,
-      "tolerance": 0,
-      "category": "Biology"
+      "prompt": "How many legs does a spider have?",
+      "expected_answer": 8,
+      "category": "Biology Retrieval",
+      "difficulty": 2,
+      "marginOfError": 0
     },
     {
       "id": 3,
-      "prompt": "What is the atomic number of Gold?",
-      "expected_answer": 79,
-      "tolerance": 0,
-      "category": "Chemistry"
+      "prompt": "What is the result of 144 divided by 4?",
+      "expected_answer": 36,
+      "category": "Simple Arithmetic",
+      "difficulty": 4,
+      "marginOfError": 0
     },
     {
       "id": 4,
-      "prompt": "In what year did the Titanic sink?",
-      "expected_answer": 1912,
-      "tolerance": 0,
-      "category": "History"
+      "prompt": "In the sequence 5, 10, 20, 40, what is the next number?",
+      "expected_answer": 80,
+      "category": "Pattern Recognition",
+      "difficulty": 5,
+      "marginOfError": 0
     },
     {
       "id": 5,
-      "prompt": "How many strings does a standard cello have?",
-      "expected_answer": 4,
-      "tolerance": 0,
-      "category": "Music"
+      "prompt": "What is the sum of the angles in a triangle (in degrees)?",
+      "expected_answer": 180,
+      "category": "Geometry Retrieval",
+      "difficulty": 3,
+      "marginOfError": 0
     },
     {
       "id": 6,
-      "prompt": "Calculate (15 * 4) + (100 / 5).",
-      "expected_answer": 80,
-      "tolerance": 0,
-      "category": "Arithmetic"
+      "prompt": "If x = 5 and y = x + 10, what is y?",
+      "expected_answer": 15,
+      "category": "Variable Logic",
+      "difficulty": 4,
+      "marginOfError": 0
     },
     {
       "id": 7,
-      "prompt": "What is the boiling point of water in degrees Celsius?",
-      "expected_answer": 100,
-      "tolerance": 0,
-      "category": "Physics"
+      "prompt": "A clock shows 3:00. How many degrees are between the hour and minute hand?",
+      "expected_answer": 90,
+      "category": "Spatial Logic",
+      "difficulty": 7,
+      "marginOfError": 0
     },
     {
       "id": 8,
-      "prompt": "How many planets in our solar system have rings?",
-      "expected_answer": 4,
-      "tolerance": 0,
-      "category": "Astronomy"
+      "prompt": "How many faces does a standard cube have?",
+      "expected_answer": 6,
+      "category": "Spatial Retrieval",
+      "difficulty": 3,
+      "marginOfError": 0
     },
     {
       "id": 9,
-      "prompt": "What is 144 divided by 12?",
-      "expected_answer": 12,
-      "tolerance": 0,
-      "category": "Math"
+      "prompt": "If you have 3 apples and you take away 2, how many apples do YOU have?",
+      "expected_answer": 2,
+      "category": "Linguistic Trap",
+      "difficulty": 8,
+      "marginOfError": 0
     },
     {
       "id": 10,
-      "prompt": "How many days are in a non-leap year?",
-      "expected_answer": 365,
-      "tolerance": 0,
-      "category": "General Knowledge"
+      "prompt": "What is 10% of 2000?",
+      "expected_answer": 200,
+      "category": "Percentage",
+      "difficulty": 4,
+      "marginOfError": 0
+    },
+    {
+      "id": 11,
+      "prompt": "How many centimeters are in 2 meters?",
+      "expected_answer": 200,
+      "category": "Unit Conversion",
+      "difficulty": 4,
+      "marginOfError": 0
+    },
+    {
+      "id": 12,
+      "prompt": "A baker has 12 cookies. He sells all but 4. How many cookies does he have left?",
+      "expected_answer": 4,
+      "category": "Semantic Parsing",
+      "difficulty": 7,
+      "marginOfError": 0
+    },
+    {
+      "id": 13,
+      "prompt": "What is the square of 13?",
+      "expected_answer": 169,
+      "category": "Math Retrieval",
+      "difficulty": 5,
+      "marginOfError": 0
+    },
+    {
+      "id": 14,
+      "prompt": "If a rectangle is 5cm wide and 10cm long, what is its area in cm?",
+      "expected_answer": 50,
+      "category": "Geometry Calculation",
+      "difficulty": 4,
+      "marginOfError": 0
+    },
+    {
+      "id": 15,
+      "prompt": "How many days are in the month of September?",
+      "expected_answer": 30,
+      "category": "Temporal Retrieval",
+      "difficulty": 3,
+      "marginOfError": 0
+    },
+    {
+      "id": 16,
+      "prompt": "What is the equatorial radius of Jupiter in kilometers?",
+      "expected_answer": 71492,
+      "category": "Planetary Science",
+      "difficulty": 6,
+      "marginOfError": 100
+    },
+    {
+      "id": 17,
+      "prompt": "How many bones are in the adult human body?",
+      "expected_answer": 206,
+      "category": "Anatomy",
+      "difficulty": 4,
+      "marginOfError": 0
+    },
+    {
+      "id": 18,
+      "prompt": "What is the speed of light in a vacuum in meters per second?",
+      "expected_answer": 299792458,
+      "category": "Physical Constants",
+      "difficulty": 8,
+      "marginOfError": 500
+    },
+    {
+      "id": 19,
+      "prompt": "How many bits are in 4 bytes?",
+      "expected_answer": 32,
+      "category": "Computing",
+      "difficulty": 3,
+      "marginOfError": 0
+    },
+    {
+      "id": 20,
+      "prompt": "How many states are in the United States of America?",
+      "expected_answer": 50,
+      "category": "Geography",
+      "difficulty": 1,
+      "marginOfError": 0
     }
   ]
 }

@@ -181,13 +181,18 @@ func roundToInt(val float64) int {
 }
 
 type accuracyLine struct {
-	Model   string `json:"model"`
-	Correct bool   `json:"correct"`
+	Model         string `json:"model"`
+	Correct       bool   `json:"correct"`
+	Difficulty    int    `json:"difficulty"`
+	MarginOfError int    `json:"marginOfError"`
 }
 
 type accuracyTotals struct {
-	Total   int
-	Correct int
+	Total         int
+	Correct       int
+	DifficultySum int
+	MarginSum     int
+	ByDifficulty  map[int]accuracyTotals
 }
 
 func loadAccuracyStats(dir string) (map[string]metrics.AccuracyStats, error) {
@@ -245,6 +250,17 @@ func loadAccuracyStats(dir string) (map[string]metrics.AccuracyStats, error) {
 			if rec.Correct {
 				stat.Correct++
 			}
+			stat.DifficultySum += rec.Difficulty
+			stat.MarginSum += rec.MarginOfError
+			if stat.ByDifficulty == nil {
+				stat.ByDifficulty = make(map[int]accuracyTotals)
+			}
+			diffStat := stat.ByDifficulty[rec.Difficulty]
+			diffStat.Total++
+			if rec.Correct {
+				diffStat.Correct++
+			}
+			stat.ByDifficulty[rec.Difficulty] = diffStat
 			totals[rec.Model] = stat
 		}
 		if err := scanner.Err(); err != nil {
@@ -259,13 +275,32 @@ func loadAccuracyStats(dir string) (map[string]metrics.AccuracyStats, error) {
 	stats := make(map[string]metrics.AccuracyStats, len(totals))
 	for model, stat := range totals {
 		accuracy := 0.0
+		avgDifficulty := 0.0
+		avgMargin := 0.0
 		if stat.Total > 0 {
 			accuracy = float64(stat.Correct) / float64(stat.Total)
+			avgDifficulty = float64(stat.DifficultySum) / float64(stat.Total)
+			avgMargin = float64(stat.MarginSum) / float64(stat.Total)
+		}
+		byDifficulty := make(map[int]metrics.AccuracyBucket, len(stat.ByDifficulty))
+		for difficulty, diffStat := range stat.ByDifficulty {
+			diffAccuracy := 0.0
+			if diffStat.Total > 0 {
+				diffAccuracy = float64(diffStat.Correct) / float64(diffStat.Total)
+			}
+			byDifficulty[difficulty] = metrics.AccuracyBucket{
+				Total:    diffStat.Total,
+				Correct:  diffStat.Correct,
+				Accuracy: diffAccuracy,
+			}
 		}
 		stats[model] = metrics.AccuracyStats{
-			Total:    stat.Total,
-			Correct:  stat.Correct,
-			Accuracy: accuracy,
+			Total:            stat.Total,
+			Correct:          stat.Correct,
+			Accuracy:         accuracy,
+			AvgDifficulty:    avgDifficulty,
+			AvgMarginOfError: avgMargin,
+			ByDifficulty:     byDifficulty,
 		}
 	}
 

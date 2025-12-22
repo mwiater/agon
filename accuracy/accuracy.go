@@ -4,6 +4,7 @@ package accuracy
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -87,46 +88,69 @@ func RunAccuracy(cfg *appconfig.Config) error {
 	}()
 
 	totalPrompts := len(suite.Tests)
-	for i, test := range suite.Tests {
-		fmt.Printf("Iteration: %d/%d user prompts\n", i+1, totalPrompts)
-
-		var wg sync.WaitGroup
-		for _, runner := range runners {
-			wg.Add(1)
-			go func(r hostRunner, t PromptTest) {
-				defer wg.Done()
-
-				fmt.Printf("Host/Model: %s / %s\n", r.host.Name, r.model)
-				fmt.Printf("Prompt: %s\n", t.Prompt)
+	var wg sync.WaitGroup
+	for _, runner := range runners {
+		wg.Add(1)
+		go func(r hostRunner, total int) {
+			defer wg.Done()
+			for i, t := range suite.Tests {
+				iteration := i + 1
+				fmt.Printf("[%d/%d] %s / %s - Prompt: %s\n", iteration, total, r.host.Name, r.model, t.Prompt)
 
 				response, err := runPrompt(r.provider, r.host, r.model, suite.SystemPrompt, t.Prompt)
 				if err != nil {
-					fmt.Printf("Result: error=%v\n", err)
+					deadlineExceeded := isDeadlineExceeded(err)
+					if deadlineExceeded {
+						fmt.Printf("[%d/%d] %s / %s - Result: deadlineExceeded=true error=%v\n", iteration, total, r.host.Name, r.model, err)
+						result := AccuracyResult{
+							Timestamp:          time.Now().Format(time.RFC3339),
+							Host:               r.host.Name,
+							Model:              r.model,
+							PromptID:           t.ID,
+							Prompt:             t.Prompt,
+							ExpectedAnswer:     t.ExpectedAnswer,
+							Response:           err.Error(),
+							Correct:            false,
+							MarginOfError:      t.MarginOfError,
+							Difficulty:         t.Difficulty,
+							DeadlineExceeded:   true,
+							DeadlineTimeoutSec: cfg.TimeoutSeconds,
+						}
+
+						if err := appendResult(r.model, result); err != nil {
+							log.Printf("error writing result for model %s: %v", r.model, err)
+						}
+					} else {
+						fmt.Printf("[%d/%d] %s / %s - Result: error=%v\n", iteration, total, r.host.Name, r.model, err)
+					}
 					return
 				}
 
-				parsedAnswer, ok := parseAnswer(response)
-				correct := ok && withinTolerance(parsedAnswer, t.ExpectedAnswer, t.Tolerance)
-				fmt.Printf("Result (%s): correct=%t response=%q expected=%d\n", r.model, correct, response, t.ExpectedAnswer)
+				correct := matchesExpected(response, t.ExpectedAnswer, t.MarginOfError)
+				fmt.Printf("[%d/%d] %s / %s - Result: correct=%t response=%q expected=%d\n", iteration, total, r.host.Name, r.model, correct, response, t.ExpectedAnswer)
 
 				result := AccuracyResult{
-					Timestamp:      time.Now().Format(time.RFC3339),
-					Host:           r.host.Name,
-					Model:          r.model,
-					PromptID:       t.ID,
-					Prompt:         t.Prompt,
-					ExpectedAnswer: t.ExpectedAnswer,
-					Response:       response,
-					Correct:        correct,
+					Timestamp:          time.Now().Format(time.RFC3339),
+					Host:               r.host.Name,
+					Model:              r.model,
+					PromptID:           t.ID,
+					Prompt:             t.Prompt,
+					ExpectedAnswer:     t.ExpectedAnswer,
+					Response:           response,
+					Correct:            correct,
+					MarginOfError:      t.MarginOfError,
+					Difficulty:         t.Difficulty,
+					DeadlineExceeded:   false,
+					DeadlineTimeoutSec: 0,
 				}
 
 				if err := appendResult(r.model, result); err != nil {
 					log.Printf("error writing result for model %s: %v", r.model, err)
 				}
-			}(runner, test)
-		}
-		wg.Wait()
+			}
+		}(runner, totalPrompts)
 	}
+	wg.Wait()
 
 	return nil
 }
@@ -218,6 +242,19 @@ func parseAnswer(response string) (int, bool) {
 	return value, true
 }
 
+func matchesExpected(response string, expected, marginOfError int) bool {
+	for _, token := range tokenizeResponse(stripThinkBlocks(response)) {
+		value, err := strconv.Atoi(token)
+		if err != nil {
+			continue
+		}
+		if withinTolerance(value, expected, marginOfError) {
+			return true
+		}
+	}
+	return false
+}
+
 func withinTolerance(actual, expected, tolerance int) bool {
 	if tolerance < 0 {
 		tolerance = 0
@@ -270,6 +307,16 @@ func tokenizeResponse(response string) []string {
 		}
 	}
 	return strings.Fields(b.String())
+}
+
+func isDeadlineExceeded(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "context deadline exceeded")
 }
 
 // slugify converts a string into a filesystem-friendly slug.

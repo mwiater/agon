@@ -229,7 +229,7 @@ Benchmark mode uses the following definitions:
 
 ### Accuracy Mode
 
-Accuracy mode runs a fixed prompt suite against each host/model pair and records per-prompt correctness. Like Benchmark mode, your configuration file **must only have one model per host.** The system prompt is loaded from `accuracy/system_prompt.txt`, and prompts + expected answers are loaded from `accuracy/user_prompts.json`.
+Accuracy mode runs a fixed prompt suite against each host/model pair and records per-prompt correctness. Like Benchmark mode, your configuration file **must only have one model per host.** The system prompt and tests are loaded from `accuracy/accuracy_prompts.json`, including `difficulty` and `marginOfError` for each test.
 
 Results are appended to `accuracy/results/<model>.json` (one entry per prompt per run). Each entry includes the prompt, the model response, the expected answer, and a boolean indicating correctness. This makes it easy to run the suite multiple times and track consistency over time. See the `config/config.example.AccuracyMode.json` example.
 
@@ -276,7 +276,7 @@ Starts the main interactive chat UI. The UI mode is determined by the configurat
 
 ### `agon accuracy`
 
-*   **`agon accuracy`**: Runs the accuracy suite defined in `accuracy/user_prompts.json` against each host/model pair and appends results to `accuracy/results/`. Requires `accuracyMode: true` and one model per host.
+*   **`agon accuracy`**: Runs the accuracy suite defined in `accuracy/accuracy_prompts.json` against each host/model pair and appends results to `accuracy/results/`. Requires `accuracyMode: true` and one model per host.
 
 ### `agon pull`
 

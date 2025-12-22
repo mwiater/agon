@@ -57,6 +57,16 @@ type VarianceStats struct {
 
 // AccuracyStats stores aggregated correctness information for a model.
 type AccuracyStats struct {
+	Total            int                     `json:"total"`
+	Correct          int                     `json:"correct"`
+	Accuracy         float64                 `json:"accuracy"`
+	AvgDifficulty    float64                 `json:"avgDifficulty"`
+	AvgMarginOfError float64                 `json:"avgMarginOfError"`
+	ByDifficulty     map[int]AccuracyBucket  `json:"byDifficulty"`
+}
+
+// AccuracyBucket stores aggregated accuracy for a difficulty bucket.
+type AccuracyBucket struct {
 	Total    int     `json:"total"`
 	Correct  int     `json:"correct"`
 	Accuracy float64 `json:"accuracy"`
@@ -704,6 +714,8 @@ const reportTemplateHTML = `<!DOCTYPE html>
                   <th class="sortable" data-type="number">Avg Total (s) <span class="material-icons-two-tone sort">import_export</span></th>
                   <th class="sortable" data-type="number">Avg Output Tokens <span class="material-icons-two-tone sort">import_export</span></th>
                   <th class="sortable" data-type="number">Accuracy (%) <span class="material-icons-two-tone sort">import_export</span></th>
+                  <th class="sortable" data-type="number">Avg Difficulty <span class="material-icons-two-tone sort">import_export</span></th>
+                  <th class="sortable" data-type="number">Avg Margin <span class="material-icons-two-tone sort">import_export</span></th>
                   <th class="sortable" data-type="number">Throughput Score <span class="material-icons-two-tone sort">import_export</span></th>
                   <th class="sortable" data-type="number">Latency Score <span class="material-icons-two-tone sort">import_export</span></th>
                   <th class="sortable" data-type="number">Efficiency Score <span class="material-icons-two-tone sort">import_export</span></th>
@@ -714,6 +726,20 @@ const reportTemplateHTML = `<!DOCTYPE html>
               <tbody></tbody>
             </table>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mt-4">
+      <div class="card shadow-sm">
+        <div class="card-header bg-white">
+          <h5 class="mb-0">Accuracy vs. Throughput (Avg TPS)</h5>
+        </div>
+        <div class="card-body">
+          <div class="ratio ratio-16x9">
+            <canvas id="accuracyThroughputChart" aria-label="Accuracy vs throughput chart" role="img"></canvas>
+          </div>
+          <div id="accuracyThroughputEmpty" class="text-muted small mt-2"></div>
         </div>
       </div>
     </section>
@@ -757,6 +783,7 @@ const reportTemplateHTML = `<!DOCTYPE html>
 
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
   <script>
     var analysis = {{ .AnalysisJSON }};
   </script>
@@ -804,6 +831,16 @@ const reportTemplateHTML = `<!DOCTYPE html>
             accuracyPct = model.accuracy.accuracy * 100;
           }
           $row.append(createNumericCell(accuracyPct, 1));
+          var avgDifficulty = null;
+          if (model.accuracy && typeof model.accuracy.avgDifficulty === 'number') {
+            avgDifficulty = model.accuracy.avgDifficulty;
+          }
+          $row.append(createNumericCell(avgDifficulty, 2));
+          var avgMargin = null;
+          if (model.accuracy && typeof model.accuracy.avgMarginOfError === 'number') {
+            avgMargin = model.accuracy.avgMarginOfError;
+          }
+          $row.append(createNumericCell(avgMargin, 2));
           $row.append(createNumericCell(model.scores.throughputScore, 1));
           $row.append(createNumericCell(model.scores.latencyScore, 1));
           $row.append(createNumericCell(model.scores.efficiencyScore, 1));
@@ -852,6 +889,31 @@ const reportTemplateHTML = `<!DOCTYPE html>
             accuracyPct = model.accuracy.accuracy * 100;
             accuracyLine = formatNumber(accuracyPct, 1) + '% (' + model.accuracy.correct + '/' + model.accuracy.total + ')';
           }
+          var avgDifficultyLine = '-';
+          var avgMarginLine = '-';
+          if (model.accuracy && typeof model.accuracy.avgDifficulty === 'number') {
+            avgDifficultyLine = formatNumber(model.accuracy.avgDifficulty, 2);
+          }
+          if (model.accuracy && typeof model.accuracy.avgMarginOfError === 'number') {
+            avgMarginLine = formatNumber(model.accuracy.avgMarginOfError, 2);
+          }
+          var difficultyBreakdown = '-';
+          if (model.accuracy && model.accuracy.byDifficulty) {
+            var buckets = [];
+            Object.keys(model.accuracy.byDifficulty).sort(function(a, b) {
+              return Number(a) - Number(b);
+            }).forEach(function(key) {
+              var bucket = model.accuracy.byDifficulty[key];
+              if (!bucket || bucket.total <= 0) {
+                return;
+              }
+              var pct = bucket.accuracy * 100;
+              buckets.push('d' + key + ' ' + formatNumber(pct, 1) + '% (' + bucket.correct + '/' + bucket.total + ')');
+            });
+            if (buckets.length > 0) {
+              difficultyBreakdown = buckets.join(', ');
+            }
+          }
           var bodyParts = [];
           bodyParts.push('<div id="' + collapseID + '" class="accordion-collapse collapse ' + (index === 0 ? 'show' : '') + '" aria-labelledby="' + headerID + '" data-bs-parent="#modelAccordion">');
           bodyParts.push('<div class="accordion-body"><div class="row g-3">');
@@ -862,6 +924,9 @@ const reportTemplateHTML = `<!DOCTYPE html>
           bodyParts.push('<li><strong>Total (s):</strong> ' + formatNumber(model.avg.totalExecutionTimeSeconds, 2) + '</li>');
           bodyParts.push('<li><strong>Output tokens:</strong> ' + formatNumber(model.avg.outputTokens, 1) + '</li>');
           bodyParts.push('<li><strong>Accuracy:</strong> ' + accuracyLine + '</li>');
+          bodyParts.push('<li><strong>Avg difficulty:</strong> ' + avgDifficultyLine + '</li>');
+          bodyParts.push('<li><strong>Avg margin:</strong> ' + avgMarginLine + '</li>');
+          bodyParts.push('<li><strong>By difficulty:</strong> ' + difficultyBreakdown + '</li>');
           bodyParts.push('</ul><h6>Variance</h6><ul class="list-unstyled mb-3">');
           bodyParts.push('<li><strong>TPS σ:</strong> ' + formatNumber(model.variance.tokensPerSecondStdDev, 2) + '</li>');
           bodyParts.push('<li><strong>TTFT σ (s):</strong> ' + formatNumber(model.variance.timeToFirstTokenStdDevSeconds, 2) + '</li>');
@@ -918,6 +983,80 @@ const reportTemplateHTML = `<!DOCTYPE html>
         }
         recommendations.forEach(function(rec) {
           $list.append('<li class="list-group-item">' + rec + '</li>');
+        });
+      }
+
+      function buildAccuracyThroughputChart(models) {
+        var canvas = document.getElementById('accuracyThroughputChart');
+        if (!canvas) {
+          return;
+        }
+        var points = [];
+        models.forEach(function(model) {
+          if (!model.accuracy || model.accuracy.total <= 0) {
+            return;
+          }
+          if (!model.avg || typeof model.avg.tokensPerSecond !== 'number') {
+            return;
+          }
+          points.push({
+            x: model.avg.tokensPerSecond,
+            y: model.accuracy.accuracy * 100,
+            modelName: model.modelName
+          });
+        });
+        if (points.length === 0) {
+          $('#accuracyThroughputEmpty').text('No accuracy data available for this report.');
+          return;
+        }
+        new Chart(canvas, {
+          type: 'scatter',
+          data: {
+            datasets: [{
+              label: 'Models',
+              data: points,
+              backgroundColor: 'rgba(54, 162, 235, 0.75)',
+              borderColor: 'rgba(54, 162, 235, 1)',
+              pointRadius: 6,
+              pointHoverRadius: 8
+            }]
+          },
+          options: {
+            animation: false,
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: {
+                title: {
+                  display: true,
+                  text: 'Avg TPS (Throughput)'
+                }
+              },
+              y: {
+                title: {
+                  display: true,
+                  text: 'Accuracy (%)'
+                },
+                suggestedMin: 0,
+                suggestedMax: 100
+              }
+            },
+            plugins: {
+              legend: {
+                display: false
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    var point = context.raw || {};
+                    var tps = typeof point.x === 'number' ? point.x.toFixed(2) : 'n/a';
+                    var acc = typeof point.y === 'number' ? point.y.toFixed(1) : 'n/a';
+                    return (point.modelName || 'model') + ': ' + tps + ' TPS, ' + acc + '%';
+                  }
+                }
+              }
+            }
+          }
         });
       }
 
@@ -979,6 +1118,7 @@ const reportTemplateHTML = `<!DOCTYPE html>
 
         populateTable(models);
         attachSorting();
+        buildAccuracyThroughputChart(models);
         buildAccordion(models);
         populateAnomalies(analysis.anomalies || []);
         populateRecommendations(analysis.recommendations || []);
