@@ -62,6 +62,8 @@ type AccuracyStats struct {
 	Accuracy         float64                 `json:"accuracy"`
 	AvgDifficulty    float64                 `json:"avgDifficulty"`
 	AvgMarginOfError float64                 `json:"avgMarginOfError"`
+	Timeouts         int                     `json:"timeouts"`
+	TimeoutSeconds   int                     `json:"timeoutSeconds"`
 	ByDifficulty     map[int]AccuracyBucket  `json:"byDifficulty"`
 }
 
@@ -711,16 +713,15 @@ const reportTemplateHTML = `<!DOCTYPE html>
                   <th class="sortable" data-type="text">Model <span class="material-icons-two-tone sort">import_export</span></th>
                   <th class="sortable" data-type="number">Avg TPS <span class="material-icons-two-tone sort">import_export</span></th>
                   <th class="sortable" data-type="number">Avg TTFT (s) <span class="material-icons-two-tone sort">import_export</span></th>
-                  <th class="sortable" data-type="number">Avg Total (s) <span class="material-icons-two-tone sort">import_export</span></th>
                   <th class="sortable" data-type="number">Avg Output Tokens <span class="material-icons-two-tone sort">import_export</span></th>
                   <th class="sortable" data-type="number">Accuracy (%) <span class="material-icons-two-tone sort">import_export</span></th>
+                  <th class="sortable" data-type="number">No. of Questions <span class="material-icons-two-tone sort">import_export</span></th>
+                  <th class="sortable" data-type="number" id="timeoutsHeader">Timeouts <span class="material-icons-two-tone sort">import_export</span></th>
                   <th class="sortable" data-type="number">Avg Difficulty <span class="material-icons-two-tone sort">import_export</span></th>
-                  <th class="sortable" data-type="number">Avg Margin <span class="material-icons-two-tone sort">import_export</span></th>
                   <th class="sortable" data-type="number">Throughput Score <span class="material-icons-two-tone sort">import_export</span></th>
                   <th class="sortable" data-type="number">Latency Score <span class="material-icons-two-tone sort">import_export</span></th>
                   <th class="sortable" data-type="number">Efficiency Score <span class="material-icons-two-tone sort">import_export</span></th>
                   <th class="sortable" data-type="text">Speed Tier <span class="material-icons-two-tone sort">import_export</span></th>
-                  <th class="sortable" data-type="text">Suitability <span class="material-icons-two-tone sort">import_export</span></th>
                 </tr>
               </thead>
               <tbody></tbody>
@@ -824,28 +825,31 @@ const reportTemplateHTML = `<!DOCTYPE html>
           $row.append($('<td><span class="material-icons-two-tone">smart_toy</span> '+model.modelName+'</td>'))
           $row.append(createNumericCell(model.avg.tokensPerSecond, 2));
           $row.append(createNumericCell(model.avg.timeToFirstTokenSeconds, 2));
-          $row.append(createNumericCell(model.avg.totalExecutionTimeSeconds, 2));
           $row.append(createNumericCell(model.avg.outputTokens, 1));
           var accuracyPct = null;
           if (model.accuracy && typeof model.accuracy.accuracy === 'number') {
             accuracyPct = model.accuracy.accuracy * 100;
           }
           $row.append(createNumericCell(accuracyPct, 1));
+          var questionCount = null;
+          if (model.accuracy && typeof model.accuracy.total === 'number') {
+            questionCount = model.accuracy.total;
+          }
+          $row.append(createNumericCell(questionCount, 0));
+          var timeoutCount = null;
+          if (model.accuracy && typeof model.accuracy.timeouts === 'number') {
+            timeoutCount = model.accuracy.timeouts;
+          }
+          $row.append(createNumericCell(timeoutCount, 0));
           var avgDifficulty = null;
           if (model.accuracy && typeof model.accuracy.avgDifficulty === 'number') {
             avgDifficulty = model.accuracy.avgDifficulty;
           }
           $row.append(createNumericCell(avgDifficulty, 2));
-          var avgMargin = null;
-          if (model.accuracy && typeof model.accuracy.avgMarginOfError === 'number') {
-            avgMargin = model.accuracy.avgMarginOfError;
-          }
-          $row.append(createNumericCell(avgMargin, 2));
           $row.append(createNumericCell(model.scores.throughputScore, 1));
           $row.append(createNumericCell(model.scores.latencyScore, 1));
           $row.append(createNumericCell(model.scores.efficiencyScore, 1));
           $row.append($('<td></td>').text(model.labels.relativeSpeedTier || '—'));
-          $row.append($('<td></td>').text(model.labels.interactiveSuitability || '—'));
           $tbody.append($row);
         });
       }
@@ -1111,6 +1115,17 @@ const reportTemplateHTML = `<!DOCTYPE html>
         $('#mostAccurateModel').text(summary.mostAccurateModel || '-');
 
         var models = analysis.models || [];
+        var timeoutSeconds = null;
+        models.forEach(function(model) {
+          if (model.accuracy && typeof model.accuracy.timeoutSeconds === 'number') {
+            if (timeoutSeconds === null || model.accuracy.timeoutSeconds > timeoutSeconds) {
+              timeoutSeconds = model.accuracy.timeoutSeconds;
+            }
+          }
+        });
+        if (timeoutSeconds !== null && timeoutSeconds > 0) {
+          $('#timeoutsHeader').text('Timeouts (' + timeoutSeconds + 's)');
+        }
         var interactiveCount = models.filter(function(model) {
           return model.labels && model.labels.interactiveSuitability === 'good';
         }).length;

@@ -185,6 +185,8 @@ type accuracyLine struct {
 	Correct       bool   `json:"correct"`
 	Difficulty    int    `json:"difficulty"`
 	MarginOfError int    `json:"marginOfError"`
+	DeadlineExceeded bool `json:"deadlineExceeded"`
+	DeadlineTimeoutSec int `json:"deadlineTimeout"`
 }
 
 type accuracyTotals struct {
@@ -192,6 +194,8 @@ type accuracyTotals struct {
 	Correct       int
 	DifficultySum int
 	MarginSum     int
+	Timeouts      int
+	TimeoutSeconds int
 	ByDifficulty  map[int]accuracyTotals
 }
 
@@ -246,6 +250,14 @@ func loadAccuracyStats(dir string) (map[string]metrics.AccuracyStats, error) {
 				return nil, fmt.Errorf("accuracy JSONL missing model field %s:%d", path, lineNo)
 			}
 			stat := totals[rec.Model]
+			if rec.DeadlineTimeoutSec > stat.TimeoutSeconds {
+				stat.TimeoutSeconds = rec.DeadlineTimeoutSec
+			}
+			if rec.DeadlineExceeded {
+				stat.Timeouts++
+				totals[rec.Model] = stat
+				continue
+			}
 			stat.Total++
 			if rec.Correct {
 				stat.Correct++
@@ -300,6 +312,8 @@ func loadAccuracyStats(dir string) (map[string]metrics.AccuracyStats, error) {
 			Accuracy:         accuracy,
 			AvgDifficulty:    avgDifficulty,
 			AvgMarginOfError: avgMargin,
+			Timeouts:         stat.Timeouts,
+			TimeoutSeconds:   stat.TimeoutSeconds,
 			ByDifficulty:     byDifficulty,
 		}
 	}
