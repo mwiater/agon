@@ -12,6 +12,7 @@ type PromptTest struct {
 	ID             int    `json:"id"`
 	Prompt         string `json:"prompt"`
 	ExpectedAnswer int    `json:"expected_answer"`
+	Tolerance      int    `json:"tolerance,omitempty"`
 	Category       string `json:"category"`
 }
 

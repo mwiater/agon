@@ -2,22 +2,25 @@
 package agon
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mwiater/agon/internal/metrics"
 	"github.com/spf13/cobra"
 )
 
 type analyzeMetricsOptions struct {
-	inputPath    string
-	htmlPath     string
-	analysisPath string
-	hostName     string
-	hostNotes    string
+	inputPath          string
+	htmlPath           string
+	analysisPath        string
+	accuracyResultsDir string
+	hostName           string
+	hostNotes          string
 }
 
 var analyzeMetricsOpts analyzeMetricsOptions
@@ -50,7 +53,12 @@ dashboard for review.`,
 			Notes:       analyzeMetricsOpts.hostNotes,
 		}
 
-		analysis := metrics.AnalyzeMetrics(results, host)
+		accuracyStats, err := loadAccuracyStats(analyzeMetricsOpts.accuracyResultsDir)
+		if err != nil {
+			return err
+		}
+
+		analysis := metrics.AnalyzeMetrics(results, host, accuracyStats)
 
 		if analyzeMetricsOpts.analysisPath != "" {
 			if err := writeAnalysisJSON(analyzeMetricsOpts.analysisPath, analysis); err != nil {
@@ -81,6 +89,7 @@ func init() {
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.inputPath, "input", "reports/data/model_performance_metrics.json", "Path to benchmark JSON (required)")
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.htmlPath, "html-output", "reports/metrics-report.html", "Destination HTML report path")
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.analysisPath, "analysis-output", "", "Optional path to write the analysis JSON")
+	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.accuracyResultsDir, "accuracy-results", "accuracy/results", "Optional path to accuracy JSONL results directory")
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.hostName, "host-name", "", "Optional cluster/host label to embed in the analysis")
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.hostNotes, "host-notes", "", "Optional host notes to embed in the analysis")
 
@@ -169,4 +178,96 @@ func roundToInt(val float64) int {
 		return 0
 	}
 	return int(math.Round(val))
+}
+
+type accuracyLine struct {
+	Model   string `json:"model"`
+	Correct bool   `json:"correct"`
+}
+
+type accuracyTotals struct {
+	Total   int
+	Correct int
+}
+
+func loadAccuracyStats(dir string) (map[string]metrics.AccuracyStats, error) {
+	if dir == "" {
+		return nil, nil
+	}
+
+	info, err := os.Stat(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("unable to stat accuracy results dir %s: %w", dir, err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("accuracy results path is not a directory: %s", dir)
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read accuracy results dir %s: %w", dir, err)
+	}
+
+	totals := make(map[string]accuracyTotals)
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".jsonl" {
+			continue
+		}
+		path := filepath.Join(dir, entry.Name())
+		file, err := os.Open(path)
+		if err != nil {
+			return nil, fmt.Errorf("unable to open accuracy results file %s: %w", path, err)
+		}
+
+		scanner := bufio.NewScanner(file)
+		scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+		lineNo := 0
+		for scanner.Scan() {
+			lineNo++
+			line := strings.TrimSpace(scanner.Text())
+			if line == "" {
+				continue
+			}
+			var rec accuracyLine
+			if err := json.Unmarshal([]byte(line), &rec); err != nil {
+				_ = file.Close()
+				return nil, fmt.Errorf("unable to parse accuracy JSONL %s:%d: %w", path, lineNo, err)
+			}
+			if rec.Model == "" {
+				_ = file.Close()
+				return nil, fmt.Errorf("accuracy JSONL missing model field %s:%d", path, lineNo)
+			}
+			stat := totals[rec.Model]
+			stat.Total++
+			if rec.Correct {
+				stat.Correct++
+			}
+			totals[rec.Model] = stat
+		}
+		if err := scanner.Err(); err != nil {
+			_ = file.Close()
+			return nil, fmt.Errorf("error reading accuracy results file %s: %w", path, err)
+		}
+		if err := file.Close(); err != nil {
+			return nil, fmt.Errorf("error closing accuracy results file %s: %w", path, err)
+		}
+	}
+
+	stats := make(map[string]metrics.AccuracyStats, len(totals))
+	for model, stat := range totals {
+		accuracy := 0.0
+		if stat.Total > 0 {
+			accuracy = float64(stat.Correct) / float64(stat.Total)
+		}
+		stats[model] = metrics.AccuracyStats{
+			Total:    stat.Total,
+			Correct:  stat.Correct,
+			Accuracy: accuracy,
+		}
+	}
+
+	return stats, nil
 }

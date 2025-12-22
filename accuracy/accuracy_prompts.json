@@ -1,0 +1,75 @@
+{
+  "system_prompt": "You are a precise facts and math engine. Output ONLY the final numerical answer as a single integer. No text, no explanation, no units, no commas.",
+  "tests": [
+    {
+      "id": 1,
+      "prompt": "What is the diameter of the moon in kilometers?",
+      "expected_answer": 3474,
+      "tolerance": 2,
+      "category": "Astronomy"
+    },
+    {
+      "id": 2,
+      "prompt": "How many hearts does an octopus have?",
+      "expected_answer": 3,
+      "tolerance": 0,
+      "category": "Biology"
+    },
+    {
+      "id": 3,
+      "prompt": "What is the atomic number of Gold?",
+      "expected_answer": 79,
+      "tolerance": 0,
+      "category": "Chemistry"
+    },
+    {
+      "id": 4,
+      "prompt": "In what year did the Titanic sink?",
+      "expected_answer": 1912,
+      "tolerance": 0,
+      "category": "History"
+    },
+    {
+      "id": 5,
+      "prompt": "How many strings does a standard cello have?",
+      "expected_answer": 4,
+      "tolerance": 0,
+      "category": "Music"
+    },
+    {
+      "id": 6,
+      "prompt": "Calculate (15 * 4) + (100 / 5).",
+      "expected_answer": 80,
+      "tolerance": 0,
+      "category": "Arithmetic"
+    },
+    {
+      "id": 7,
+      "prompt": "What is the boiling point of water in degrees Celsius?",
+      "expected_answer": 100,
+      "tolerance": 0,
+      "category": "Physics"
+    },
+    {
+      "id": 8,
+      "prompt": "How many planets in our solar system have rings?",
+      "expected_answer": 4,
+      "tolerance": 0,
+      "category": "Astronomy"
+    },
+    {
+      "id": 9,
+      "prompt": "What is 144 divided by 12?",
+      "expected_answer": 12,
+      "tolerance": 0,
+      "category": "Math"
+    },
+    {
+      "id": 10,
+      "prompt": "How many days are in a non-leap year?",
+      "expected_answer": 365,
+      "tolerance": 0,
+      "category": "General Knowledge"
+    }
+  ]
+}

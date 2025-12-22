@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/mwiater/agon/internal/appconfig"
 	"github.com/mwiater/agon/internal/providerfactory"
@@ -20,9 +21,8 @@ import (
 )
 
 const (
-	systemPromptPath = "accuracy/system_prompt_example.txt"
-	userPromptPath   = "accuracy/user_prompt_examples.json"
-	resultsDir       = "accuracy/results"
+	promptSuitePath = "accuracy/accuracy_prompts.json"
+	resultsDir      = "accuracy/results"
 )
 
 // RunAccuracy executes the accuracy suite for each configured host/model pair.
@@ -43,12 +43,7 @@ func RunAccuracy(cfg *appconfig.Config) error {
 		}
 	}
 
-	systemPrompt, err := loadSystemPrompt(systemPromptPath)
-	if err != nil {
-		return err
-	}
-
-	suite, err := loadPromptSuite(userPromptPath)
+	suite, err := loadPromptSuite(promptSuitePath)
 	if err != nil {
 		return err
 	}
@@ -104,15 +99,15 @@ func RunAccuracy(cfg *appconfig.Config) error {
 				fmt.Printf("Host/Model: %s / %s\n", r.host.Name, r.model)
 				fmt.Printf("Prompt: %s\n", t.Prompt)
 
-				response, err := runPrompt(r.provider, r.host, r.model, systemPrompt, t.Prompt)
+				response, err := runPrompt(r.provider, r.host, r.model, suite.SystemPrompt, t.Prompt)
 				if err != nil {
 					fmt.Printf("Result: error=%v\n", err)
 					return
 				}
 
 				parsedAnswer, ok := parseAnswer(response)
-				correct := ok && parsedAnswer == t.ExpectedAnswer
-				fmt.Printf("Result: correct=%t response=%q expected=%d\n", correct, response, t.ExpectedAnswer)
+				correct := ok && withinTolerance(parsedAnswer, t.ExpectedAnswer, t.Tolerance)
+				fmt.Printf("Result (%s): correct=%t response=%q expected=%d\n", r.model, correct, response, t.ExpectedAnswer)
 
 				result := AccuracyResult{
 					Timestamp:      time.Now().Format(time.RFC3339),
@@ -179,24 +174,11 @@ func loadPromptSuite(path string) (PromptSuite, error) {
 	if len(suite.Tests) == 0 {
 		return PromptSuite{}, fmt.Errorf("prompt suite contains no tests")
 	}
+	if strings.TrimSpace(suite.SystemPrompt) == "" {
+		return PromptSuite{}, fmt.Errorf("prompt suite contains an empty system_prompt")
+	}
 
 	return suite, nil
-}
-
-func loadSystemPrompt(path string) (string, error) {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return "", fmt.Errorf("error reading system prompt: %w", err)
-	}
-	prompt := strings.TrimSpace(string(raw))
-	if len(prompt) >= 2 && strings.HasPrefix(prompt, "\"") && strings.HasSuffix(prompt, "\"") {
-		prompt = strings.Trim(prompt, "\"")
-	}
-	prompt = strings.TrimSpace(prompt)
-	if prompt == "" {
-		return "", fmt.Errorf("system prompt is empty")
-	}
-	return prompt, nil
 }
 
 func appendResult(modelName string, result AccuracyResult) error {
@@ -218,7 +200,7 @@ func appendResult(modelName string, result AccuracyResult) error {
 }
 
 func parseAnswer(response string) (int, bool) {
-	trimmed := strings.TrimSpace(response)
+	trimmed := strings.TrimSpace(stripThinkBlocks(response))
 	if trimmed == "" {
 		return 0, false
 	}
@@ -226,11 +208,68 @@ func parseAnswer(response string) (int, bool) {
 		trimmed = strings.Trim(trimmed, "\"")
 	}
 	trimmed = strings.TrimSpace(trimmed)
-	value, err := strconv.Atoi(trimmed)
-	if err != nil {
+	if trimmed == "" {
 		return 0, false
 	}
+	value, err := strconv.Atoi(trimmed)
+	if err != nil {
+		return parseFromTokens(trimmed)
+	}
 	return value, true
+}
+
+func withinTolerance(actual, expected, tolerance int) bool {
+	if tolerance < 0 {
+		tolerance = 0
+	}
+	diff := actual - expected
+	if diff < 0 {
+		diff = -diff
+	}
+	return diff <= tolerance
+}
+
+func stripThinkBlocks(response string) string {
+	trimmed := strings.TrimSpace(response)
+	if trimmed == "" {
+		return trimmed
+	}
+	const startTag = "<think>"
+	const endTag = "</think>"
+	for {
+		start := strings.Index(trimmed, startTag)
+		if start == -1 {
+			break
+		}
+		end := strings.Index(trimmed[start+len(startTag):], endTag)
+		if end == -1 {
+			break
+		}
+		end += start + len(startTag) + len(endTag)
+		trimmed = strings.TrimSpace(trimmed[:start] + trimmed[end:])
+	}
+	return trimmed
+}
+
+func parseFromTokens(response string) (int, bool) {
+	for _, token := range tokenizeResponse(response) {
+		value, err := strconv.Atoi(token)
+		if err == nil {
+			return value, true
+		}
+	}
+	return 0, false
+}
+
+func tokenizeResponse(response string) []string {
+	var b strings.Builder
+	b.Grow(len(response))
+	for _, r := range response {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || unicode.IsSpace(r) {
+			b.WriteRune(r)
+		}
+	}
+	return strings.Fields(b.String())
 }
 
 // slugify converts a string into a filesystem-friendly slug.

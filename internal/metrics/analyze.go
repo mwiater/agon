@@ -55,6 +55,13 @@ type VarianceStats struct {
 	OutputTokensStdDev            float64 `json:"outputTokensStdDev"`
 }
 
+// AccuracyStats stores aggregated correctness information for a model.
+type AccuracyStats struct {
+	Total    int     `json:"total"`
+	Correct  int     `json:"correct"`
+	Accuracy float64 `json:"accuracy"`
+}
+
 // ScoreStats contains normalized scores for each model.
 type ScoreStats struct {
 	ThroughputScore float64 `json:"throughputScore"`
@@ -84,6 +91,7 @@ type ModelAnalysis struct {
 	Min            AggregatedStats `json:"min"`
 	Max            AggregatedStats `json:"max"`
 	Variance       VarianceStats   `json:"variance"`
+	Accuracy       AccuracyStats   `json:"accuracy"`
 	Scores         ScoreStats      `json:"scores"`
 	Labels         LabelStats      `json:"labels"`
 	DerivedRatios  DerivedRatios   `json:"derivedRatios"`
@@ -108,11 +116,18 @@ type EfficiencyRankingEntry struct {
 	EfficiencyScore float64 `json:"efficiencyScore"`
 }
 
+// AccuracyRankingEntry captures ordering by accuracy.
+type AccuracyRankingEntry struct {
+	ModelName string  `json:"modelName"`
+	Accuracy  float64 `json:"accuracy"`
+}
+
 // Rankings groups the sorted ranking lists.
 type Rankings struct {
 	ByThroughput      []ThroughputRankingEntry `json:"byThroughput"`
 	ByLatency         []LatencyRankingEntry    `json:"byLatency"`
 	ByEfficiencyScore []EfficiencyRankingEntry `json:"byEfficiencyScore"`
+	ByAccuracy        []AccuracyRankingEntry   `json:"byAccuracy"`
 }
 
 // Anomaly describes any notable outlier detected in the analysis.
@@ -128,6 +143,7 @@ type OverallSummary struct {
 	FastestModel       string   `json:"fastestModel"`
 	BestLatencyModel   string   `json:"bestLatencyModel"`
 	MostEfficientModel string   `json:"mostEfficientModel"`
+	MostAccurateModel  string   `json:"mostAccurateModel"`
 	SummaryNotes       []string `json:"summaryNotes"`
 }
 
@@ -155,7 +171,7 @@ type ReportTemplateData struct {
 }
 
 // AnalyzeMetrics transforms raw benchmark results into a structured Analysis object.
-func AnalyzeMetrics(results BenchmarkResults, host HostInfo) Analysis {
+func AnalyzeMetrics(results BenchmarkResults, host HostInfo, accuracy map[string]AccuracyStats) Analysis {
 	analysis := Analysis{
 		GeneratedAt: time.Now().UTC(),
 		HostInfo:    host,
@@ -267,10 +283,17 @@ func AnalyzeMetrics(results BenchmarkResults, host HostInfo) Analysis {
 	rankThroughput := make([]ThroughputRankingEntry, 0, len(modelAnalyses))
 	rankLatency := make([]LatencyRankingEntry, 0, len(modelAnalyses))
 	rankEfficiency := make([]EfficiencyRankingEntry, 0, len(modelAnalyses))
+	rankAccuracy := make([]AccuracyRankingEntry, 0, len(modelAnalyses))
 
 	multiModel := len(modelAnalyses) > 1
 
 	for _, ma := range modelAnalyses {
+		if accuracy != nil {
+			if stats, ok := accuracy[ma.ModelName]; ok {
+				ma.Accuracy = stats
+			}
+		}
+
 		if multiModel && globalMaxAvgTPS > 0 {
 			ma.Scores.ThroughputScore = clampFloat((ma.Avg.TokensPerSecond/globalMaxAvgTPS)*100, 0, 100)
 		} else if !multiModel {
@@ -315,6 +338,12 @@ func AnalyzeMetrics(results BenchmarkResults, host HostInfo) Analysis {
 			ModelName:       ma.ModelName,
 			EfficiencyScore: ma.Scores.EfficiencyScore,
 		})
+		if ma.Accuracy.Total > 0 {
+			rankAccuracy = append(rankAccuracy, AccuracyRankingEntry{
+				ModelName: ma.ModelName,
+				Accuracy:  ma.Accuracy.Accuracy,
+			})
+		}
 	}
 
 	sort.Slice(rankThroughput, func(i, j int) bool {
@@ -325,6 +354,9 @@ func AnalyzeMetrics(results BenchmarkResults, host HostInfo) Analysis {
 	})
 	sort.Slice(rankEfficiency, func(i, j int) bool {
 		return rankEfficiency[i].EfficiencyScore > rankEfficiency[j].EfficiencyScore
+	})
+	sort.Slice(rankAccuracy, func(i, j int) bool {
+		return rankAccuracy[i].Accuracy > rankAccuracy[j].Accuracy
 	})
 
 	finalModels := make([]ModelAnalysis, len(modelAnalyses))
@@ -337,6 +369,7 @@ func AnalyzeMetrics(results BenchmarkResults, host HostInfo) Analysis {
 		ByThroughput:      rankThroughput,
 		ByLatency:         rankLatency,
 		ByEfficiencyScore: rankEfficiency,
+		ByAccuracy:        rankAccuracy,
 	}
 
 	analysis.Overall = buildOverallSummary(analysis.Rankings)
@@ -383,6 +416,11 @@ func buildOverallSummary(rankings Rankings) OverallSummary {
 		entry := rankings.ByEfficiencyScore[0]
 		summary.MostEfficientModel = entry.ModelName
 		summary.SummaryNotes = append(summary.SummaryNotes, fmt.Sprintf("Most efficient model is %s with an efficiency score of %.1f.", entry.ModelName, entry.EfficiencyScore))
+	}
+	if len(rankings.ByAccuracy) > 0 {
+		entry := rankings.ByAccuracy[0]
+		summary.MostAccurateModel = entry.ModelName
+		summary.SummaryNotes = append(summary.SummaryNotes, fmt.Sprintf("Most accurate model is %s with %.1f%% accuracy.", entry.ModelName, entry.Accuracy*100))
 	}
 	return summary
 }
@@ -628,7 +666,15 @@ const reportTemplateHTML = `<!DOCTYPE html>
         <div class="card shadow-sm h-100">
           <div class="card-body">
             <p style="font-size: 1.5em;" class="text-muted mb-1"><span style="display: inline-block;font-size: 1.5em;vertical-align: top;" class="material-icons-two-tone">speed</span> Most Efficient</p>
-            <h5 class="card-title" id="mostEfficientModel">—</h5>
+            <h5 class="card-title" id="mostEfficientModel">-</h5>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <p style="font-size: 1.5em;" class="text-muted mb-1"><span style="display: inline-block;font-size: 1.5em;vertical-align: top;" class="material-icons-two-tone">fact_check</span> Most Accurate</p>
+            <h5 class="card-title" id="mostAccurateModel">-</h5>
           </div>
         </div>
       </div>
@@ -657,6 +703,7 @@ const reportTemplateHTML = `<!DOCTYPE html>
                   <th class="sortable" data-type="number">Avg TTFT (s) <span class="material-icons-two-tone sort">import_export</span></th>
                   <th class="sortable" data-type="number">Avg Total (s) <span class="material-icons-two-tone sort">import_export</span></th>
                   <th class="sortable" data-type="number">Avg Output Tokens <span class="material-icons-two-tone sort">import_export</span></th>
+                  <th class="sortable" data-type="number">Accuracy (%) <span class="material-icons-two-tone sort">import_export</span></th>
                   <th class="sortable" data-type="number">Throughput Score <span class="material-icons-two-tone sort">import_export</span></th>
                   <th class="sortable" data-type="number">Latency Score <span class="material-icons-two-tone sort">import_export</span></th>
                   <th class="sortable" data-type="number">Efficiency Score <span class="material-icons-two-tone sort">import_export</span></th>
@@ -752,6 +799,11 @@ const reportTemplateHTML = `<!DOCTYPE html>
           $row.append(createNumericCell(model.avg.timeToFirstTokenSeconds, 2));
           $row.append(createNumericCell(model.avg.totalExecutionTimeSeconds, 2));
           $row.append(createNumericCell(model.avg.outputTokens, 1));
+          var accuracyPct = null;
+          if (model.accuracy && typeof model.accuracy.accuracy === 'number') {
+            accuracyPct = model.accuracy.accuracy * 100;
+          }
+          $row.append(createNumericCell(accuracyPct, 1));
           $row.append(createNumericCell(model.scores.throughputScore, 1));
           $row.append(createNumericCell(model.scores.latencyScore, 1));
           $row.append(createNumericCell(model.scores.efficiencyScore, 1));
@@ -794,6 +846,12 @@ const reportTemplateHTML = `<!DOCTYPE html>
           if (!notes) {
             notes = '<li>No significant notes for this model.</li>';
           }
+          var accuracyPct = null;
+          var accuracyLine = '-';
+          if (model.accuracy && model.accuracy.total > 0) {
+            accuracyPct = model.accuracy.accuracy * 100;
+            accuracyLine = formatNumber(accuracyPct, 1) + '% (' + model.accuracy.correct + '/' + model.accuracy.total + ')';
+          }
           var bodyParts = [];
           bodyParts.push('<div id="' + collapseID + '" class="accordion-collapse collapse ' + (index === 0 ? 'show' : '') + '" aria-labelledby="' + headerID + '" data-bs-parent="#modelAccordion">');
           bodyParts.push('<div class="accordion-body"><div class="row g-3">');
@@ -803,6 +861,7 @@ const reportTemplateHTML = `<!DOCTYPE html>
           bodyParts.push('<li><strong>TTFT (s):</strong> ' + formatNumber(model.avg.timeToFirstTokenSeconds, 2) + '</li>');
           bodyParts.push('<li><strong>Total (s):</strong> ' + formatNumber(model.avg.totalExecutionTimeSeconds, 2) + '</li>');
           bodyParts.push('<li><strong>Output tokens:</strong> ' + formatNumber(model.avg.outputTokens, 1) + '</li>');
+          bodyParts.push('<li><strong>Accuracy:</strong> ' + accuracyLine + '</li>');
           bodyParts.push('</ul><h6>Variance</h6><ul class="list-unstyled mb-3">');
           bodyParts.push('<li><strong>TPS σ:</strong> ' + formatNumber(model.variance.tokensPerSecondStdDev, 2) + '</li>');
           bodyParts.push('<li><strong>TTFT σ (s):</strong> ' + formatNumber(model.variance.timeToFirstTokenStdDevSeconds, 2) + '</li>');
@@ -907,9 +966,10 @@ const reportTemplateHTML = `<!DOCTYPE html>
         }
 
         var summary = analysis.overall || {};
-        $('#fastestModel').text(summary.fastestModel || '—');
-        $('#bestLatencyModel').text(summary.bestLatencyModel || '—');
-        $('#mostEfficientModel').text(summary.mostEfficientModel || '—');
+        $('#fastestModel').text(summary.fastestModel || '-');
+        $('#bestLatencyModel').text(summary.bestLatencyModel || '-');
+        $('#mostEfficientModel').text(summary.mostEfficientModel || '-');
+        $('#mostAccurateModel').text(summary.mostAccurateModel || '-');
 
         var models = analysis.models || [];
         var interactiveCount = models.filter(function(model) {
