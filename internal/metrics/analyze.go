@@ -647,6 +647,49 @@ const reportTemplateHTML = `<!DOCTYPE html>
     .accordion-button .badge { margin-left: 0.5rem; }
     .list-group-item { display: flex; align-items: center; justify-content: space-between; }
     .notes-list li { margin-bottom: 0.25rem; }
+    .chart-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    }
+    .chart-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #2d3748;
+      margin-bottom: 0.25rem;
+    }
+    .chart-subtitle {
+      color: #718096;
+      margin-bottom: 1.5rem;
+    }
+    .chart-canvas {
+      position: relative;
+      height: 420px;
+    }
+    .legend-container {
+      display: flex;
+      gap: 1.5rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 1.25rem;
+      padding-top: 1.25rem;
+      border-top: 2px solid #e2e8f0;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .legend-color {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+    }
+    .legend-text {
+      font-size: 0.9rem;
+      color: #4a5568;
+    }
   </style>
 </head>
 <body>
@@ -732,15 +775,32 @@ const reportTemplateHTML = `<!DOCTYPE html>
     </section>
 
     <section class="mt-4">
-      <div class="card shadow-sm">
-        <div class="card-header bg-white">
-          <h5 class="mb-0">Accuracy vs. Throughput (Avg TPS)</h5>
-        </div>
+      <div class="card shadow-sm chart-card">
         <div class="card-body">
-          <div class="ratio ratio-16x9">
+          <div class="chart-title">LLM Performance Analysis</div>
+          <div class="chart-subtitle">Accuracy vs throughput trade-offs - higher is better</div>
+          <div class="chart-canvas">
             <canvas id="accuracyThroughputChart" aria-label="Accuracy vs throughput chart" role="img"></canvas>
           </div>
           <div id="accuracyThroughputEmpty" class="text-muted small mt-2"></div>
+          <div class="legend-container">
+            <div class="legend-item">
+              <div class="legend-color" style="background: #10b981;"></div>
+              <span class="legend-text"><strong>Excellent</strong> (70%+ accuracy)</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background: #3b82f6;"></div>
+              <span class="legend-text"><strong>Good</strong> (50-70% accuracy)</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background: #f59e0b;"></div>
+              <span class="legend-text"><strong>Fair</strong> (35-50% accuracy)</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background: #ef4444;"></div>
+              <span class="legend-text"><strong>Poor</strong> (&lt;35% accuracy)</span>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -995,6 +1055,13 @@ const reportTemplateHTML = `<!DOCTYPE html>
         if (!canvas) {
           return;
         }
+        function getColorForAccuracy(accuracy) {
+          if (accuracy >= 70) return '#10b981';
+          if (accuracy >= 50) return '#3b82f6';
+          if (accuracy >= 35) return '#f59e0b';
+          return '#ef4444';
+        }
+
         var points = [];
         models.forEach(function(model) {
           if (!model.accuracy || model.accuracy.total <= 0) {
@@ -1013,36 +1080,97 @@ const reportTemplateHTML = `<!DOCTYPE html>
           $('#accuracyThroughputEmpty').text('No accuracy data available for this report.');
           return;
         }
+
+        var chartData = points.map(function(point) {
+          return {
+            x: point.x,
+            y: point.y,
+            modelName: point.modelName,
+            backgroundColor: getColorForAccuracy(point.y)
+          };
+        });
+
+        var labelPlugin = {
+          id: 'modelLabels',
+          afterDatasetsDraw: function(chart) {
+            var ctx = chart.ctx;
+            chart.data.datasets.forEach(function(dataset, datasetIndex) {
+              var meta = chart.getDatasetMeta(datasetIndex);
+              meta.data.forEach(function(element, index) {
+                var data = chartData[index];
+                if (!data) {
+                  return;
+                }
+                var modelName = (data.modelName || '').split(':')[0];
+                if (!modelName) {
+                  return;
+                }
+                ctx.fillStyle = '#2d3748';
+                ctx.font = 'bold 11px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText(modelName, element.x, element.y - 12);
+              });
+            });
+          }
+        };
+
         new Chart(canvas, {
           type: 'scatter',
           data: {
             datasets: [{
-              label: 'Models',
-              data: points,
-              backgroundColor: 'rgba(54, 162, 235, 0.75)',
-              borderColor: 'rgba(54, 162, 235, 1)',
-              pointRadius: 6,
-              pointHoverRadius: 8
+              data: chartData,
+              pointRadius: 8,
+              pointHoverRadius: 12,
+              pointBackgroundColor: chartData.map(function(d) { return d.backgroundColor; }),
+              pointBorderColor: '#ffffff',
+              pointBorderWidth: 2,
+              pointHoverBorderWidth: 3
             }]
           },
           options: {
-            animation: false,
             responsive: true,
             maintainAspectRatio: false,
+            animation: false,
             scales: {
               x: {
                 title: {
                   display: true,
-                  text: 'Avg TPS (Throughput)'
+                  text: 'Throughput (tokens/second)',
+                  font: {
+                    size: 14,
+                    weight: 'bold'
+                  },
+                  color: '#4a5568'
+                },
+                grid: {
+                  color: 'rgba(0, 0, 0, 0.05)'
+                },
+                ticks: {
+                  color: '#718096'
                 }
               },
               y: {
                 title: {
                   display: true,
-                  text: 'Accuracy (%)'
+                  text: 'Accuracy (%)',
+                  font: {
+                    size: 14,
+                    weight: 'bold'
+                  },
+                  color: '#4a5568'
                 },
                 suggestedMin: 0,
-                suggestedMax: 100
+                suggestedMax: 100,
+                grid: {
+                  color: 'rgba(0, 0, 0, 0.05)'
+                },
+                ticks: {
+                  color: '#718096',
+                  callback: function(value) {
+                    return value + '%';
+                  }
+                }
               }
             },
             plugins: {
@@ -1055,12 +1183,23 @@ const reportTemplateHTML = `<!DOCTYPE html>
                     var point = context.raw || {};
                     var tps = typeof point.x === 'number' ? point.x.toFixed(2) : 'n/a';
                     var acc = typeof point.y === 'number' ? point.y.toFixed(1) : 'n/a';
-                    return (point.modelName || 'model') + ': ' + tps + ' TPS, ' + acc + '%';
+                    return [
+                      'Throughput: ' + tps + ' tokens/sec',
+                      'Accuracy: ' + acc + '%'
+                    ];
+                  },
+                  title: function(items) {
+                    if (!items.length) {
+                      return 'model';
+                    }
+                    var data = chartData[items[0].dataIndex] || {};
+                    return data.modelName || 'model';
                   }
                 }
               }
             }
-          }
+          },
+          plugins: [labelPlugin]
         });
       }
 
