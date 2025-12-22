@@ -141,7 +141,7 @@ func RunAccuracy(cfg *appconfig.Config) error {
 					MarginOfError:      t.MarginOfError,
 					Difficulty:         t.Difficulty,
 					DeadlineExceeded:   false,
-					DeadlineTimeoutSec: 0,
+					DeadlineTimeoutSec: cfg.TimeoutSeconds,
 				}
 
 				if err := appendResult(r.model, result); err != nil {

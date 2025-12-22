@@ -1263,7 +1263,16 @@ const reportTemplateHTML = `<!DOCTYPE html>
           }
         });
         if (timeoutSeconds !== null && timeoutSeconds > 0) {
-          $('#timeoutsHeader').text('Timeouts (' + timeoutSeconds + 's)');
+          var headerText = 'Timeouts (' + timeoutSeconds + 's) ';
+          var $header = $('#timeoutsHeader');
+          var textNode = $header.contents().filter(function() {
+            return this.nodeType === 3;
+          }).first();
+          if (textNode.length) {
+            textNode[0].textContent = headerText;
+          } else {
+            $header.prepend(document.createTextNode(headerText));
+          }
         }
         var interactiveCount = models.filter(function(model) {
           return model.labels && model.labels.interactiveSuitability === 'good';
