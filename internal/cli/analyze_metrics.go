@@ -21,6 +21,7 @@ type analyzeMetricsOptions struct {
 	accuracyResultsDir string
 	hostName           string
 	hostNotes          string
+	accuracyOnly       bool
 }
 
 var analyzeMetricsOpts analyzeMetricsOptions
@@ -34,18 +35,26 @@ derived metrics, and emit both the analysis JSON and a self-contained HTML
 dashboard for review.`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if analyzeMetricsOpts.inputPath == "" {
-			return fmt.Errorf("input benchmark file is required (pass --input)")
-		}
+		var results metrics.BenchmarkResults
+		if analyzeMetricsOpts.accuracyOnly {
+			var err error
+			results, err = loadAccuracyPerformanceResults(analyzeMetricsOpts.accuracyResultsDir)
+			if err != nil {
+				return err
+			}
+		} else {
+			if analyzeMetricsOpts.inputPath == "" {
+				return fmt.Errorf("input benchmark file is required (pass --input)")
+			}
+			data, err := os.ReadFile(analyzeMetricsOpts.inputPath)
+			if err != nil {
+				return fmt.Errorf("unable to read benchmark file %s: %w", analyzeMetricsOpts.inputPath, err)
+			}
 
-		data, err := os.ReadFile(analyzeMetricsOpts.inputPath)
-		if err != nil {
-			return fmt.Errorf("unable to read benchmark file %s: %w", analyzeMetricsOpts.inputPath, err)
-		}
-
-		results, err := parseBenchmarkResults(data)
-		if err != nil {
-			return fmt.Errorf("unable to parse benchmark JSON %s: %w", analyzeMetricsOpts.inputPath, err)
+			results, err = parseBenchmarkResults(data)
+			if err != nil {
+				return fmt.Errorf("unable to parse benchmark JSON %s: %w", analyzeMetricsOpts.inputPath, err)
+			}
 		}
 
 		host := metrics.HostInfo{
@@ -92,6 +101,7 @@ func init() {
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.accuracyResultsDir, "accuracy-results", "accuracy/results", "Optional path to accuracy JSONL results directory")
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.hostName, "host-name", "", "Optional cluster/host label to embed in the analysis")
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.hostNotes, "host-notes", "", "Optional host notes to embed in the analysis")
+	analyzeMetricsCmd.Flags().BoolVar(&analyzeMetricsOpts.accuracyOnly, "accuracy-only", true, "Build the report from accuracy JSONL data instead of benchmark JSON")
 
 	analyzeCmd.AddCommand(analyzeMetricsCmd)
 }
@@ -187,6 +197,11 @@ type accuracyLine struct {
 	MarginOfError int    `json:"marginOfError"`
 	DeadlineExceeded bool `json:"deadlineExceeded"`
 	DeadlineTimeoutSec int `json:"deadlineTimeout"`
+	TimeToFirstToken int     `json:"time_to_first_token"`
+	TokensPerSecond  float64 `json:"tokens_per_second"`
+	InputTokens      int     `json:"input_tokens"`
+	OutputTokens     int     `json:"output_tokens"`
+	TotalDurationMs  int     `json:"total_duration_ms"`
 }
 
 type accuracyTotals struct {
@@ -319,4 +334,187 @@ func loadAccuracyStats(dir string) (map[string]metrics.AccuracyStats, error) {
 	}
 
 	return stats, nil
+}
+
+func loadAccuracyPerformanceResults(dir string) (metrics.BenchmarkResults, error) {
+	if dir == "" {
+		return metrics.BenchmarkResults{}, nil
+	}
+
+	info, err := os.Stat(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return metrics.BenchmarkResults{}, nil
+		}
+		return nil, fmt.Errorf("unable to stat accuracy results dir %s: %w", dir, err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("accuracy results path is not a directory: %s", dir)
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read accuracy results dir %s: %w", dir, err)
+	}
+
+	type perfSample struct {
+		tps          float64
+		ttftMs       int
+		inputTokens  int
+		outputTokens int
+		totalMs      int
+	}
+
+	perfByModel := make(map[string][]perfSample)
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".jsonl" {
+			continue
+		}
+		path := filepath.Join(dir, entry.Name())
+		file, err := os.Open(path)
+		if err != nil {
+			return nil, fmt.Errorf("unable to open accuracy results file %s: %w", path, err)
+		}
+
+		scanner := bufio.NewScanner(file)
+		scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+		lineNo := 0
+		for scanner.Scan() {
+			lineNo++
+			line := strings.TrimSpace(scanner.Text())
+			if line == "" {
+				continue
+			}
+			var rec accuracyLine
+			if err := json.Unmarshal([]byte(line), &rec); err != nil {
+				_ = file.Close()
+				return nil, fmt.Errorf("unable to parse accuracy JSONL %s:%d: %w", path, lineNo, err)
+			}
+			if rec.Model == "" {
+				_ = file.Close()
+				return nil, fmt.Errorf("accuracy JSONL missing model field %s:%d", path, lineNo)
+			}
+			if rec.DeadlineExceeded {
+				continue
+			}
+			perfByModel[rec.Model] = append(perfByModel[rec.Model], perfSample{
+				tps:          rec.TokensPerSecond,
+				ttftMs:       rec.TimeToFirstToken,
+				inputTokens:  rec.InputTokens,
+				outputTokens: rec.OutputTokens,
+				totalMs:      rec.TotalDurationMs,
+			})
+		}
+		if err := scanner.Err(); err != nil {
+			_ = file.Close()
+			return nil, fmt.Errorf("error reading accuracy results file %s: %w", path, err)
+		}
+		if err := file.Close(); err != nil {
+			return nil, fmt.Errorf("error closing accuracy results file %s: %w", path, err)
+		}
+	}
+
+	results := make(metrics.BenchmarkResults, len(perfByModel))
+	for model, samples := range perfByModel {
+		if len(samples) == 0 {
+			continue
+		}
+
+		var (
+			sumTPS, sumTTFT, sumInput, sumOutput, sumTotal float64
+			minTPS, maxTPS                                 float64
+			minTTFT, maxTTFT                               int
+			minInput, maxInput                             int
+			minOutput, maxOutput                           int
+			minTotal, maxTotal                             int
+		)
+
+		for i, s := range samples {
+			sumTPS += s.tps
+			sumTTFT += float64(s.ttftMs)
+			sumInput += float64(s.inputTokens)
+			sumOutput += float64(s.outputTokens)
+			sumTotal += float64(s.totalMs)
+			if i == 0 || s.tps < minTPS {
+				minTPS = s.tps
+			}
+			if i == 0 || s.tps > maxTPS {
+				maxTPS = s.tps
+			}
+			if i == 0 || s.ttftMs < minTTFT {
+				minTTFT = s.ttftMs
+			}
+			if i == 0 || s.ttftMs > maxTTFT {
+				maxTTFT = s.ttftMs
+			}
+			if i == 0 || s.inputTokens < minInput {
+				minInput = s.inputTokens
+			}
+			if i == 0 || s.inputTokens > maxInput {
+				maxInput = s.inputTokens
+			}
+			if i == 0 || s.outputTokens < minOutput {
+				minOutput = s.outputTokens
+			}
+			if i == 0 || s.outputTokens > maxOutput {
+				maxOutput = s.outputTokens
+			}
+			if i == 0 || s.totalMs < minTotal {
+				minTotal = s.totalMs
+			}
+			if i == 0 || s.totalMs > maxTotal {
+				maxTotal = s.totalMs
+			}
+		}
+
+		count := float64(len(samples))
+		avgTPS := sumTPS / count
+		avgTTFT := sumTTFT / count
+		avgInput := sumInput / count
+		avgOutput := sumOutput / count
+		avgTotal := sumTotal / count
+
+		iterations := make([]metrics.Iteration, 0, len(samples))
+		for i, s := range samples {
+			iterations = append(iterations, metrics.Iteration{
+				Iteration: i + 1,
+				Stats: metrics.Stats{
+					TotalExecutionTime: int64(s.totalMs) * 1e6,
+					TimeToFirstToken:   int64(s.ttftMs) * 1e6,
+					TokensPerSecond:    s.tps,
+					InputTokenCount:    s.inputTokens,
+					OutputTokenCount:   s.outputTokens,
+				},
+			})
+		}
+
+		results[model] = metrics.ModelBenchmark{
+			ModelName:      model,
+			BenchmarkCount: len(samples),
+			AverageStats: metrics.Stats{
+				TotalExecutionTime: int64(avgTotal * 1e6),
+				TimeToFirstToken:   int64(avgTTFT * 1e6),
+				TokensPerSecond:    avgTPS,
+				InputTokenCount:    int(math.Round(avgInput)),
+				OutputTokenCount:   int(math.Round(avgOutput)),
+			},
+			MinStats: metrics.Stats{
+				TotalExecutionTime: int64(minTotal) * 1e6,
+				TimeToFirstToken:   int64(minTTFT) * 1e6,
+				TokensPerSecond:    minTPS,
+				InputTokenCount:    minInput,
+				OutputTokenCount:   minOutput,
+			},
+			MaxStats: metrics.Stats{
+				TotalExecutionTime: int64(maxTotal) * 1e6,
+				TimeToFirstToken:   int64(maxTTFT) * 1e6,
+				TokensPerSecond:    maxTPS,
+				InputTokenCount:    maxInput,
+				OutputTokenCount:   maxOutput,
+			},
+			Iterations: iterations,
+		}
+	}
+
+	return results, nil
 }

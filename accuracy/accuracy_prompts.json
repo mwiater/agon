@@ -3,162 +3,202 @@
   "tests": [
     {
       "id": 1,
-      "prompt": "What is the atomic number of Iron?",
-      "expected_answer": 26,
-      "category": "Chemistry Retrieval",
-      "difficulty": 4,
+      "prompt": "What is the atomic number of Helium?",
+      "expected_answer": 2,
+      "category": "Basic Retrieval",
+      "difficulty": 2,
       "marginOfError": 0
     },
     {
       "id": 2,
-      "prompt": "Calculate (45 / 3) + (12 * 2).",
-      "expected_answer": 39,
-      "category": "Arithmetic",
-      "difficulty": 4,
+      "prompt": "How many legs does a spider have?",
+      "expected_answer": 8,
+      "category": "Biology Retrieval",
+      "difficulty": 2,
       "marginOfError": 0
     },
     {
       "id": 3,
-      "prompt": "How many players are on a standard baseball team on the field at one time?",
-      "expected_answer": 9,
-      "category": "General Knowledge",
+      "prompt": "What is the result of 144 divided by 4?",
+      "expected_answer": 36,
+      "category": "Simple Arithmetic",
       "difficulty": 4,
       "marginOfError": 0
     },
     {
       "id": 4,
-      "prompt": "What is the square root of 225?",
-      "expected_answer": 15,
-      "category": "Math Retrieval",
-      "difficulty": 4,
-      "marginOfError": 0
-    },
-    {
-      "id": 5,
-      "prompt": "If x = 12 and y = (x / 2) + 7, what is y?",
-      "expected_answer": 13,
-      "category": "Variable Logic",
-      "difficulty": 4,
-      "marginOfError": 0
-    },
-    {
-      "id": 6,
-      "prompt": "How many continents are there on Earth?",
-      "expected_answer": 7,
-      "category": "Geography",
-      "difficulty": 4,
-      "marginOfError": 0
-    },
-    {
-      "id": 7,
-      "prompt": "In the sequence 3, 9, 27, 81, what is the next number?",
-      "expected_answer": 243,
+      "prompt": "In the sequence 5, 10, 20, 40, what is the next number?",
+      "expected_answer": 80,
       "category": "Pattern Recognition",
       "difficulty": 5,
       "marginOfError": 0
     },
     {
-      "id": 8,
-      "prompt": "What is the boiling point of water in degrees Fahrenheit at sea level?",
-      "expected_answer": 212,
-      "category": "Physics Retrieval",
-      "difficulty": 5,
+      "id": 5,
+      "prompt": "What is the sum of the angles in a triangle (in degrees)?",
+      "expected_answer": 180,
+      "category": "Geometry Retrieval",
+      "difficulty": 3,
       "marginOfError": 0
     },
     {
-      "id": 9,
-      "prompt": "How many edges does a standard cube have?",
-      "expected_answer": 12,
-      "category": "Spatial Logic",
-      "difficulty": 5,
-      "marginOfError": 0
-    },
-    {
-      "id": 10,
-      "prompt": "What is 15 percent of 400?",
-      "expected_answer": 60,
-      "category": "Percentages",
-      "difficulty": 5,
-      "marginOfError": 0
-    },
-    {
-      "id": 11,
-      "prompt": "How many minutes are in 2.5 hours?",
-      "expected_answer": 150,
-      "category": "Unit Conversion",
-      "difficulty": 5,
-      "marginOfError": 0
-    },
-    {
-      "id": 12,
-      "prompt": "Imagine you are visiting a local organic farm on a Sunday morning. The farmer, who has been raising free-range chickens for over twenty years, informs you that his prize-winning hens have had a very productive week. He offers you a special deal on his fresh produce. He explains that a single carton containing exactly one dozen Grade-A large eggs is priced at three dollars and zero cents. Given this specific pricing structure provided by the farmer for his artisanal local produce, and assuming there are no additional taxes or bulk discounts applied to this individual transaction, calculate exactly how many individual cents one single egg would cost. Provide only the integer.",
-      "expected_answer": 25,
-      "category": "Arithmetic Reasoning - Long Form",
-      "difficulty": 5,
-      "marginOfError": 0
-    },
-    {
-      "id": 13,
-      "prompt": "What is the largest 2-digit prime number?",
-      "expected_answer": 97,
-      "category": "Number Theory",
-      "difficulty": 5,
-      "marginOfError": 0
-    },
-    {
-      "id": 14,
-      "prompt": "How many hours are in one full week?",
-      "expected_answer": 168,
-      "category": "Calculation",
-      "difficulty": 5,
-      "marginOfError": 0
-    },
-    {
-      "id": 15,
-      "prompt": "What is the atomic number of Silver?",
-      "expected_answer": 47,
-      "category": "Chemistry Retrieval",
-      "difficulty": 5,
-      "marginOfError": 0
-    },
-    {
-      "id": 16,
-      "prompt": "How many strings are on a standard guitar?",
-      "expected_answer": 6,
-      "category": "General Knowledge",
+      "id": 6,
+      "prompt": "If x = 5 and y = x + 10, what is y?",
+      "expected_answer": 15,
+      "category": "Variable Logic",
       "difficulty": 4,
       "marginOfError": 0
     },
     {
-      "id": 17,
-      "prompt": "What is the value of 2 to the power of 8?",
-      "expected_answer": 256,
+      "id": 7,
+      "prompt": "A clock shows 3:00. How many degrees are between the hour and minute hand?",
+      "expected_answer": 90,
+      "category": "Spatial Logic",
+      "difficulty": 7,
+      "marginOfError": 0
+    },
+    {
+      "id": 8,
+      "prompt": "How many faces does a standard cube have?",
+      "expected_answer": 6,
+      "category": "Spatial Retrieval",
+      "difficulty": 3,
+      "marginOfError": 0
+    },
+    {
+      "id": 9,
+      "prompt": "If you have 3 apples and you take away 2, how many apples do YOU have?",
+      "expected_answer": 2,
+      "category": "Linguistic Trap",
+      "difficulty": 8,
+      "marginOfError": 0
+    },
+    {
+      "id": 10,
+      "prompt": "What is 10% of 2000?",
+      "expected_answer": 200,
+      "category": "Percentage",
+      "difficulty": 4,
+      "marginOfError": 0
+    },
+    {
+      "id": 11,
+      "prompt": "How many centimeters are in 2 meters?",
+      "expected_answer": 200,
+      "category": "Unit Conversion",
+      "difficulty": 4,
+      "marginOfError": 0
+    },
+    {
+      "id": 12,
+      "prompt": "A baker has 12 cookies. He sells all but 4. How many cookies does he have left?",
+      "expected_answer": 4,
+      "category": "Semantic Parsing",
+      "difficulty": 7,
+      "marginOfError": 0
+    },
+    {
+      "id": 13,
+      "prompt": "What is the square of 13?",
+      "expected_answer": 169,
       "category": "Math Retrieval",
       "difficulty": 5,
       "marginOfError": 0
     },
     {
-      "id": 18,
-      "prompt": "How many interior degrees are in a square?",
-      "expected_answer": 360,
-      "category": "Geometry",
+      "id": 14,
+      "prompt": "If a rectangle is 5cm wide and 10cm long, what is its area in cm?",
+      "expected_answer": 50,
+      "category": "Geometry Calculation",
       "difficulty": 4,
       "marginOfError": 0
     },
     {
-      "id": 19,
-      "prompt": "What is the sum of the first 5 positive integers?",
-      "expected_answer": 15,
-      "category": "Sequential Math",
+      "id": 15,
+      "prompt": "How many days are in the month of September?",
+      "expected_answer": 30,
+      "category": "Temporal Retrieval",
+      "difficulty": 3,
+      "marginOfError": 0
+    },
+    {
+      "id": 16,
+      "prompt": "What is the equatorial radius of Jupiter in kilometers?",
+      "expected_answer": 71492,
+      "category": "Planetary Science",
+      "difficulty": 6,
+      "marginOfError": 100
+    },
+    {
+      "id": 17,
+      "prompt": "How many bones are in the adult human body?",
+      "expected_answer": 206,
+      "category": "Anatomy",
       "difficulty": 4,
+      "marginOfError": 0
+    },
+    {
+      "id": 18,
+      "prompt": "What is the speed of light in a vacuum in meters per second?",
+      "expected_answer": 299792458,
+      "category": "Physical Constants",
+      "difficulty": 8,
+      "marginOfError": 500
+    },
+    {
+      "id": 19,
+      "prompt": "How many bits are in 4 bytes?",
+      "expected_answer": 32,
+      "category": "Computing",
+      "difficulty": 3,
       "marginOfError": 0
     },
     {
       "id": 20,
-      "prompt": "Consider a mathematical scenario involving a specific positive integer. We start our calculation with the number forty-eight. First, you must perform a primary operation where you take this initial value of forty-eight and double it precisely. Once you have arrived at the intermediate product of that first step, you are then required to perform a secondary operation. In this second stage, you must take the intermediate value you just calculated and subtract the number sixteen from it. After completing both the doubling of the original value and the subsequent subtraction of sixteen in the correct order of operations, what is the final numerical result of this multi-step mathematical sequence? Provide only the final integer as your output.",
-      "expected_answer": 80,
-      "category": "Multi-step Logic - Long Form",
-      "difficulty": 4,
+      "prompt": "How many states are in the United States of America?",
+      "expected_answer": 50,
+      "category": "Geography",
+      "difficulty": 1,
+      "marginOfError": 0
+    },
+    {
+      "id": 21,
+      "prompt": "Which of these integers is the greatest: 45, 102, or 88? Output only the final number.",
+      "expected_answer": 102,
+      "category": "Comparative Magnitude",
+      "difficulty": 5,
+      "marginOfError": 0
+    },
+    {
+      "id": 22,
+      "prompt": "In formal logic, if we assume that all healthy plants are green, is a plant that is not green necessarily unhealthy? Please think through this conditional statement and answer with 1 for 'Yes' or 0 for 'No'. Provide only the integer as your output.",
+      "expected_answer": 1,
+      "category": "Negation Logic",
+      "difficulty": 7,
+      "marginOfError": 0
+    },
+    {
+      "id": 23,
+      "prompt": "A large industrial water tank starts the day with exactly 50 liters of liquid. Every single hour that passes, precisely 4 liters are systematically removed from the tank. If this removal process begins at exactly 1:00 PM and continues at a steady rate until it ends at 6:00 PM, how many total liters are left in the tank? Provide only the integer.",
+      "expected_answer": 30,
+      "category": "State Tracking",
+      "difficulty": 6,
+      "marginOfError": 0
+    },
+    {
+      "id": 24,
+      "prompt": "Focus your attention on the word 'GOLANG' and identify the third character in the string. Your specific task is to determine the numerical position of that letter in the standard English alphabet, where the letter A is assigned 1, B is 2, C is 3, and so on. After successfully identifying the alphabetical index for that third letter, multiply that specific number by 2. What is the final numerical value? Provide only the integer.",
+      "expected_answer": 24,
+      "category": "Token-Level Math",
+      "difficulty": 8,
+      "marginOfError": 0
+    },
+    {
+      "id": 25,
+      "prompt": "In mathematics, we often categorize integers based on shared properties like being a perfect square. Consider the following sequence: four, nine, sixteen, twenty-five, and thirty. Most of these values are perfect squares, which means they are the result of an integer being multiplied by itself. However, there is one number that is the 'odd one out' because it fails this specific condition. Examine the numbers provided, identify the one that is not a perfect square, and then output that number as your final result. Provide only the integer.",
+      "expected_answer": 30,
+      "category": "Categorical Exclusion",
+      "difficulty": 7,
       "marginOfError": 0
     }
   ]

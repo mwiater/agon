@@ -108,6 +108,7 @@ type ModelAnalysis struct {
 	Labels         LabelStats      `json:"labels"`
 	DerivedRatios  DerivedRatios   `json:"derivedRatios"`
 	Notes          []string        `json:"notes"`
+	Iterations     []Iteration     `json:"iterations,omitempty"`
 }
 
 // ThroughputRankingEntry captures ordering by throughput.
@@ -276,6 +277,10 @@ func AnalyzeMetrics(results BenchmarkResults, host HostInfo, accuracy map[string
 			TokensPerSecondStdDev:         stddevFromValues(iterTPS, ma.Avg.TokensPerSecond),
 			TimeToFirstTokenStdDevSeconds: stddevFromValues(iterTTFT, ma.Avg.TimeToFirstTokenSeconds),
 			OutputTokensStdDev:            stddevFromValues(iterOutputTokens, ma.Avg.OutputTokens),
+		}
+
+		if len(bench.Iterations) > 0 {
+			ma.Iterations = bench.Iterations
 		}
 
 		if ma.Avg.TokensPerSecond > globalMaxAvgTPS {
@@ -690,6 +695,17 @@ const reportTemplateHTML = `<!DOCTYPE html>
       font-size: 0.9rem;
       color: #4a5568;
     }
+    .filter-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    .filter-label {
+      font-weight: 600;
+      color: #2d3748;
+    }
   </style>
 </head>
 <body>
@@ -812,6 +828,33 @@ const reportTemplateHTML = `<!DOCTYPE html>
         </div>
         <div class="card-body">
           <div class="accordion" id="modelAccordion"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mt-4">
+      <div class="card shadow-sm chart-card">
+        <div class="card-body">
+          <div class="chart-title">Input Tokens vs Processing</div>
+          <div class="chart-subtitle">Visualize how input length affects TTFT and throughput.</div>
+          <div class="filter-row">
+            <span class="filter-label">Model filter:</span>
+            <select class="form-select form-select-sm w-auto" id="inputTokenModelFilter"></select>
+          </div>
+          <div class="row g-3">
+            <div class="col-lg-6">
+              <div class="chart-canvas">
+                <canvas id="inputTokensTtftChart" aria-label="Input tokens vs time to first token" role="img"></canvas>
+              </div>
+              <div id="inputTokensTtftEmpty" class="text-muted small mt-2"></div>
+            </div>
+            <div class="col-lg-6">
+              <div class="chart-canvas">
+                <canvas id="inputTokensTpsChart" aria-label="Input tokens vs tokens per second" role="img"></canvas>
+              </div>
+              <div id="inputTokensTpsEmpty" class="text-muted small mt-2"></div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -1215,6 +1258,177 @@ const reportTemplateHTML = `<!DOCTYPE html>
         });
       }
 
+      function buildInputTokenCharts(models) {
+        var ttftCanvas = document.getElementById('inputTokensTtftChart');
+        var tpsCanvas = document.getElementById('inputTokensTpsChart');
+        if (!ttftCanvas || !tpsCanvas) {
+          return;
+        }
+
+        var palette = [
+          '#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#6366f1',
+          '#14b8a6', '#f97316', '#8b5cf6', '#0ea5e9', '#84cc16'
+        ];
+        var modelColors = {};
+        models.forEach(function(model, index) {
+          modelColors[model.modelName] = palette[index % palette.length];
+        });
+
+        function collectPoints(selectedModel) {
+          var datasets = [];
+          models.forEach(function(model) {
+            if (selectedModel && selectedModel !== 'all' && model.modelName !== selectedModel) {
+              return;
+            }
+            var iterations = model.iterations || [];
+            if (!iterations.length) {
+              return;
+            }
+            var color = modelColors[model.modelName] || '#3b82f6';
+            var ttftPoints = [];
+            var tpsPoints = [];
+            iterations.forEach(function(iter) {
+              if (!iter || !iter.stats) {
+                return;
+              }
+              var inputTokens = Number(iter.stats.inputTokenCount);
+              if (isNaN(inputTokens)) {
+                return;
+              }
+              var ttftMs = Number(iter.stats.timeToFirstToken) / 1e6;
+              if (!isNaN(ttftMs)) {
+                ttftPoints.push({ x: inputTokens, y: ttftMs, modelName: model.modelName });
+              }
+              var tps = Number(iter.stats.tokensPerSecond);
+              if (!isNaN(tps)) {
+                tpsPoints.push({ x: inputTokens, y: tps, modelName: model.modelName });
+              }
+            });
+            if (ttftPoints.length) {
+              datasets.push({
+                model: model.modelName,
+                color: color,
+                ttft: ttftPoints,
+                tps: tpsPoints
+              });
+            }
+          });
+          return datasets;
+        }
+
+        function buildChart(canvas, datasets, yLabel, yFormatter) {
+          return new Chart(canvas, {
+            type: 'scatter',
+            data: {
+              datasets: datasets.map(function(dataset) {
+                return {
+                  label: dataset.model,
+                  data: yLabel.indexOf('TTFT') !== -1 ? dataset.ttft : dataset.tps,
+                  backgroundColor: dataset.color,
+                  borderColor: '#ffffff',
+                  borderWidth: 1,
+                  pointRadius: 6,
+                  pointHoverRadius: 9
+                };
+              })
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: false,
+              scales: {
+                x: {
+                  title: {
+                    display: true,
+                    text: 'Input tokens',
+                    font: { size: 13, weight: 'bold' },
+                    color: '#4a5568'
+                  },
+                  grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                  ticks: { color: '#718096' }
+                },
+                y: {
+                  title: {
+                    display: true,
+                    text: yLabel,
+                    font: { size: 13, weight: 'bold' },
+                    color: '#4a5568'
+                  },
+                  grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                  ticks: {
+                    color: '#718096',
+                    callback: yFormatter
+                  }
+                }
+              },
+              plugins: {
+                legend: {
+                  position: 'bottom',
+                  labels: {
+                    usePointStyle: true,
+                    boxWidth: 8,
+                    color: '#4a5568'
+                  }
+                },
+                tooltip: {
+                  callbacks: {
+                    title: function(items) {
+                      if (!items.length) {
+                        return 'model';
+                      }
+                      var point = items[0].raw || {};
+                      return point.modelName || items[0].dataset.label || 'model';
+                    },
+                    label: function(context) {
+                      var point = context.raw || {};
+                      var x = typeof point.x === 'number' ? point.x.toFixed(0) : 'n/a';
+                      var y = typeof point.y === 'number' ? point.y.toFixed(2) : 'n/a';
+                      return 'Input tokens: ' + x + ', ' + yLabel + ': ' + y;
+                    }
+                  }
+                }
+              }
+            }
+          });
+        }
+
+        var modelsWithIterations = models.filter(function(model) {
+          return model.iterations && model.iterations.length;
+        });
+        var filter = $('#inputTokenModelFilter').empty();
+        filter.append('<option value="all">All models</option>');
+        modelsWithIterations.forEach(function(model) {
+          filter.append('<option value="' + model.modelName + '">' + model.modelName + '</option>');
+        });
+
+        var ttftChart = null;
+        var tpsChart = null;
+
+        function renderCharts() {
+          if (ttftChart) {
+            ttftChart.destroy();
+          }
+          if (tpsChart) {
+            tpsChart.destroy();
+          }
+          $('#inputTokensTtftEmpty').text('');
+          $('#inputTokensTpsEmpty').text('');
+
+          var selected = filter.val();
+          var datasets = collectPoints(selected);
+          if (!datasets.length) {
+            $('#inputTokensTtftEmpty').text('No input token data available for this selection.');
+            $('#inputTokensTpsEmpty').text('No input token data available for this selection.');
+            return;
+          }
+          ttftChart = buildChart(ttftCanvas, datasets, 'TTFT (ms)', function(value) { return Math.round(value) + ' ms'; });
+          tpsChart = buildChart(tpsCanvas, datasets, 'Tokens per second', function(value) { return Math.round(value); });
+        }
+
+        filter.on('change', renderCharts);
+        renderCharts();
+      }
+
       function sortTable(columnIndex, type, direction) {
         var $tbody = $('#modelsTable tbody');
         var rows = $tbody.find('tr').get();
@@ -1282,6 +1496,7 @@ const reportTemplateHTML = `<!DOCTYPE html>
         populateTable(models);
         attachSorting();
         buildAccuracyThroughputChart(models);
+        buildInputTokenCharts(models);
         buildAccordion(models);
         populateAnomalies(analysis.anomalies || []);
         populateRecommendations(analysis.recommendations || []);

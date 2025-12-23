@@ -37,6 +37,7 @@ func RunAccuracy(cfg *appconfig.Config) error {
 	if len(cfg.Hosts) == 0 {
 		return fmt.Errorf("accuracy mode requires at least one host in the configuration")
 	}
+	timeoutSeconds := int(cfg.RequestTimeout().Seconds())
 
 	for _, host := range cfg.Hosts {
 		if len(host.Models) != 1 {
@@ -120,7 +121,7 @@ func RunAccuracy(cfg *appconfig.Config) error {
 							OutputTokens:       outputTokens,
 							TotalDurationMs:    totalDurationMs,
 							DeadlineExceeded:   true,
-							DeadlineTimeoutSec: cfg.TimeoutSeconds,
+							DeadlineTimeoutSec: timeoutSeconds,
 						}
 
 						if err := appendResult(r.model, result); err != nil {
@@ -153,7 +154,7 @@ func RunAccuracy(cfg *appconfig.Config) error {
 					OutputTokens:       outputTokens,
 					TotalDurationMs:    totalDurationMs,
 					DeadlineExceeded:   false,
-					DeadlineTimeoutSec: cfg.TimeoutSeconds,
+					DeadlineTimeoutSec: timeoutSeconds,
 				}
 
 				if err := appendResult(r.model, result); err != nil {
