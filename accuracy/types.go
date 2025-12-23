@@ -29,6 +29,11 @@ type AccuracyResult struct {
 	Correct            bool   `json:"correct"`
 	MarginOfError      int    `json:"marginOfError"`
 	Difficulty         int    `json:"difficulty"`
+	TimeToFirstToken   int    `json:"time_to_first_token"`
+	TokensPerSecond    float64 `json:"tokens_per_second"`
+	InputTokens        int    `json:"input_tokens"`
+	OutputTokens       int    `json:"output_tokens"`
+	TotalDurationMs    int    `json:"total_duration_ms"`
 	DeadlineExceeded   bool   `json:"deadlineExceeded"`
 	DeadlineTimeoutSec int    `json:"deadlineTimeout"`
 }

@@ -97,11 +97,12 @@ func RunAccuracy(cfg *appconfig.Config) error {
 				iteration := i + 1
 				fmt.Printf("[%d/%d] %s / %s - Prompt: %s\n", iteration, total, r.host.Name, r.model, t.Prompt)
 
-				response, err := runPrompt(r.provider, r.host, r.model, suite.SystemPrompt, t.Prompt)
+				response, meta, err := runPrompt(r.provider, r.host, r.model, suite.SystemPrompt, t.Prompt)
 				if err != nil {
 					deadlineExceeded := isDeadlineExceeded(err)
 					if deadlineExceeded {
 						fmt.Printf("[%d/%d] %s / %s - Result: deadlineExceeded=true error=%v\n", iteration, total, r.host.Name, r.model, err)
+						ttftMs, tokensPerSecond, inputTokens, outputTokens, totalDurationMs := accuracyMetrics(meta)
 						result := AccuracyResult{
 							Timestamp:          time.Now().Format(time.RFC3339),
 							Host:               r.host.Name,
@@ -113,6 +114,11 @@ func RunAccuracy(cfg *appconfig.Config) error {
 							Correct:            false,
 							MarginOfError:      t.MarginOfError,
 							Difficulty:         t.Difficulty,
+							TimeToFirstToken:   ttftMs,
+							TokensPerSecond:    tokensPerSecond,
+							InputTokens:        inputTokens,
+							OutputTokens:       outputTokens,
+							TotalDurationMs:    totalDurationMs,
 							DeadlineExceeded:   true,
 							DeadlineTimeoutSec: cfg.TimeoutSeconds,
 						}
@@ -129,6 +135,7 @@ func RunAccuracy(cfg *appconfig.Config) error {
 				correct := matchesExpected(response, t.ExpectedAnswer, t.MarginOfError)
 				fmt.Printf("[%d/%d] %s / %s - Result: correct=%t response=%q expected=%d\n", iteration, total, r.host.Name, r.model, correct, response, t.ExpectedAnswer)
 
+				ttftMs, tokensPerSecond, inputTokens, outputTokens, totalDurationMs := accuracyMetrics(meta)
 				result := AccuracyResult{
 					Timestamp:          time.Now().Format(time.RFC3339),
 					Host:               r.host.Name,
@@ -140,6 +147,11 @@ func RunAccuracy(cfg *appconfig.Config) error {
 					Correct:            correct,
 					MarginOfError:      t.MarginOfError,
 					Difficulty:         t.Difficulty,
+					TimeToFirstToken:   ttftMs,
+					TokensPerSecond:    tokensPerSecond,
+					InputTokens:        inputTokens,
+					OutputTokens:       outputTokens,
+					TotalDurationMs:    totalDurationMs,
 					DeadlineExceeded:   false,
 					DeadlineTimeoutSec: cfg.TimeoutSeconds,
 				}
@@ -155,8 +167,9 @@ func RunAccuracy(cfg *appconfig.Config) error {
 	return nil
 }
 
-func runPrompt(provider providers.ChatProvider, host appconfig.Host, modelName, systemPrompt, prompt string) (string, error) {
+func runPrompt(provider providers.ChatProvider, host appconfig.Host, modelName, systemPrompt, prompt string) (string, providers.StreamMetadata, error) {
 	var output strings.Builder
+	var meta providers.StreamMetadata
 
 	req := providers.StreamRequest{
 		Host:         host,
@@ -175,13 +188,17 @@ func runPrompt(provider providers.ChatProvider, host appconfig.Host, modelName, 
 			output.WriteString(chunk.Content)
 			return nil
 		},
+		OnComplete: func(m providers.StreamMetadata) error {
+			meta = m
+			return nil
+		},
 	}
 
 	if err := provider.Stream(context.Background(), req, callbacks); err != nil {
-		return "", err
+		return "", meta, err
 	}
 
-	return strings.TrimSpace(output.String()), nil
+	return strings.TrimSpace(output.String()), meta, nil
 }
 
 func loadPromptSuite(path string) (PromptSuite, error) {
@@ -240,6 +257,16 @@ func parseAnswer(response string) (int, bool) {
 		return parseFromTokens(trimmed)
 	}
 	return value, true
+}
+
+func accuracyMetrics(meta providers.StreamMetadata) (int, float64, int, int, int) {
+	ttftMs := int((meta.LoadDuration + meta.PromptEvalDuration) / int64(time.Millisecond))
+	totalDurationMs := int(meta.TotalDuration / int64(time.Millisecond))
+	tokensPerSecond := 0.0
+	if meta.EvalDuration > 0 {
+		tokensPerSecond = float64(meta.EvalCount) / (float64(meta.EvalDuration) / float64(time.Second))
+	}
+	return ttftMs, tokensPerSecond, meta.PromptEvalCount, meta.EvalCount, totalDurationMs
 }
 
 func matchesExpected(response string, expected, marginOfError int) bool {
