@@ -19,21 +19,27 @@ type PromptTest struct {
 
 // AccuracyResult records a single model response and its correctness.
 type AccuracyResult struct {
-	Timestamp          string `json:"timestamp"`
-	Host               string `json:"host"`
-	Model              string `json:"model"`
-	PromptID           int    `json:"promptId"`
-	Prompt             string `json:"prompt"`
-	ExpectedAnswer     int    `json:"expectedAnswer"`
-	Response           string `json:"response"`
-	Correct            bool   `json:"correct"`
-	MarginOfError      int    `json:"marginOfError"`
-	Difficulty         int    `json:"difficulty"`
-	TimeToFirstToken   int    `json:"time_to_first_token"`
+	Timestamp          string  `json:"timestamp"`
+	Host               string  `json:"host"`
+	Model              string  `json:"model"`
+	PromptID           int     `json:"promptId"`
+	Prompt             string  `json:"prompt"`
+	ExpectedAnswer     int     `json:"expectedAnswer"`
+	Response           string  `json:"response"`
+	Correct            bool    `json:"correct"`
+	MarginOfError      int     `json:"marginOfError"`
+	Difficulty         int     `json:"difficulty"`
+	TimeToFirstToken   int     `json:"time_to_first_token"`
 	TokensPerSecond    float64 `json:"tokens_per_second"`
-	InputTokens        int    `json:"input_tokens"`
-	OutputTokens       int    `json:"output_tokens"`
-	TotalDurationMs    int    `json:"total_duration_ms"`
-	DeadlineExceeded   bool   `json:"deadlineExceeded"`
-	DeadlineTimeoutSec int    `json:"deadlineTimeout"`
+	InputTokens        int     `json:"input_tokens"`
+	OutputTokens       int     `json:"output_tokens"`
+	TotalDurationMs    int     `json:"total_duration_ms"`
+	DeadlineExceeded   bool    `json:"deadlineExceeded"`
+	DeadlineTimeoutSec int     `json:"deadlineTimeout"`
+	RagMode            string  `json:"rag_mode,omitempty"`
+	RetrievalMs        int     `json:"retrieval_ms,omitempty"`
+	ContextTokens      int     `json:"context_tokens,omitempty"`
+	TopK               int     `json:"top_k,omitempty"`
+	SourceCoverage     int     `json:"source_coverage,omitempty"`
+	CitationsUsed      bool    `json:"citations_used,omitempty"`
 }

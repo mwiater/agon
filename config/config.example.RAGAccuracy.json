@@ -1,0 +1,51 @@
+{
+  "hosts": [
+    {
+      "name": "Ollama01",
+      "url": "{ollama-api-endpoint-01}",
+      "type": "ollama",
+      "models": [
+        "granite4:350m"
+      ],
+      "systemprompt": "You are a helpful assistant",
+      "parameters": {}
+    },
+    {
+      "name": "Ollama02",
+      "url": "{ollama-api-endpoint-02}",
+      "type": "ollama",
+      "models": [
+        "granite3.1-moe:1b"
+      ],
+      "systemprompt": "You are a helpful assistant",
+      "parameters": {}
+    }
+  ],
+  "timeout": 600,
+  "debug": true,
+  "multimodelMode": false,
+  "pipelineMode": false,
+  "jsonMode": false,
+  "mcpMode": false,
+  "benchmarkMode": false,
+  "benchmarkCount": 0,
+  "accuracyMode": true,
+  "mcpBinary": "dist/agon-mcp_linux_amd64_v1/agon-mcp",
+  "mcpInitTimeout": 10,
+  "mcpRetryCount": 1,
+  "export": "",
+  "exportMarkdown": "",
+  "metrics": true,
+  "ragMode": true,
+  "ragCorpusPath": "rag_corpus_accuracy_v1",
+  "ragIndexPath": "rag_corpus_accuracy_v1/index.jsonl",
+  "ragEmbeddingModel": "mxbai-embed-large:335m",
+  "ragEmbeddingHost": "Ollama01",
+  "ragChunkSizeTokens": 500,
+  "ragChunkOverlapTokens": 50,
+  "ragTopK": 4,
+  "ragContextTokenLimit": 1200,
+  "ragSimilarity": "cosine",
+  "ragAllowedExtensions": [".md", ".jsonl"],
+  "ragExcludeGlobs": ["**/results/**", "**/.git/**"]
+}

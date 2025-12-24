@@ -11,3 +11,5 @@
 !config.example.SystemPromptLength.json
 !config.example.BenchmarkMode.json
 !config.example.AccuracyMode.json
+!config.example.RAGAccuracy.json
+!config.RAGAccuracy.json
