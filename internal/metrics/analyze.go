@@ -1,4 +1,4 @@
-// internal/metrics/analyze.go
+﻿// internal/metrics/analyze.go
 package metrics
 
 import (
@@ -440,7 +440,7 @@ func buildOverallSummary(rankings Rankings) OverallSummary {
 	if len(rankings.ByLatency) > 0 {
 		entry := rankings.ByLatency[0]
 		summary.BestLatencyModel = entry.ModelName
-		summary.SummaryNotes = append(summary.SummaryNotes, fmt.Sprintf("Best latency model is %s with time to first token ≈ %.2fs.", entry.ModelName, entry.AvgTimeToFirstTokenSeconds))
+		summary.SummaryNotes = append(summary.SummaryNotes, fmt.Sprintf("Best latency model is %s with time to first token â‰ˆ %.2fs.", entry.ModelName, entry.AvgTimeToFirstTokenSeconds))
 	}
 	if len(rankings.ByEfficiencyScore) > 0 {
 		entry := rankings.ByEfficiencyScore[0]
@@ -709,34 +709,101 @@ const reportTemplateHTML = `<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ .Title }}</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <script src="https://kit.fontawesome.com/517f4f7a2b.js" crossorigin="anonymous"></script>
 	<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Two+Tone" rel="stylesheet">
   <style>
-    body { background-color: #f5f7fb; }
-    .card { border: none; }
+    :root {
+      --primary: #334155;
+      --secondary: #64748B;
+      --accent: #3B82F6;
+      --light: #F1F5F9;
+      --background: #FFFFFF;
+      --text: #0F172A;
+      --success: #10B981;
+      --warning: #F59E0B;
+      --border: #E2E8F0;
+    }
+    [data-theme="dark"] {
+      --primary: #0F172A;
+      --secondary: #94A3B8;
+      --accent: #60A5FA;
+      --light: #0B1220;
+      --background: #0F172A;
+      --text: #E2E8F0;
+      --success: #34D399;
+      --warning: #FBBF24;
+      --border: rgba(148, 163, 184, 0.25);
+    }
+    body {
+      background-color: var(--light);
+      color: var(--text);
+    }
+    .navbar-dark {
+      background-color: var(--primary) !important;
+    }
+    .bg-dark {
+      background-color: var(--primary) !important;
+    }
+    .navbar-dark .navbar-brand,
+    .navbar-dark .text-light {
+      color: var(--light) !important;
+    }
+    .card {
+      border: 1px solid var(--border);
+      background-color: var(--background);
+    }
     .table thead th { cursor: pointer; }
+    .table thead th,
+    .table thead td {
+      background-color: var(--light);
+      color: var(--text);
+      border-color: var(--border);
+    }
+    .table-striped>tbody>tr:nth-of-type(odd)>* {
+      --bs-table-accent-bg: var(--light);
+    }
+    .table-bordered>:not(caption)>* {
+      border-color: var(--border);
+    }
     .sort-icon { font-size: 0.8rem; margin-left: 0.25rem; }
     .accordion-button .badge { margin-left: 0.5rem; }
-    .list-group-item { display: flex; align-items: center; justify-content: space-between; }
+    .accordion-button {
+      background-color: var(--light);
+      color: var(--text);
+    }
+    .accordion-button:not(.collapsed) {
+      background-color: var(--accent);
+      color: var(--background);
+    }
+    .list-group-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background-color: var(--background);
+      border-color: var(--border);
+      color: var(--text);
+    }
     .notes-list li { margin-bottom: 0.25rem; }
     .table#modelsTable>tbody>tr>td.top-performer {
-      background-color: #98f071;
+      background-color: #DBEAFE;
       font-weight: 600;
+      color: var(--text);
     }
     .chart-card {
-      background: #fff;
+      background: var(--background);
       border-radius: 16px;
       padding: 1.5rem;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
+      border: 1px solid var(--border);
     }
     .chart-title {
       font-size: 1.5rem;
       font-weight: 700;
-      color: #2d3748;
+      color: var(--text);
       margin-bottom: 0.25rem;
     }
     .chart-subtitle {
-      color: #718096;
+      color: var(--secondary);
       margin-bottom: 1.5rem;
     }
     .chart-canvas {
@@ -750,7 +817,7 @@ const reportTemplateHTML = `<!DOCTYPE html>
       flex-wrap: wrap;
       margin-top: 1.25rem;
       padding-top: 1.25rem;
-      border-top: 2px solid #e2e8f0;
+      border-top: 2px solid var(--border);
     }
     .legend-item {
       display: flex;
@@ -764,7 +831,7 @@ const reportTemplateHTML = `<!DOCTYPE html>
     }
     .legend-text {
       font-size: 0.9rem;
-      color: #4a5568;
+      color: var(--secondary);
     }
     .filter-row {
       display: flex;
@@ -775,7 +842,44 @@ const reportTemplateHTML = `<!DOCTYPE html>
     }
     .filter-label {
       font-weight: 600;
-      color: #2d3748;
+      color: var(--text);
+    }
+    .badge.bg-primary {
+      background-color: var(--accent) !important;
+    }
+    .badge.bg-success {
+      background-color: var(--success) !important;
+    }
+    .badge.bg-warning {
+      background-color: var(--warning) !important;
+      color: var(--background) !important;
+    }
+    .badge.bg-danger {
+      background-color: #DC2626 !important;
+    }
+    .badge.bg-secondary {
+      background-color: var(--secondary) !important;
+    }
+    .theme-toggle {
+      border: 1px solid var(--border);
+      color: var(--light);
+    }
+    [data-theme="dark"] .theme-toggle {
+      color: var(--text);
+      background-color: rgba(148, 163, 184, 0.15);
+    }
+    [data-theme="dark"] .table#modelsTable>tbody>tr>td.top-performer {
+      background-color: rgba(96, 165, 250, 0.25);
+    }
+    [data-theme="dark"] .chart-card {
+      box-shadow: 0 10px 28px rgba(2, 6, 23, 0.6);
+    }
+    [data-theme="dark"] .accordion-button:not(.collapsed) {
+      background-color: var(--accent);
+      color: #0B1220;
+    }
+    [data-theme="dark"] .badge.bg-warning {
+      color: #0B1220 !important;
     }
   </style>
 </head>
@@ -783,56 +887,54 @@ const reportTemplateHTML = `<!DOCTYPE html>
   <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
       <span class="navbar-brand mb-0 h1">{{ .Title }}</span>
-      <span class="text-light">Generated: <span id="generatedAt">—</span></span>
+      <div class="d-flex align-items-center gap-3">
+        <button class="btn btn-sm theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">
+          <span class="material-icons-two-tone" aria-hidden="true">dark_mode</span>
+        </button>
+        <span class="text-light">Generated: <span id="generatedAt">-</span></span>
+      </div>
     </div>
   </nav>
   <main class="container-fluid my-4">
     <div class="row g-3">
-      <div class="col-sm-6 col-lg-3">
+      <div class="col-sm-6 col-lg-2">
         <div class="card shadow-sm h-100">
           <div class="card-body">
-            <p style="font-size: 1.5em;" class="text-muted mb-1"><span style="display: inline-block;font-size: 1.5em;vertical-align: top;" class="material-icons-two-tone">speed</span> Fastest Model</p>
-            <h5 class="card-title" id="fastestModel">—</h5>
+            <p style="font-size: 1.5em;" class="text-muted mb-1"><i class="fa-duotone fa-regular fa-rabbit-running fa-fw"></i> Fastest Model</p>
+            <h5 class="card-title" id="fastestModel">â€”</h5>
           </div>
         </div>
       </div>
-      <div class="col-sm-6 col-lg-3">
+      <div class="col-sm-6 col-lg-2">
         <div class="card shadow-sm h-100">
           <div class="card-body">
-            <p style="font-size: 1.5em;" class="text-muted mb-1"><span style="display: inline-block;font-size: 1.5em;vertical-align: top;" class="material-icons-two-tone">speed</span> Best Latency</p>
-            <h5 class="card-title" id="bestLatencyModel">—</h5>
+            <p style="font-size: 1.5em;" class="text-muted mb-1"><i class="fa-duotone fa-regular fa-gauge-low"></i> Best Latency</p>
+            <h5 class="card-title" id="bestLatencyModel">â€”</h5>
           </div>
         </div>
       </div>
-      <div class="col-sm-6 col-lg-3">
+      <div class="col-sm-6 col-lg-2">
         <div class="card shadow-sm h-100">
           <div class="card-body">
-            <p style="font-size: 1.5em;" class="text-muted mb-1"><span style="display: inline-block;font-size: 1.5em;vertical-align: top;" class="material-icons-two-tone">speed</span> Most Efficient</p>
+            <p style="font-size: 1.5em;" class="text-muted mb-1"><i class="fa-duotone fa-regular fa-gauge-high"></i> Most Efficient</p>
             <h5 class="card-title" id="mostEfficientModel">-</h5>
           </div>
         </div>
       </div>
-        <div class="col-sm-6 col-lg-3">
+        <div class="col-sm-6 col-lg-2">
           <div class="card shadow-sm h-100">
             <div class="card-body">
-              <p style="font-size: 1.5em;" class="text-muted mb-1"><span style="display: inline-block;font-size: 1.5em;vertical-align: top;" class="material-icons-two-tone">fact_check</span> Most Accurate</p>
+              <p style="font-size: 1.5em;" class="text-muted mb-1"><i class="fa-duotone fa-solid fa-bullseye-arrow"></i> Most Accurate</p>
               <h5 class="card-title" id="mostAccurateModel">-</h5>
             </div>
           </div>
         </div>
-        <div class="col-sm-6 col-lg-3">
+        <div class="col-sm-6 col-lg-2">
           <div class="card shadow-sm h-100">
             <div class="card-body">
-              <p style="font-size: 1.5em;" class="text-muted mb-1"><span style="display: inline-block;font-size: 1.5em;vertical-align: top;" class="material-icons-two-tone">insights</span> Best Trade-off</p>
+              <p style="font-size: 1.5em;" class="text-muted mb-1"><i class="fa-duotone fa-solid fa-code-compare"></i> Best Trade-off</p>
               <h5 class="card-title" id="bestTradeoffModel">-</h5>
             </div>
-          </div>
-        </div>
-        <div class="col-sm-6 col-lg-3">
-          <div class="card shadow-sm h-100">
-            <div class="card-body">
-              <p style="font-size: 1.5em;" class="text-muted mb-1"><span style="display: inline-block;font-size: 1.5em;vertical-align: top;" class="material-icons-two-tone">speed</span> Interactive-Ready Models</p>
-            <h5 class="card-title" id="interactiveCount">0</h5>
           </div>
         </div>
       </div>
@@ -879,19 +981,19 @@ const reportTemplateHTML = `<!DOCTYPE html>
           <div id="accuracyThroughputEmpty" class="text-muted small mt-2"></div>
           <div class="legend-container">
             <div class="legend-item">
-              <div class="legend-color" style="background: #10b981;"></div>
+              <div class="legend-color" style="background: #334155;"></div>
               <span class="legend-text"><strong>Excellent</strong> (70%+ accuracy)</span>
             </div>
             <div class="legend-item">
-              <div class="legend-color" style="background: #3b82f6;"></div>
+              <div class="legend-color" style="background: #64748B;"></div>
               <span class="legend-text"><strong>Good</strong> (50-70% accuracy)</span>
             </div>
             <div class="legend-item">
-              <div class="legend-color" style="background: #f59e0b;"></div>
+              <div class="legend-color" style="background: #94A3B8;"></div>
               <span class="legend-text"><strong>Fair</strong> (35-50% accuracy)</span>
             </div>
             <div class="legend-item">
-              <div class="legend-color" style="background: #ef4444;"></div>
+              <div class="legend-color" style="background: #CBD5E1;"></div>
               <span class="legend-text"><strong>Poor</strong> (&lt;35% accuracy)</span>
             </div>
           </div>
@@ -973,7 +1075,7 @@ const reportTemplateHTML = `<!DOCTYPE html>
     (function($) {
       function formatNumber(value, decimals) {
         if (value === null || value === undefined || isNaN(value)) {
-          return '—';
+          return 'â€”';
         }
         return Number(value).toFixed(decimals);
       }
@@ -1004,7 +1106,7 @@ const reportTemplateHTML = `<!DOCTYPE html>
         models.forEach(function(model) {
           var $row = $('<tr></tr>');
           var paretoBadge = model.paretoFront ? ' <span class="badge bg-success text-uppercase ms-1">Pareto</span>' : '';
-          $row.append($('<td><span class="material-icons-two-tone">smart_toy</span> '+model.modelName+paretoBadge+'</td>'))
+          $row.append($('<td><i class="fa-duotone fa-regular fa-user-robot"></i> '+model.modelName+paretoBadge+'</td>'))
           $row.append(createNumericCell(model.avg.tokensPerSecond, 2));
           $row.append(createNumericCell(model.avg.timeToFirstTokenSeconds, 2));
           $row.append(createNumericCell(model.avg.outputTokens, 1));
@@ -1164,9 +1266,9 @@ const reportTemplateHTML = `<!DOCTYPE html>
           bodyParts.push('<li><strong>Avg margin:</strong> ' + avgMarginLine + '</li>');
           bodyParts.push('<li><strong>By difficulty:</strong> ' + difficultyBreakdown + '</li>');
           bodyParts.push('</ul><h6>Variance</h6><ul class="list-unstyled mb-3">');
-          bodyParts.push('<li><strong>TPS σ:</strong> ' + formatNumber(model.variance.tokensPerSecondStdDev, 2) + '</li>');
-          bodyParts.push('<li><strong>TTFT σ (s):</strong> ' + formatNumber(model.variance.timeToFirstTokenStdDevSeconds, 2) + '</li>');
-          bodyParts.push('<li><strong>Output σ:</strong> ' + formatNumber(model.variance.outputTokensStdDev, 2) + '</li>');
+          bodyParts.push('<li><strong>TPS Ïƒ:</strong> ' + formatNumber(model.variance.tokensPerSecondStdDev, 2) + '</li>');
+          bodyParts.push('<li><strong>TTFT Ïƒ (s):</strong> ' + formatNumber(model.variance.timeToFirstTokenStdDevSeconds, 2) + '</li>');
+          bodyParts.push('<li><strong>Output Ïƒ:</strong> ' + formatNumber(model.variance.outputTokensStdDev, 2) + '</li>');
           bodyParts.push('</ul></div>');
           bodyParts.push('<div class="col-md-6">');
           bodyParts.push('<h6>Extremes</h6><ul class="list-unstyled mb-3">');
@@ -1203,7 +1305,7 @@ const reportTemplateHTML = `<!DOCTYPE html>
             + '<div class="list-group-item">'
             + '<div>'
             + '<span class="badge ' + badgeClass + ' text-uppercase me-2">' + (anomaly.severity || 'info') + '</span>'
-            + '<strong>' + (anomaly.modelName || '—') + '</strong>'
+            + '<strong>' + (anomaly.modelName || 'â€”') + '</strong>'
             + '</div>'
             + '<p class="mb-0 small">' + (anomaly.message || '') + '</p>'
             + '</div>';
@@ -1228,10 +1330,10 @@ const reportTemplateHTML = `<!DOCTYPE html>
           return;
         }
         function getColorForAccuracy(accuracy) {
-          if (accuracy >= 70) return '#10b981';
-          if (accuracy >= 50) return '#3b82f6';
-          if (accuracy >= 35) return '#f59e0b';
-          return '#ef4444';
+          if (accuracy >= 70) return '#334155';
+          if (accuracy >= 50) return '#64748B';
+          if (accuracy >= 35) return '#94A3B8';
+          return '#CBD5E1';
         }
 
         var points = [];
@@ -1277,7 +1379,7 @@ const reportTemplateHTML = `<!DOCTYPE html>
                 if (!modelName) {
                   return;
                 }
-                ctx.fillStyle = '#2d3748';
+                ctx.fillStyle = '#0F172A';
                 ctx.font = 'bold 11px sans-serif';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'bottom';
@@ -1313,13 +1415,13 @@ const reportTemplateHTML = `<!DOCTYPE html>
                     size: 14,
                     weight: 'bold'
                   },
-                  color: '#4a5568'
+                  color: '#64748B'
                 },
                 grid: {
                   color: 'rgba(0, 0, 0, 0.05)'
                 },
                 ticks: {
-                  color: '#718096'
+                  color: '#64748B'
                 }
               },
               y: {
@@ -1330,7 +1432,7 @@ const reportTemplateHTML = `<!DOCTYPE html>
                     size: 14,
                     weight: 'bold'
                   },
-                  color: '#4a5568'
+                  color: '#64748B'
                 },
                 suggestedMin: 0,
                 suggestedMax: 100,
@@ -1338,7 +1440,7 @@ const reportTemplateHTML = `<!DOCTYPE html>
                   color: 'rgba(0, 0, 0, 0.05)'
                 },
                 ticks: {
-                  color: '#718096',
+                  color: '#64748B',
                   callback: function(value) {
                     return value + '%';
                   }
@@ -1395,8 +1497,8 @@ const reportTemplateHTML = `<!DOCTYPE html>
         }
 
         var palette = [
-          '#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#6366f1',
-          '#14b8a6', '#f97316', '#8b5cf6', '#0ea5e9', '#84cc16'
+          '#334155', '#64748B', '#94A3B8', '#CBD5E1', '#3B82F6',
+          '#1D4ED8', '#0EA5E9', '#38BDF8', '#14B8A6', '#10B981'
         ];
         var modelColors = {};
         models.forEach(function(model, index) {
@@ -1413,7 +1515,7 @@ const reportTemplateHTML = `<!DOCTYPE html>
             if (!iterations.length) {
               return;
             }
-            var color = modelColors[model.modelName] || '#3b82f6';
+            var color = modelColors[model.modelName] || '#64748B';
             var ttftPoints = [];
             var tpsPoints = [];
             iterations.forEach(function(iter) {
@@ -1471,21 +1573,21 @@ const reportTemplateHTML = `<!DOCTYPE html>
                     display: true,
                     text: 'Input tokens',
                     font: { size: 13, weight: 'bold' },
-                    color: '#4a5568'
+                    color: '#64748B'
                   },
                   grid: { color: 'rgba(0, 0, 0, 0.05)' },
-                  ticks: { color: '#718096' }
+                  ticks: { color: '#64748B' }
                 },
                 y: {
                   title: {
                     display: true,
                     text: yLabel,
                     font: { size: 13, weight: 'bold' },
-                    color: '#4a5568'
+                    color: '#64748B'
                   },
                   grid: { color: 'rgba(0, 0, 0, 0.05)' },
                   ticks: {
-                    color: '#718096',
+                    color: '#64748B',
                     callback: yFormatter
                   }
                 }
@@ -1496,7 +1598,7 @@ const reportTemplateHTML = `<!DOCTYPE html>
                   labels: {
                     usePointStyle: true,
                     boxWidth: 8,
-                    color: '#4a5568'
+                    color: '#64748B'
                   }
                 },
                 tooltip: {
@@ -1581,7 +1683,40 @@ const reportTemplateHTML = `<!DOCTYPE html>
         });
       }
 
-      $(function() {
+      
+      function applyTheme(theme) {
+        var selected = theme === 'dark' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', selected);
+        var toggle = document.getElementById('themeToggle');
+        if (toggle) {
+          var icon = toggle.querySelector('.material-icons-two-tone');
+          var label = selected === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+          toggle.setAttribute('aria-label', label);
+          if (icon) {
+            icon.textContent = selected === 'dark' ? 'light_mode' : 'dark_mode';
+          }
+        }
+        try {
+          localStorage.setItem('agon-theme', selected);
+        } catch (e) {}
+      }
+
+      function initThemeToggle() {
+        var saved = null;
+        try {
+          saved = localStorage.getItem('agon-theme');
+        } catch (e) {}
+        applyTheme(saved || 'light');
+        var toggle = document.getElementById('themeToggle');
+        if (!toggle) {
+          return;
+        }
+        toggle.addEventListener('click', function() {
+          var current = document.documentElement.getAttribute('data-theme');
+          applyTheme(current === 'dark' ? 'light' : 'dark');
+        });
+      }$(function() {
+        initThemeToggle();
         if (!analysis) {
           return;
         }
