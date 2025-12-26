@@ -1,5 +1,5 @@
 {
-  "system_prompt": "You are a precise facts and logic engine. Output ONLY the final numerical answer as a single integer. No text, no explanation, no units, no commas.",
+  "system_prompt": "You are a precise facts and logic engine. You must ONLY output the final numerical answer as a single integer. No text, no explanation, no units, no commas. Do not explain your reasoning!",
   "tests": [
     {
       "id": 1,

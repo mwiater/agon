@@ -57,14 +57,14 @@ type VarianceStats struct {
 
 // AccuracyStats stores aggregated correctness information for a model.
 type AccuracyStats struct {
-	Total            int                     `json:"total"`
-	Correct          int                     `json:"correct"`
-	Accuracy         float64                 `json:"accuracy"`
-	AvgDifficulty    float64                 `json:"avgDifficulty"`
-	AvgMarginOfError float64                 `json:"avgMarginOfError"`
-	Timeouts         int                     `json:"timeouts"`
-	TimeoutSeconds   int                     `json:"timeoutSeconds"`
-	ByDifficulty     map[int]AccuracyBucket  `json:"byDifficulty"`
+	Total            int                    `json:"total"`
+	Correct          int                    `json:"correct"`
+	Accuracy         float64                `json:"accuracy"`
+	AvgDifficulty    float64                `json:"avgDifficulty"`
+	AvgMarginOfError float64                `json:"avgMarginOfError"`
+	Timeouts         int                    `json:"timeouts"`
+	TimeoutSeconds   int                    `json:"timeoutSeconds"`
+	ByDifficulty     map[int]AccuracyBucket `json:"byDifficulty"`
 }
 
 // AccuracyBucket stores aggregated accuracy for a difficulty bucket.
@@ -79,6 +79,7 @@ type ScoreStats struct {
 	ThroughputScore float64 `json:"throughputScore"`
 	LatencyScore    float64 `json:"latencyScore"`
 	EfficiencyScore float64 `json:"efficiencyScore"`
+	CompositeScore  float64 `json:"compositeScore"`
 }
 
 // LabelStats captures qualitative assessments for a model.
@@ -107,6 +108,7 @@ type ModelAnalysis struct {
 	Scores         ScoreStats      `json:"scores"`
 	Labels         LabelStats      `json:"labels"`
 	DerivedRatios  DerivedRatios   `json:"derivedRatios"`
+	ParetoFront    bool            `json:"paretoFront"`
 	Notes          []string        `json:"notes"`
 	Iterations     []Iteration     `json:"iterations,omitempty"`
 }
@@ -157,6 +159,7 @@ type OverallSummary struct {
 	BestLatencyModel   string   `json:"bestLatencyModel"`
 	MostEfficientModel string   `json:"mostEfficientModel"`
 	MostAccurateModel  string   `json:"mostAccurateModel"`
+	BestTradeoffModel  string   `json:"bestTradeoffModel"`
 	SummaryNotes       []string `json:"summaryNotes"`
 }
 
@@ -326,6 +329,10 @@ func AnalyzeMetrics(results BenchmarkResults, host HostInfo, accuracy map[string
 		}
 
 		ma.Scores.EfficiencyScore = 0.6*ma.Scores.ThroughputScore + 0.4*ma.Scores.LatencyScore
+		if ma.Accuracy.Total > 0 {
+			accuracyPct := ma.Accuracy.Accuracy * 100
+			ma.Scores.CompositeScore = 0.6*accuracyPct + 0.4*ma.Scores.ThroughputScore
+		}
 
 		if globalMaxAvgTPS > 0 {
 			ma.DerivedRatios.RelativeToFastest = ma.Avg.TokensPerSecond / globalMaxAvgTPS
@@ -376,6 +383,8 @@ func AnalyzeMetrics(results BenchmarkResults, host HostInfo, accuracy map[string
 		return rankAccuracy[i].Accuracy > rankAccuracy[j].Accuracy
 	})
 
+	bestTradeoffModel := applyParetoFront(modelAnalyses)
+
 	finalModels := make([]ModelAnalysis, len(modelAnalyses))
 	for i, ma := range modelAnalyses {
 		finalModels[i] = *ma
@@ -390,6 +399,10 @@ func AnalyzeMetrics(results BenchmarkResults, host HostInfo, accuracy map[string
 	}
 
 	analysis.Overall = buildOverallSummary(analysis.Rankings)
+	if bestTradeoffModel != "" {
+		analysis.Overall.BestTradeoffModel = bestTradeoffModel
+		analysis.Overall.SummaryNotes = append(analysis.Overall.SummaryNotes, fmt.Sprintf("Best trade-off model is %s based on the Pareto front and composite score tie-break.", bestTradeoffModel))
+	}
 	analysis.Anomalies = detectAnomalies(analysis.Models)
 	analysis.Recommendations = buildRecommendations(analysis.Models)
 
@@ -440,6 +453,60 @@ func buildOverallSummary(rankings Rankings) OverallSummary {
 		summary.SummaryNotes = append(summary.SummaryNotes, fmt.Sprintf("Most accurate model is %s with %.1f%% accuracy.", entry.ModelName, entry.Accuracy*100))
 	}
 	return summary
+}
+
+func applyParetoFront(models []*ModelAnalysis) string {
+	candidates := make([]*ModelAnalysis, 0, len(models))
+	for _, model := range models {
+		if model.Accuracy.Total > 0 && model.Avg.TokensPerSecond > 0 {
+			candidates = append(candidates, model)
+		}
+	}
+	const epsilon = 1e-9
+	for _, model := range candidates {
+		model.ParetoFront = true
+		for _, other := range candidates {
+			if model == other {
+				continue
+			}
+			accuracyBetter := other.Accuracy.Accuracy >= model.Accuracy.Accuracy-epsilon
+			tpsBetter := other.Avg.TokensPerSecond >= model.Avg.TokensPerSecond-epsilon
+			strictBetter := other.Accuracy.Accuracy > model.Accuracy.Accuracy+epsilon || other.Avg.TokensPerSecond > model.Avg.TokensPerSecond+epsilon
+			if accuracyBetter && tpsBetter && strictBetter {
+				model.ParetoFront = false
+				break
+			}
+		}
+	}
+
+	best := ""
+	var bestScore float64
+	var bestAccuracy float64
+	var bestTPS float64
+	for _, model := range candidates {
+		if !model.ParetoFront {
+			continue
+		}
+		score := model.Scores.CompositeScore
+		if best == "" || score > bestScore+epsilon {
+			best = model.ModelName
+			bestScore = score
+			bestAccuracy = model.Accuracy.Accuracy
+			bestTPS = model.Avg.TokensPerSecond
+			continue
+		}
+		if math.Abs(score-bestScore) <= epsilon {
+			if model.Accuracy.Accuracy > bestAccuracy+epsilon {
+				best = model.ModelName
+				bestAccuracy = model.Accuracy.Accuracy
+				bestTPS = model.Avg.TokensPerSecond
+			} else if math.Abs(model.Accuracy.Accuracy-bestAccuracy) <= epsilon && model.Avg.TokensPerSecond > bestTPS+epsilon {
+				best = model.ModelName
+				bestTPS = model.Avg.TokensPerSecond
+			}
+		}
+	}
+	return best
 }
 
 // detectAnomalies identifies any notable outliers in the analysis.
@@ -643,7 +710,7 @@ const reportTemplateHTML = `<!DOCTYPE html>
   <title>{{ .Title }}</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-	    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Two+Tone" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Two+Tone" rel="stylesheet">
   <style>
     body { background-color: #f5f7fb; }
     .card { border: none; }
@@ -652,6 +719,10 @@ const reportTemplateHTML = `<!DOCTYPE html>
     .accordion-button .badge { margin-left: 0.5rem; }
     .list-group-item { display: flex; align-items: center; justify-content: space-between; }
     .notes-list li { margin-bottom: 0.25rem; }
+    .table#modelsTable>tbody>tr>td.top-performer {
+      background-color: #98f071;
+      font-weight: 600;
+    }
     .chart-card {
       background: #fff;
       border-radius: 16px;
@@ -741,18 +812,26 @@ const reportTemplateHTML = `<!DOCTYPE html>
           </div>
         </div>
       </div>
-      <div class="col-sm-6 col-lg-3">
-        <div class="card shadow-sm h-100">
-          <div class="card-body">
-            <p style="font-size: 1.5em;" class="text-muted mb-1"><span style="display: inline-block;font-size: 1.5em;vertical-align: top;" class="material-icons-two-tone">fact_check</span> Most Accurate</p>
-            <h5 class="card-title" id="mostAccurateModel">-</h5>
+        <div class="col-sm-6 col-lg-3">
+          <div class="card shadow-sm h-100">
+            <div class="card-body">
+              <p style="font-size: 1.5em;" class="text-muted mb-1"><span style="display: inline-block;font-size: 1.5em;vertical-align: top;" class="material-icons-two-tone">fact_check</span> Most Accurate</p>
+              <h5 class="card-title" id="mostAccurateModel">-</h5>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="col-sm-6 col-lg-3">
-        <div class="card shadow-sm h-100">
-          <div class="card-body">
-            <p style="font-size: 1.5em;" class="text-muted mb-1"><span style="display: inline-block;font-size: 1.5em;vertical-align: top;" class="material-icons-two-tone">speed</span> Interactive-Ready Models</p>
+        <div class="col-sm-6 col-lg-3">
+          <div class="card shadow-sm h-100">
+            <div class="card-body">
+              <p style="font-size: 1.5em;" class="text-muted mb-1"><span style="display: inline-block;font-size: 1.5em;vertical-align: top;" class="material-icons-two-tone">insights</span> Best Trade-off</p>
+              <h5 class="card-title" id="bestTradeoffModel">-</h5>
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+          <div class="card shadow-sm h-100">
+            <div class="card-body">
+              <p style="font-size: 1.5em;" class="text-muted mb-1"><span style="display: inline-block;font-size: 1.5em;vertical-align: top;" class="material-icons-two-tone">speed</span> Interactive-Ready Models</p>
             <h5 class="card-title" id="interactiveCount">0</h5>
           </div>
         </div>
@@ -780,7 +859,6 @@ const reportTemplateHTML = `<!DOCTYPE html>
                   <th class="sortable" data-type="number">Throughput Score <span class="material-icons-two-tone sort">import_export</span></th>
                   <th class="sortable" data-type="number">Latency Score <span class="material-icons-two-tone sort">import_export</span></th>
                   <th class="sortable" data-type="number">Efficiency Score <span class="material-icons-two-tone sort">import_export</span></th>
-                  <th class="sortable" data-type="text">Speed Tier <span class="material-icons-two-tone sort">import_export</span></th>
                 </tr>
               </thead>
               <tbody></tbody>
@@ -822,17 +900,6 @@ const reportTemplateHTML = `<!DOCTYPE html>
     </section>
 
     <section class="mt-4">
-      <div class="card shadow-sm">
-        <div class="card-header bg-white">
-          <h5 class="mb-0">Per-Model Details</h5>
-        </div>
-        <div class="card-body">
-          <div class="accordion" id="modelAccordion"></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="mt-4">
       <div class="card shadow-sm chart-card">
         <div class="card-body">
           <div class="chart-title">Input Tokens vs Processing</div>
@@ -855,6 +922,17 @@ const reportTemplateHTML = `<!DOCTYPE html>
               <div id="inputTokensTpsEmpty" class="text-muted small mt-2"></div>
             </div>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mt-4">
+      <div class="card shadow-sm">
+        <div class="card-header bg-white">
+          <h5 class="mb-0">Per-Model Details</h5>
+        </div>
+        <div class="card-body">
+          <div class="accordion" id="modelAccordion"></div>
         </div>
       </div>
     </section>
@@ -925,7 +1003,8 @@ const reportTemplateHTML = `<!DOCTYPE html>
         var $tbody = $('#modelsTable tbody').empty();
         models.forEach(function(model) {
           var $row = $('<tr></tr>');
-          $row.append($('<td><span class="material-icons-two-tone">smart_toy</span> '+model.modelName+'</td>'))
+          var paretoBadge = model.paretoFront ? ' <span class="badge bg-success text-uppercase ms-1">Pareto</span>' : '';
+          $row.append($('<td><span class="material-icons-two-tone">smart_toy</span> '+model.modelName+paretoBadge+'</td>'))
           $row.append(createNumericCell(model.avg.tokensPerSecond, 2));
           $row.append(createNumericCell(model.avg.timeToFirstTokenSeconds, 2));
           $row.append(createNumericCell(model.avg.outputTokens, 1));
@@ -952,8 +1031,55 @@ const reportTemplateHTML = `<!DOCTYPE html>
           $row.append(createNumericCell(model.scores.throughputScore, 1));
           $row.append(createNumericCell(model.scores.latencyScore, 1));
           $row.append(createNumericCell(model.scores.efficiencyScore, 1));
-          $row.append($('<td></td>').text(model.labels.relativeSpeedTier || '—'));
           $tbody.append($row);
+        });
+        highlightTopPerformers($tbody);
+      }
+
+      function highlightTopPerformers($tbody) {
+        var columns = [
+          { index: 1, mode: 'max' },
+          { index: 2, mode: 'min' },
+          { index: 3, mode: 'max' },
+          { index: 4, mode: 'max' },
+          { index: 5, mode: 'max' },
+          { index: 6, mode: 'min' },
+          { index: 7, mode: 'max' },
+          { index: 8, mode: 'max' },
+          { index: 9, mode: 'max' },
+          { index: 10, mode: 'max' }
+        ];
+        columns.forEach(function(column) {
+          var best = null;
+          $tbody.find('tr').each(function() {
+            var $cell = $(this).children().eq(column.index);
+            var value = parseFloat($cell.attr('data-value'));
+            if (isNaN(value)) {
+              return;
+            }
+            if (best === null) {
+              best = value;
+              return;
+            }
+            if (column.mode === 'min' && value < best) {
+              best = value;
+            } else if (column.mode === 'max' && value > best) {
+              best = value;
+            }
+          });
+          if (best === null) {
+            return;
+          }
+          $tbody.find('tr').each(function() {
+            var $cell = $(this).children().eq(column.index);
+            var value = parseFloat($cell.attr('data-value'));
+            if (isNaN(value)) {
+              return;
+            }
+            if (value === best) {
+              $cell.addClass('top-performer');
+            }
+          });
         });
       }
 
@@ -975,6 +1101,9 @@ const reportTemplateHTML = `<!DOCTYPE html>
               badgeClass = 'bg-danger';
             }
             badges += '<span class="badge ' + badgeClass + ' text-uppercase">' + model.labels.interactiveSuitability + '</span>';
+          }
+          if (model.paretoFront) {
+            badges += '<span class="badge bg-success text-uppercase">pareto</span>';
           }
           var header = ''
             + '<h2 class="accordion-header" id="' + headerID + '">'
@@ -1466,6 +1595,7 @@ const reportTemplateHTML = `<!DOCTYPE html>
         $('#bestLatencyModel').text(summary.bestLatencyModel || '-');
         $('#mostEfficientModel').text(summary.mostEfficientModel || '-');
         $('#mostAccurateModel').text(summary.mostAccurateModel || '-');
+        $('#bestTradeoffModel').text(summary.bestTradeoffModel || '-');
 
         var models = analysis.models || [];
         var timeoutSeconds = null;

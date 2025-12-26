@@ -19,6 +19,7 @@ import (
 	"github.com/mwiater/agon/internal/appconfig"
 	"github.com/mwiater/agon/internal/providerfactory"
 	"github.com/mwiater/agon/internal/providers"
+	"github.com/mwiater/agon/internal/rag"
 )
 
 const (
@@ -98,6 +99,13 @@ func RunAccuracy(cfg *appconfig.Config) error {
 				iteration := i + 1
 				fmt.Printf("[%d/%d] %s / %s - Prompt: %s\n", iteration, total, r.host.Name, r.model, t.Prompt)
 
+				if cfg.RagMode {
+					if err := runRagCompare(cfg, r.provider, r.host, r.model, suite.SystemPrompt, t, timeoutSeconds); err != nil {
+						log.Printf("error running RAG compare for model %s: %v", r.model, err)
+					}
+					continue
+				}
+
 				response, meta, err := runPrompt(r.provider, r.host, r.model, suite.SystemPrompt, t.Prompt)
 				if err != nil {
 					deadlineExceeded := isDeadlineExceeded(err)
@@ -166,6 +174,158 @@ func RunAccuracy(cfg *appconfig.Config) error {
 	wg.Wait()
 
 	return nil
+}
+
+func runRagCompare(cfg *appconfig.Config, provider providers.ChatProvider, host appconfig.Host, modelName, systemPrompt string, test PromptTest, timeoutSeconds int) error {
+	// RAG OFF: baseline run (no context).
+	response, meta, err := runPrompt(provider, host, modelName, systemPrompt, test.Prompt)
+	if err != nil {
+		if isDeadlineExceeded(err) {
+			ttftMs, tokensPerSecond, inputTokens, outputTokens, totalDurationMs := accuracyMetrics(meta)
+			result := AccuracyResult{
+				Timestamp:          time.Now().Format(time.RFC3339),
+				Host:               host.Name,
+				Model:              modelName,
+				PromptID:           test.ID,
+				Prompt:             test.Prompt,
+				ExpectedAnswer:     test.ExpectedAnswer,
+				Response:           err.Error(),
+				Correct:            false,
+				MarginOfError:      test.MarginOfError,
+				Difficulty:         test.Difficulty,
+				TimeToFirstToken:   ttftMs,
+				TokensPerSecond:    tokensPerSecond,
+				InputTokens:        inputTokens,
+				OutputTokens:       outputTokens,
+				TotalDurationMs:    totalDurationMs,
+				DeadlineExceeded:   true,
+				DeadlineTimeoutSec: timeoutSeconds,
+				RagMode:            "off",
+			}
+			if err := appendResult(modelName, result); err != nil {
+				log.Printf("error writing result for model %s: %v", modelName, err)
+			}
+			return nil
+		}
+		return err
+	}
+	correct := matchesExpected(response, test.ExpectedAnswer, test.MarginOfError)
+	ttftMs, tokensPerSecond, inputTokens, outputTokens, totalDurationMs := accuracyMetrics(meta)
+	result := AccuracyResult{
+		Timestamp:          time.Now().Format(time.RFC3339),
+		Host:               host.Name,
+		Model:              modelName,
+		PromptID:           test.ID,
+		Prompt:             test.Prompt,
+		ExpectedAnswer:     test.ExpectedAnswer,
+		Response:           response,
+		Correct:            correct,
+		MarginOfError:      test.MarginOfError,
+		Difficulty:         test.Difficulty,
+		TimeToFirstToken:   ttftMs,
+		TokensPerSecond:    tokensPerSecond,
+		InputTokens:        inputTokens,
+		OutputTokens:       outputTokens,
+		TotalDurationMs:    totalDurationMs,
+		DeadlineExceeded:   false,
+		DeadlineTimeoutSec: timeoutSeconds,
+		RagMode:            "off",
+	}
+	if err := appendResult(modelName, result); err != nil {
+		log.Printf("error writing result for model %s: %v", modelName, err)
+	}
+
+	// RAG ON: retrieve context and inject.
+	retrieval, err := rag.Retrieve(context.Background(), cfg, test.Prompt)
+	if err != nil {
+		return err
+	}
+
+	ragSystemPrompt := buildRagSystemPrompt(systemPrompt)
+	promptWithContext := test.Prompt
+	if retrieval.Context != "" {
+		promptWithContext = retrieval.Context + "\n\n" + test.Prompt
+	}
+
+	response, meta, err = runPrompt(provider, host, modelName, ragSystemPrompt, promptWithContext)
+	if err != nil {
+		if isDeadlineExceeded(err) {
+			ttftMs, tokensPerSecond, inputTokens, outputTokens, totalDurationMs := accuracyMetrics(meta)
+			result := AccuracyResult{
+				Timestamp:          time.Now().Format(time.RFC3339),
+				Host:               host.Name,
+				Model:              modelName,
+				PromptID:           test.ID,
+				Prompt:             test.Prompt,
+				ExpectedAnswer:     test.ExpectedAnswer,
+				Response:           err.Error(),
+				Correct:            false,
+				MarginOfError:      test.MarginOfError,
+				Difficulty:         test.Difficulty,
+				TimeToFirstToken:   ttftMs,
+				TokensPerSecond:    tokensPerSecond,
+				InputTokens:        inputTokens,
+				OutputTokens:       outputTokens,
+				TotalDurationMs:    totalDurationMs,
+				DeadlineExceeded:   true,
+				DeadlineTimeoutSec: timeoutSeconds,
+				RagMode:            "on",
+				RetrievalMs:        retrieval.RetrievalMs,
+				ContextTokens:      retrieval.ContextTokens,
+				TopK:               len(retrieval.Chunks),
+				SourceCoverage:     retrieval.SourceCoverage,
+			}
+			if err := appendResult(modelName, result); err != nil {
+				log.Printf("error writing result for model %s: %v", modelName, err)
+			}
+			return nil
+		}
+		return err
+	}
+	correct = matchesExpected(response, test.ExpectedAnswer, test.MarginOfError)
+	ttftMs, tokensPerSecond, inputTokens, outputTokens, totalDurationMs = accuracyMetrics(meta)
+	result = AccuracyResult{
+		Timestamp:          time.Now().Format(time.RFC3339),
+		Host:               host.Name,
+		Model:              modelName,
+		PromptID:           test.ID,
+		Prompt:             test.Prompt,
+		ExpectedAnswer:     test.ExpectedAnswer,
+		Response:           response,
+		Correct:            correct,
+		MarginOfError:      test.MarginOfError,
+		Difficulty:         test.Difficulty,
+		TimeToFirstToken:   ttftMs,
+		TokensPerSecond:    tokensPerSecond,
+		InputTokens:        inputTokens,
+		OutputTokens:       outputTokens,
+		TotalDurationMs:    totalDurationMs,
+		DeadlineExceeded:   false,
+		DeadlineTimeoutSec: timeoutSeconds,
+		RagMode:            "on",
+		RetrievalMs:        retrieval.RetrievalMs,
+		ContextTokens:      retrieval.ContextTokens,
+		TopK:               len(retrieval.Chunks),
+		SourceCoverage:     retrieval.SourceCoverage,
+		CitationsUsed:      false,
+	}
+	if err := appendResult(modelName, result); err != nil {
+		log.Printf("error writing result for model %s: %v", modelName, err)
+	}
+
+	return nil
+}
+
+func buildRagSystemPrompt(systemPrompt string) string {
+	trimmed := strings.TrimSpace(systemPrompt)
+	if trimmed == "" {
+		return "If CONTEXT is provided, treat it as authoritative reference material."
+	}
+	line := "If CONTEXT is provided, treat it as authoritative reference material."
+	if strings.Contains(trimmed, line) {
+		return trimmed
+	}
+	return trimmed + "\n" + line
 }
 
 func runPrompt(provider providers.ChatProvider, host appconfig.Host, modelName, systemPrompt, prompt string) (string, providers.StreamMetadata, error) {

@@ -1,11 +1,11 @@
 {
-  "hosts": [
+    "hosts": [
     {
       "name": "Ollama01",
       "url": "https://o-udoo01.0nezer0.com",
       "type": "ollama",
       "models": [
-        "granite4:350m"
+        "gemma3:270m"
       ],
       "systemprompt": "You are a helpful assistant",
       "parameters": {}
@@ -15,9 +15,29 @@
       "url": "https://o-udoo02.0nezer0.com",
       "type": "ollama",
       "models": [
-        "granite3.1-moe:1b"
+        "granite4:350m"
       ],
       "systemprompt": "You are a helpful assistant",
+      "parameters": {}
+    },
+    {
+      "name": "Ollama03",
+      "url": "https://o-udoo03.0nezer0.com",
+      "type": "ollama",
+      "models": [
+        "smollm2:360m"
+      ],
+      "systemprompt": "You are a helpful assistant",
+      "parameters": {}
+    },
+    {
+      "name": "Ollama04",
+      "url": "https://o-udoo04.0nezer0.com",
+      "type": "ollama",
+      "models": [
+        "smollm2:1.7b"
+      ],
+      "systemprompt": "You are a helpful and assistant",
       "parameters": {}
     }
   ],
