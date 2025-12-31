@@ -32,6 +32,32 @@
 - Support router mode endpoints for model management when present; gracefully degrade if not supported.
 - Use host.Type = "llama.cpp" (or "llamacpp") in config; keep Ollama as default.
 
+## Model load/unload parity map
+
+### Load (where it happens today)
+- Chat flow: `internal/providers/ollama/provider.go` calls `EnsureModelReady()` at the start of `Stream()`, which POSTs `/api/generate` to trigger a load.
+- MCP flow: `internal/providers/mcp/provider.go` delegates `EnsureModelReady()` to the active provider when the `ensure_model` tool is used.
+
+### Load (llama.cpp parity target)
+- Chat flow: `internal/providers/llamacpp/provider.go` calls `EnsureModelReady()` at the start of `Stream()`, which POSTs `/models/load` and waits for `status=loaded` via `/models`.
+- Fallback parity: when `/models/load` is 404/405, the first `/v1/chat/completions` request should serve as the implicit load (router mode auto-load behavior).
+
+### Unload (where it happens today)
+- CLI flow: `agon unload models` -> `internal/models/commands.go` `UnloadModels()` -> `LLMHost.GetRunningModels()` -> `LLMHost.UnloadModel()`.
+- Ollama host behavior:
+  - `GetRunningModels()` GETs `/api/ps`.
+  - `UnloadModel()` POSTs `/api/chat` with `{"keep_alive": 0}`.
+
+### Unload (llama.cpp parity target)
+- CLI flow: same entry points as Ollama (`UnloadModels()` -> `GetRunningModels()` -> `UnloadModel()`).
+- Llama.cpp host behavior:
+  - `GetRunningModels()` GETs `/models` and filters `status=loaded`.
+  - `UnloadModel()` POSTs `/models/unload` with `{"model": "..."}`.
+
+### Notes
+- Router mode LRU eviction is server-managed; the client should still explicitly unload when `agon unload models` is run.
+- Keep load/unload entry points identical between providers; only the HTTP implementation differs.
+
 ## Remaining work
 
 ### 1) Validate /models schema against real server output
