@@ -430,7 +430,7 @@ func (m *multimodelModel) updateChat(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if userInput != "" {
 			userMsg := chatMessage{Role: "user", Content: userInput}
 			for i := range m.columnResponses {
-				if m.assignments[i].isAssigned {
+				if i < len(m.assignments) && m.assignments[i].isAssigned {
 					m.columnResponses[i].chatHistory = append(m.columnResponses[i].chatHistory, userMsg)
 					m.columnResponses[i].requestStartTime = time.Now()
 					m.columnResponses[i].isStreaming = true
@@ -641,6 +641,9 @@ func (m *multimodelModel) multimodelChatView() string {
 
 	var loadingIndicators []string
 	for i := range m.columnResponses {
+		if i >= len(m.assignments) {
+			continue
+		}
 		if m.columnResponses[i].isStreaming {
 			timer := fmt.Sprintf("%.1f", time.Since(m.columnResponses[i].requestStartTime).Seconds())
 			loadingIndicators = append(loadingIndicators, fmt.Sprintf("%s Querying %s... %ss", m.spinner.View(), m.assignments[i].selectedModel, timer))

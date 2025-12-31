@@ -31,6 +31,14 @@ func createHosts(config appconfig.Config) []LLMHost {
 				client:         client,
 				requestTimeout: timeout,
 			})
+		case "llama.cpp":
+			hosts = append(hosts, &LlamaCppHost{
+				Name:           hostConfig.Name,
+				URL:            hostConfig.URL,
+				Models:         hostConfig.Models,
+				client:         client,
+				requestTimeout: timeout,
+			})
 		default:
 			fmt.Printf("Unknown host type: %s\n", hostConfig.Type)
 		}
@@ -133,7 +141,7 @@ func UnloadModels(config *appconfig.Config) {
 		wg.Add(1)
 		go func(h LLMHost) {
 			defer wg.Done()
-			if h.GetType() != "ollama" {
+			if h.GetType() != "ollama" && h.GetType() != "llama.cpp" {
 				fmt.Printf("Unloading models is not supported for %s (%s)\n", h.GetName(), h.GetType())
 				return
 			}
