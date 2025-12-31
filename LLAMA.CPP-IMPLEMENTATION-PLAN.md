@@ -32,105 +32,59 @@
 - Support router mode endpoints for model management when present; gracefully degrade if not supported.
 - Use host.Type = "llama.cpp" (or "llamacpp") in config; keep Ollama as default.
 
-## Implementation steps
+## Remaining work
 
-## Progress update
-- Completed:
-  - Added llama.cpp ChatProvider at internal/providers/llamacpp/provider.go with /models load and /v1/chat/completions streaming/non-streaming.
-  - Added llama.cpp LLMHost at internal/models/llama_host.go for /models list and /models/unload.
-  - Added a multiplex provider to route calls by host.Type without impacting Ollama behavior.
-  - Updated provider factory to select llama.cpp when host.Type is "llama.cpp" and to multiplex mixed host types.
-  - Updated model host creation and unload flow to support llama.cpp hosts.
-- In progress:
-  - Documentation updates (README + config examples).
-  - Test coverage for /models parsing and SSE streaming.
-- Not started:
-  - RAG embeddings for llama.cpp (pending endpoint confirmation).
-  - Tool-calling support for llama.cpp (pending compatibility check).
+### 1) Validate /models schema against real server output
+- Run `go run scripts/llamacpp_integration_check.go -config config/config.example.LlamaCpp.json`.
+- Capture and store the raw `/models` JSON output for the target server version.
+- Compare observed fields/status values to the current parser:
+  - `data` or `models` arrays
+  - fields `id`, `name`, `model`, `path`
+  - status formats: string vs `{ "value": "..." }`
+- If any fields/status variants are missing:
+  - Add parsing support in `internal/models/llama_host.go` and `internal/providers/llamacpp/provider.go`.
+  - Extend `internal/models/llama_host_test.go` with the new schema variant.
+- Decide on the canonical display name if multiple identifiers are present (document in README if needed).
 
-### 1) Config and host types
-- Add a new host type string ("llama.cpp" or "llamacpp") in config docs and examples.
-- Update config example JSONs and README to show llama.cpp hosts and router-mode setup.
-- Update internal/models/commands.go createHosts() to instantiate LlamaCppHost when host.Type matches.
-- Add any llama.cpp-specific optional fields only if needed (avoid new schema changes unless necessary).
+### 2) Verify accepted OpenAI parameters for llama.cpp
+- Use the integration script param probe output to identify accepted/rejected fields.
+- For any rejected fields:
+  - Remove or conditionally omit them in `applyParameters()` (or log if provided).
+  - Update `README.md` to reflect the supported subset for llama.cpp.
+- Re-run `go test ./...` after any mapping changes.
 
-### 2) Llama.cpp model management (LLMHost)
-Create internal/models/llama_host.go implementing LLMHost with the router endpoints:
-- ListRawModels/ListModels:
-  - Call GET {host.URL}/models
-  - Parse list and status (loaded/loading/unloaded) and return formatted list.
-- GetRunningModels:
-  - Filter models from GET /models where status == "loaded".
-- UnloadModel:
-  - Call POST {host.URL}/models/unload with {"model": "..."}.
-- PullModel/DeleteModel/GetModelParameters:
-  - Not supported in router mode. Implement as no-op + user-facing message or return a clear error.
-  - Note: ListModelParameters currently assumes Ollama /api/show; keep llama.cpp as unsupported.
+### 3) Confirm tool-calling and JSON mode behavior on real server
+- With a llama.cpp model that advertises tools, run a chat that triggers a tool call.
+- Verify:
+  - `tools` + `tool_choice: "auto"` are accepted without errors.
+  - Responses return `tool_calls` in either `message` (non-streaming) or `delta` (streaming).
+  - MCP execution path returns tool output correctly.
+- If the server rejects tools or omits tool calls:
+  - Update the no-capability detection strings in `isNoToolCapabilityResponse`.
+  - Document the limitation in `README.md` under the compatibility matrix.
+- For JSON mode:
+  - Send a request with `response_format: {"type":"json_object"}`.
+  - If rejected, add a fallback to omit `response_format` and log the behavior.
 
-### 3) Llama.cpp chat provider (ChatProvider)
-Create internal/providers/llamacpp/provider.go:
-- LoadedModels(ctx, host):
-  - Reuse GET /models logic to report loaded models.
-- EnsureModelReady(ctx, host, model):
-  - Prefer POST /models/load if router mode is enabled.
-  - If 404/unsupported, fall back to a lightweight chat/completions request to trigger auto-loading.
-- Stream(ctx, req, callbacks):
-  - Use POST {host.URL}/v1/chat/completions
-  - Support streaming with SSE (data: {json} ... data: [DONE]).
-  - For non-streaming, parse the JSON response and deliver a single OnChunk.
-  - Map existing request data to OpenAI fields:
-    - model: req.Model
-    - messages: req.History + system prompt
-    - temperature/top_p/etc from req.Parameters (verify llama.cpp accepts the fields)
-    - stream: !req.DisableStreaming
-  - Tools:
-    - If llama.cpp supports OpenAI tool calls, pass tools in OpenAI format.
-    - Otherwise, skip tool payloads and note in logs (or gate behind a config flag).
-  - JSON mode:
-    - If supported, map to OpenAI response_format (json_object) or vendor-specific flag.
-    - If unsupported, ignore with a log message.
+### 4) Decide llama.cpp-specific config surface (if any)
+- Determine if any server flags should be expressed in config (e.g., router mode assumptions).
+- If needed:
+  - Add new optional fields to `internal/appconfig.Config` and document them in `README.md`.
+  - Keep defaults aligned with current behavior (no breaking changes).
+- If not needed:
+  - Document that llama.cpp settings are controlled via server CLI flags.
 
-### 4) Provider selection and factory
-- Update internal/providerfactory/factory.go to select llama.cpp provider when any host.Type is llama.cpp.
-- If mixed host types are allowed, decide selection strategy:
-  - Option A: choose provider per host (preferred, but requires refactor).
-  - Option B: reject mixed types and return a config error.
-- Update CLI initialization to surface a clear error if host types are mixed and unsupported.
-
-### 5) RAG embedding support (optional, gated)
-- Investigate llama.cpp embedding endpoint availability (OpenAI /v1/embeddings or custom).
+### 5) Optional: llama.cpp embeddings support (deferred)
+- Investigate whether llama.cpp supports `/v1/embeddings` or a custom embedding endpoint.
 - If supported:
-  - Add a llama.cpp branch in internal/rag/embedding.go for embeddings.
+  - Add a llama.cpp branch in `internal/rag/embedding.go`.
+  - Add unit tests covering the new path.
 - If not supported:
-  - Keep embeddings Ollama-only and document limitation.
+  - Document that embeddings remain Ollama-only.
 
-### 6) Logging, metrics, and error handling
-- Log all llama.cpp HTTP calls using existing logging helpers (AGON->LLM, LLM->AGON).
-- Ensure timeouts use cfg.RequestTimeout().
-- Return clear errors when router endpoints are missing or return unexpected schema.
-
-### 7) Documentation updates
-- README: add llama.cpp router-mode setup and example config.
-- Config examples: add a llama.cpp host variant.
-- Add a brief compatibility matrix: Ollama vs llama.cpp features (model pull/delete, list, load/unload, tools, JSON mode).
-
-## Testing plan
-- Unit tests for llama.cpp host parsing of /models responses (loaded/loading/unloaded).
-- Provider tests:
-  - Non-streaming chat response parsing.
-  - Streaming SSE parsing and chunk forwarding.
-- Manual tests:
-  - llama-server in router mode with multiple GGUF files.
-  - Verify list models, load/unload, and chat routing by model name.
-
-## Risks and open questions
-- Confirm llama.cpp /models response schema (fields and status values).
-- Confirm which OpenAI parameters llama.cpp accepts (top_k, repeat_penalty, min_p, etc.).
-- Confirm tool-calling support and JSON mode compatibility.
-- Decide behavior when host types are mixed in config.
-- Decide whether to store llama.cpp-specific settings in config or rely on server CLI flags.
-
-## Suggested rollout
-- Phase 1: Basic provider + /models list/load/unload + chat (streaming and non-streaming).
-- Phase 2: JSON mode + tool calls (if supported), embeddings.
-- Phase 3: Improved UX (model status display, richer errors, docs polish).
+## Validation plan
+- Run `go test ./...` after any code changes.
+- Run the integration script against a real llama.cpp router-mode server:
+  - Capture `/models` raw output.
+  - Capture param probe output for supported fields.
+  - Record tool-call + JSON mode behavior.

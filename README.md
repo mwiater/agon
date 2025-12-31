@@ -179,6 +179,7 @@ For example configurations, see the `config/` directory. Each file demonstrates 
 *   `config.example.ModelParameters.json`: An example of how to set up model parameters.
 *   `config.example.PipelineMode.json`: An example of how to set up Pipeline mode.
 *   `config.example.LlamaCpp.json`: An example of how to set up llama.cpp router mode.
+*   `scripts/llamacpp_integration_check.go`: A quick integration check to inspect `/models` and probe accepted chat parameters on a llama.cpp endpoint.
 
 ## Operating Modes
 
@@ -556,6 +557,20 @@ Run the full test suite:
 
 ```bash
 go test ./...
+```
+
+### llama.cpp Integration Check
+
+To validate a real llama.cpp endpoint, run:
+
+```bash
+go run scripts/llamacpp_integration_check.go -config config/config.example.LlamaCpp.json
+```
+
+Optional overrides:
+
+```bash
+go run scripts/llamacpp_integration_check.go -url http://localhost:8080 -model your-model.gguf
 ```
 
 To generate a coverage report:
