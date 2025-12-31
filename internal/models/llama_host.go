@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mwiater/agon/internal/logging"
 )
 
 // LlamaCppHost implements the LLMHost interface for llama.cpp servers.
@@ -85,6 +86,7 @@ func (h *LlamaCppHost) UnloadModel(model string) {
 	payload := map[string]string{"model": model}
 	body, _ := json.Marshal(payload)
 
+	logging.LogRequest("AGON->LLM", hostIdentifier(h), model, "", body)
 	resp, cancel, err := h.doRequest(http.MethodPost, "/models/unload", bytes.NewReader(body), "application/json")
 	if err != nil {
 		fmt.Printf("Error unloading model %s on %s: %v\n", model, h.Name, err)
@@ -93,8 +95,9 @@ func (h *LlamaCppHost) UnloadModel(model string) {
 	defer cancel()
 	defer resp.Body.Close()
 
+	respBody, _ := io.ReadAll(resp.Body)
+	logging.LogRequest("LLM->AGON", hostIdentifier(h), model, "", respBody)
 	if resp.StatusCode >= 400 {
-		respBody, _ := io.ReadAll(resp.Body)
 		fmt.Printf("Error unloading model %s on %s: %s\n", model, h.Name, strings.TrimSpace(string(respBody)))
 	}
 }
@@ -184,6 +187,10 @@ type modelsResponse struct {
 }
 
 func (h *LlamaCppHost) listModels() ([]llamaModel, error) {
+	logging.LogRequest("AGON->LLM", hostIdentifier(h), "", "", map[string]string{
+		"method": http.MethodGet,
+		"url":    h.URL + "/models",
+	})
 	resp, cancel, err := h.doRequest(http.MethodGet, "/models", nil, "")
 	if err != nil {
 		return nil, fmt.Errorf("could not list models: llama.cpp is not accessible on %s", h.Name)
@@ -195,6 +202,7 @@ func (h *LlamaCppHost) listModels() ([]llamaModel, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body from %s: %v", h.Name, err)
 	}
+	logging.LogRequest("LLM->AGON", hostIdentifier(h), "", "", body)
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("could not list models: %s", strings.TrimSpace(string(body)))
 	}
@@ -271,4 +279,15 @@ func (s *statusField) UnmarshalJSON(data []byte) error {
 
 func modelStatusValue(model llamaModel) string {
 	return strings.TrimSpace(model.Status.Value)
+}
+
+func hostIdentifier(host *LlamaCppHost) string {
+	name := strings.TrimSpace(host.Name)
+	if name != "" {
+		return name
+	}
+	if url := strings.TrimSpace(host.URL); url != "" {
+		return url
+	}
+	return "llama.cpp-host"
 }

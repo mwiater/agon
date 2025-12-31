@@ -145,8 +145,10 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 	if req.JSONMode {
 		payload["response_format"] = map[string]any{"type": "json_object"}
 	}
-	if len(req.Tools) > 0 && p.debug {
-		logging.LogEvent("llama.cpp: tools are not forwarded yet; count=%d", len(req.Tools))
+	logTools(p.debug, req.Tools)
+	if len(req.Tools) > 0 {
+		payload["tools"] = formatToolsForPayload(req.Tools)
+		payload["tool_choice"] = "auto"
 	}
 
 	body, err := json.Marshal(payload)
@@ -177,16 +179,34 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 	if resp.StatusCode != http.StatusOK {
 		raw, _ := io.ReadAll(resp.Body)
 		logging.LogRequest("LLM->AGON", hostIdentifier(req.Host), req.Model, "", raw)
+		if req.DisableStreaming && isNoToolCapabilityResponse(raw) {
+			if callbacks.OnChunk != nil {
+				if err := callbacks.OnChunk(providers.ChatMessage{Role: "assistant", Content: "This model does not have tool capabilities."}); err != nil {
+					return err
+				}
+			}
+			if callbacks.OnComplete != nil {
+				meta := providers.StreamMetadata{
+					Model:     req.Model,
+					CreatedAt: time.Now(),
+					Done:      true,
+				}
+				if err := callbacks.OnComplete(meta); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
 		return fmt.Errorf("llama.cpp: /v1/chat/completions returned %s: %s", resp.Status, strings.TrimSpace(string(raw)))
 	}
 
 	if req.DisableStreaming {
-		return p.handleNonStreaming(resp, req, callbacks)
+		return p.handleNonStreaming(ctx, resp, req, callbacks)
 	}
-	return p.handleStreaming(resp, req, callbacks)
+	return p.handleStreaming(ctx, resp, req, callbacks)
 }
 
-func (p *Provider) handleNonStreaming(resp *http.Response, req providers.StreamRequest, callbacks providers.StreamCallbacks) error {
+func (p *Provider) handleNonStreaming(ctx context.Context, resp *http.Response, req providers.StreamRequest, callbacks providers.StreamCallbacks) error {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
@@ -203,6 +223,16 @@ func (p *Provider) handleNonStreaming(resp *http.Response, req providers.StreamR
 
 	content := parsed.Choices[0].Message.Content
 	role := parsed.Choices[0].Message.Role
+	toolCalls := parsed.Choices[0].Message.ToolCalls
+	if len(toolCalls) > 0 {
+		toolOutput, err := executeToolCalls(ctx, req, toolCalls)
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(toolOutput) != "" {
+			content = toolOutput
+		}
+	}
 	if role == "" {
 		role = "assistant"
 	}
@@ -228,9 +258,11 @@ func (p *Provider) handleNonStreaming(resp *http.Response, req providers.StreamR
 	return nil
 }
 
-func (p *Provider) handleStreaming(resp *http.Response, req providers.StreamRequest, callbacks providers.StreamCallbacks) error {
+func (p *Provider) handleStreaming(ctx context.Context, resp *http.Response, req providers.StreamRequest, callbacks providers.StreamCallbacks) error {
 	reader := bufio.NewReader(resp.Body)
 	var finalModel string
+	var toolCalls []toolCall
+	loggedToolCalls := false
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
@@ -260,6 +292,16 @@ func (p *Provider) handleStreaming(resp *http.Response, req providers.StreamRequ
 			continue
 		}
 		choice := chunk.Choices[0]
+		if len(choice.Delta.ToolCalls) > 0 {
+			toolCalls = append(toolCalls, choice.Delta.ToolCalls...)
+		}
+		if len(choice.Message.ToolCalls) > 0 {
+			toolCalls = append(toolCalls, choice.Message.ToolCalls...)
+		}
+		if len(toolCalls) > 0 && p.debug && !loggedToolCalls {
+			logging.LogEvent("llama.cpp: streaming tool calls detected; executing after stream completion")
+			loggedToolCalls = true
+		}
 		content := choice.Delta.Content
 		role := choice.Delta.Role
 		if content == "" && choice.Message.Content != "" {
@@ -290,6 +332,17 @@ func (p *Provider) handleStreaming(resp *http.Response, req providers.StreamRequ
 			return err
 		}
 	}
+	if len(toolCalls) > 0 {
+		toolOutput, err := executeToolCalls(ctx, req, toolCalls)
+		if err != nil {
+			return err
+		}
+		if callbacks.OnChunk != nil && strings.TrimSpace(toolOutput) != "" {
+			if err := callbacks.OnChunk(providers.ChatMessage{Role: "assistant", Content: toolOutput}); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
@@ -302,8 +355,9 @@ type chatResponse struct {
 	Model   string `json:"model"`
 	Choices []struct {
 		Message struct {
-			Role    string `json:"role"`
-			Content string `json:"content"`
+			Role      string     `json:"role"`
+			Content   string     `json:"content"`
+			ToolCalls []toolCall `json:"tool_calls,omitempty"`
 		} `json:"message"`
 	} `json:"choices"`
 }
@@ -312,12 +366,14 @@ type chatStreamChunk struct {
 	Model   string `json:"model"`
 	Choices []struct {
 		Delta struct {
-			Role    string `json:"role"`
-			Content string `json:"content"`
+			Role      string     `json:"role"`
+			Content   string     `json:"content"`
+			ToolCalls []toolCall `json:"tool_calls,omitempty"`
 		} `json:"delta"`
 		Message struct {
-			Role    string `json:"role"`
-			Content string `json:"content"`
+			Role      string     `json:"role"`
+			Content   string     `json:"content"`
+			ToolCalls []toolCall `json:"tool_calls,omitempty"`
 		} `json:"message"`
 	} `json:"choices"`
 }
@@ -515,6 +571,173 @@ func applyParameters(payload map[string]any, params appconfig.Parameters) {
 	if params.FrequencyPenalty != nil {
 		payload["frequency_penalty"] = *params.FrequencyPenalty
 	}
+}
+
+type toolCall struct {
+	ID       string `json:"id,omitempty"`
+	Type     string `json:"type"`
+	Function struct {
+		Name      string          `json:"name"`
+		Arguments json.RawMessage `json:"arguments"`
+	} `json:"function"`
+}
+
+func logTools(debug bool, tools []providers.ToolDefinition) {
+	if !debug {
+		return
+	}
+	if len(tools) == 0 {
+		logging.LogEvent("llama.cpp tools: false")
+		return
+	}
+	names := make([]string, 0, len(tools))
+	for _, tool := range tools {
+		if tool.Name != "" {
+			names = append(names, tool.Name)
+		}
+	}
+	if len(names) == 0 {
+		logging.LogEvent("llama.cpp tools: false")
+		return
+	}
+	logging.LogEvent("llama.cpp tools: {%s}", strings.Join(names, ", "))
+}
+
+func formatToolsForPayload(tools []providers.ToolDefinition) []map[string]any {
+	formatted := make([]map[string]any, 0, len(tools))
+	for _, tool := range tools {
+		function := map[string]any{
+			"name": tool.Name,
+		}
+		if tool.Description != "" {
+			function["description"] = tool.Description
+		}
+		if tool.Parameters != nil {
+			function["parameters"] = tool.Parameters
+		}
+		formatted = append(formatted, map[string]any{
+			"type":     "function",
+			"function": function,
+		})
+	}
+	return formatted
+}
+
+func executeToolCalls(ctx context.Context, req providers.StreamRequest, calls []toolCall) (string, error) {
+	if len(calls) == 0 {
+		return "", nil
+	}
+	if req.ToolExecutor == nil {
+		var summaries []string
+		for _, call := range calls {
+			summaries = append(summaries, fmt.Sprintf("[Tool call requested] %s args: %s", call.Function.Name, call.Function.Arguments))
+		}
+		return strings.Join(summaries, "\n"), nil
+	}
+	var outputs []string
+	for _, call := range calls {
+		args, err := parseToolArguments(call.Function.Arguments)
+		if err != nil {
+			return "", err
+		}
+		toolName := call.Function.Name
+		if toolName == "" && len(req.Tools) == 1 {
+			toolName = req.Tools[0].Name
+		}
+		args = normalizeToolArgs(toolName, args, req.Tools)
+		if toolName == "" {
+			if len(req.Tools) > 0 {
+				toolName = req.Tools[0].Name
+			} else {
+				toolName = call.Function.Name
+			}
+		}
+		result, err := req.ToolExecutor(ctx, toolName, args)
+		if err != nil {
+			return "", err
+		}
+		if strings.TrimSpace(result) != "" {
+			outputs = append(outputs, fmt.Sprintf("[Tool %s]\n%s", toolName, result))
+		}
+	}
+	return strings.Join(outputs, "\n\n"), nil
+}
+
+func normalizeToolArgs(toolName string, args map[string]any, availableTools []providers.ToolDefinition) map[string]any {
+	normalized := make(map[string]any, len(args))
+	for k, v := range args {
+		normalized[k] = v
+	}
+	if toolName == "" && len(availableTools) == 1 {
+		toolName = availableTools[0].Name
+	}
+	if strings.EqualFold(toolName, "current_weather") {
+		if _, ok := normalized["location"]; !ok {
+			parts := []string{}
+			for _, key := range []string{"city", "state", "country"} {
+				if val, ok := normalized[key]; ok {
+					if s := strings.TrimSpace(fmt.Sprint(val)); s != "" {
+						parts = append(parts, s)
+					}
+				}
+			}
+			if len(parts) > 0 {
+				normalized["location"] = strings.Join(parts, ", ")
+			}
+		}
+	}
+	return normalized
+}
+
+func parseToolArguments(raw json.RawMessage) (map[string]any, error) {
+	args := map[string]any{}
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" || trimmed == "null" {
+		return args, nil
+	}
+	var lastErr error
+	if err := json.Unmarshal(raw, &args); err == nil {
+		return args, nil
+	} else {
+		lastErr = err
+	}
+	var argString string
+	if err := json.Unmarshal(raw, &argString); err == nil {
+		argString = strings.TrimSpace(argString)
+		if argString == "" {
+			return args, nil
+		}
+		var parsed map[string]any
+		if err := json.Unmarshal([]byte(argString), &parsed); err == nil {
+			return parsed, nil
+		}
+		return nil, fmt.Errorf("parse tool arguments string: %w", err)
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("invalid arguments payload")
+	}
+	return nil, fmt.Errorf("parse tool arguments: %w", lastErr)
+}
+
+func isNoToolCapabilityResponse(body []byte) bool {
+	if len(body) == 0 {
+		return false
+	}
+	text := strings.ToLower(strings.TrimSpace(string(body)))
+	if text != "" && strings.Contains(text, "tool") && (strings.Contains(text, "support") || strings.Contains(text, "capab")) {
+		return true
+	}
+	var payload struct {
+		Error   string `json:"error"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(body, &payload); err == nil {
+		combined := strings.ToLower(strings.TrimSpace(payload.Error + " " + payload.Message))
+		if combined != "" && strings.Contains(combined, "tool") && (strings.Contains(combined, "support") || strings.Contains(combined, "capab")) {
+			return true
+		}
+	}
+	return false
 }
 
 func sanitizeMessages(messages []providers.ChatMessage) []providers.ChatMessage {

@@ -1,0 +1,50 @@
+{
+  "hosts": [
+    {
+      "name": "LlamaCPP01",
+      "url": "http://192.168.0.33:8888",
+      "type": "llama.cpp",
+      "models": [
+        "ministral-1.3B-instruct.Q8_0"
+      ],
+      "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point.",
+      "parameters": {}
+    },
+    {
+      "name": "Ollama01",
+      "url": "https://o-udoo01.0nezer0.com",
+      "type": "ollama",
+      "models": [
+        "deepseek-r1:1.5b",
+        "gemma3:1b",
+        "granite3.1-moe:1b",
+        "granite3.1-moe:3b",
+        "granite4:1b",
+        "granite4:350m",
+        "granite4:micro",
+        "llama3.2:1b",
+        "llama3.2:3b",
+        "phi4-mini:3.8b",
+        "smollm2:360m",
+        "smollm2:1.7b",
+        "qwen3:1.7b",
+        "qwen3:0.6b",
+        "embeddinggemma:300m"
+      ],
+      "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point.",
+      "parameters": {}
+    }
+  ],
+  "timeout": 600,
+  "debug": true,
+  "multimodelMode": true,
+  "pipelineMode": false,
+  "jsonMode": false,
+  "mcpMode": false,
+  "mcpBinary": "dist/agon-mcp_linux_amd64_v1/agon-mcp",
+  "mcpInitTimeout": 10,
+  "mcpRetryCount": 1,
+  "export": "",
+  "exportMarkdown": "",
+  "metrics": true
+}

@@ -22,7 +22,8 @@ func createHosts(config appconfig.Config) []LLMHost {
 		Timeout: timeout,
 	}
 	for _, hostConfig := range config.Hosts {
-		switch hostConfig.Type {
+		normalized := strings.ToLower(strings.TrimSpace(hostConfig.Type))
+		switch normalized {
 		case "ollama":
 			hosts = append(hosts, &OllamaHost{
 				Name:           hostConfig.Name,
@@ -31,7 +32,7 @@ func createHosts(config appconfig.Config) []LLMHost {
 				client:         client,
 				requestTimeout: timeout,
 			})
-		case "llama.cpp":
+		case "llama.cpp", "llamacpp":
 			hosts = append(hosts, &LlamaCppHost{
 				Name:           hostConfig.Name,
 				URL:            hostConfig.URL,

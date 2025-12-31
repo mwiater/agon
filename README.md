@@ -6,7 +6,7 @@
 
 > **Note:** This is a personal project. I will do my best to keep the main branch functional and up to date with the time I have available.
 
-`agon` is a terminal-first companion for interacting with large language models that expose the Ollama API. It helps you browse available hosts, launch an immersive chat session, and keep model inventories aligned across machines, whether you are experimenting locally or coordinating a distributed cluster.
+`agon` is a terminal-first companion for interacting with large language models that expose the Ollama API or the llama.cpp OpenAI-compatible API. It helps you browse available hosts, launch an immersive chat session, and keep model inventories aligned across machines, whether you are experimenting locally or coordinating a distributed cluster.
 
 **I created this application in order to compare small LLMs in parallel** (usually between 1b and 3b parameters): I have 4 distinct nodes running Ollama on non-gpu SBCs. While speed was never a priority, I needed some questions answered:
 
@@ -18,7 +18,7 @@
 Overall, `agon` was created to efficiently evaluate different scenarios with small LLMs and try to better understand how to make small LLMs work for various home lab projects.
 
 ## Requirements
-You'll need to setup and have 1-4 Ollama endpoints available.
+You'll need to set up at least one Ollama endpoint or a llama.cpp server that exposes the OpenAI-compatible API. For llama.cpp, router mode is recommended if you want model list/load/unload support.
 
 ## Table of Contents
 
@@ -88,14 +88,14 @@ These become the host/models to select from when running a chat in `multimidelMo
 
 ## Introduction & Features
 
-*   **Multi-Host Management**: Centralize connection details for any number of Ollama hosts in a single configuration file.
+*   **Multi-Host Management**: Centralize connection details for any number of Ollama or llama.cpp hosts in a single configuration file.
 *   **Interactive Chat**: A focused, terminal-based UI for conversational AI, with support for single-model, multi-model, and pipeline modes.
 *   **Multimodel Chat Mode**: Compare up to four models side-by-side in a single chat interface to evaluate their responses to the same prompt.
 *   **Pipeline Mode**: Chain up to four models together in a sequence, where the output of one stage becomes the input for the next.
 *   **Benchmark Mode**: Run a suite of benchmarks against a model to evaluate its performance.
 *   **Accuracy Mode**: Run a prompt suite against each model and log per-prompt correctness.
 *   **MCPMode**: Enables advanced functionality like tool usage by proxying requests through a local `agon-mcp` server.
-*   **Comprehensive Model Management**: A suite of commands to `list`, `pull`, `delete`, `sync`, and `unload` models across all configured hosts.
+*   **Comprehensive Model Management**: A suite of commands to `list` and `unload` models across all configured hosts, with `pull`, `delete`, and `sync` available for Ollama hosts.
 *   **Detailed Configuration**: Fine-tune model parameters, system prompts, and application behavior through a simple JSON configuration.
 *   **Debug & Performance Instrumentation**: Surface detailed timing and token metrics in the UI and log files to understand model performance.
 
@@ -147,15 +147,20 @@ This should print the version of `agon` that you have installed.
 
 ### Host Settings (`hosts` array)
 
-Each object in the `hosts` array defines an Ollama instance:
+Each object in the `hosts` array defines a host instance:
 
 *   `name`: (String) A friendly name for the host, displayed in the UI.
-*   `url`: (String) The base URL of the Ollama API endpoint (e.g., `http://localhost:11434`).
-*   `type`: (String) The type of host. Currently, only `"ollama"` is supported.
+*   `url`: (String) The base URL of the API endpoint (e.g., `http://localhost:11434`).
+*   `type`: (String) The type of host. Supported values: `"ollama"`, `"llama.cpp"` (alias: `"llamacpp"`).
 *   `models`: (Array of Strings) A list of model identifiers to manage on this host.
 *   `systemPrompt`: (String) A custom system prompt to use for all interactions with this host.
-*   `parameters`: (Object) A key-value map of Ollama model parameters to control generation. For a detailed explanation of the model parameters, see the [Ollama documentation](https://github.com/ollama/ollama/blob/main/docs/modelfile.md#valid-parameters-and-values).
+*   `parameters`: (Object) A key-value map of model parameters to control generation. For Ollama-specific details, see the [Ollama documentation](https://github.com/ollama/ollama/blob/main/docs/modelfile.md#valid-parameters-and-values).
     *   `top_k`, `top_p`, `min_p`, `tfs_z`, `typical_p`, `repeat_last_n`, `temperature`, `repeat_penalty`, `presence_penalty`, `frequency_penalty`.
+
+### Host Compatibility Matrix
+
+*   **Ollama**: model list, pull, delete, sync, unload, tool calls (MCP), JSON mode (`format: json`).
+*   **llama.cpp**: model list/load/unload via router mode, chat via OpenAI-compatible endpoints, JSON mode (`response_format`), tool calls not forwarded yet.
 
 ### MCP Mode Settings
 
@@ -173,6 +178,7 @@ For example configurations, see the `config/` directory. Each file demonstrates 
 *   `config.example.MCPMode.json`: An example of how to set up MCP mode.
 *   `config.example.ModelParameters.json`: An example of how to set up model parameters.
 *   `config.example.PipelineMode.json`: An example of how to set up Pipeline mode.
+*   `config.example.LlamaCpp.json`: An example of how to set up llama.cpp router mode.
 
 ## Operating Modes
 
@@ -202,7 +208,7 @@ Pipeline mode is designed for complex, multi-step workflows by chaining up to fo
 
 ### JSON Mode
 
-JSON mode is a constraint that can be applied to any of the other operating modes to force the language model to return its response in a valid JSON format. It works by adding a `format: json` parameter to the underlying Ollama API request. This differs from other modes as it doesn't change the user interface or workflow but rather dictates the structure of the model's output. This is extremely useful for any task that requires structured data, such as data extraction, classification, or when the output of `agon` is intended to be consumed by another program or script that expects a predictable JSON structure. It can be enabled alongside Single-Model, Multimodel, Pipeline, and MCP modes.
+JSON mode is a constraint that can be applied to any of the other operating modes to force the language model to return its response in a valid JSON format. For Ollama hosts, it adds a `format: json` parameter to the underlying API request. For llama.cpp hosts, it sends OpenAI-style `response_format: {"type":"json_object"}` and relies on the server to honor it. This differs from other modes as it doesn't change the user interface or workflow but rather dictates the structure of the model's output. This is extremely useful for any task that requires structured data, such as data extraction, classification, or when the output of `agon` is intended to be consumed by another program or script that expects a predictable JSON structure. It can be enabled alongside Single-Model, Multimodel, Pipeline, and MCP modes.
 
 ![JSON Mode](.screens/agon_jsonMode_01.png)
 
@@ -210,7 +216,7 @@ JSON mode is a constraint that can be applied to any of the other operating mode
 
 ### MCP Mode
 
-MCP mode is an advanced feature that enables language models to use external tools by proxying requests through a local `agon-mcp` server process. When enabled, `agon` starts and manages this server in the background. If the language model determines that a user's request can be fulfilled by one of the available tools (like fetching the current weather), it can issue a `tool_calls` request. `agon` intercepts this, executes the tool via the MCP server, and feeds the result back to the model to formulate a final answer. This mode is not a distinct UI but rather a capability that enhances other modes by giving them access to real-time information or other external actions. It is useful for breaking the model out of its static knowledge base and allowing it to interact with the outside world. MCP mode can be used in combination with Single-Model, Multimodel, and Pipeline modes, as well as `JSONMode`.
+MCP mode is an advanced feature that enables language models to use external tools by proxying requests through a local `agon-mcp` server process. When enabled, `agon` starts and manages this server in the background. If the language model determines that a user's request can be fulfilled by one of the available tools (like fetching the current weather), it can issue a `tool_calls` request. `agon` intercepts this, executes the tool via the MCP server, and feeds the result back to the model to formulate a final answer. This mode is not a distinct UI but rather a capability that enhances other modes by giving them access to real-time information or other external actions. It is useful for breaking the model out of its static knowledge base and allowing it to interact with the outside world. MCP mode can be used in combination with Single-Model, Multimodel, and Pipeline modes, as well as `JSONMode`. Tool calls are currently forwarded only for Ollama hosts.
 
 ![MCP Mode](.screens/agon_mcpMode_01.png)
 
@@ -271,7 +277,7 @@ Starts the main interactive chat UI. The UI mode is determined by the configurat
 ### `agon list`
 
 *   **`agon list models`**: Lists all models specified in the config for each host and indicates if they are available on the host machine.
-*   **`agon list modelparameters`**: Displays the model parameters for each host as defined in the configuration.
+*   **`agon list modelparameters`**: Displays the model parameters for each host as defined in the configuration (Ollama-only).
 *   **`agon list commands`**: Lists all available commands.
 
 ### `agon accuracy`
@@ -280,15 +286,15 @@ Starts the main interactive chat UI. The UI mode is determined by the configurat
 
 ### `agon pull`
 
-*   **`agon pull models`**: Pulls any models from your config that are missing on the respective hosts.
+*   **`agon pull models`**: Pulls any models from your config that are missing on the respective Ollama hosts.
 
 ### `agon delete`
 
-*   **`agon delete models`**: Deletes specified models from their hosts.
+*   **`agon delete models`**: Deletes specified models from their Ollama hosts.
 
 ### `agon sync`
 
-*   **`agon sync models`**: Synchronizes each host to have exactly the models listed in the config, pulling missing ones and deleting extra ones.
+*   **`agon sync models`**: Synchronizes each Ollama host to have exactly the models listed in the config, pulling missing ones and deleting extra ones.
 
 ### `agon unload`
 
@@ -467,6 +473,32 @@ Starts the main interactive chat UI. The UI mode is determined by the configurat
     agon chat
     ```
 
+### llama.cpp Router Mode
+
+1.  **Create a configuration file** (`config/config.json`):
+
+    ```json
+    {
+      "hosts": [
+        {
+          "name": "LlamaCpp01",
+          "url": "http://localhost:8080",
+          "type": "llama.cpp",
+          "models": [
+            "my-local-model.gguf"
+          ],
+          "systemprompt": "You are a helpful and concise assistant."
+        }
+      ]
+    }
+    ```
+
+2.  **Start `agon`**:
+
+    ```bash
+    agon chat
+    ```
+
 ### Exporting Data
 
 When using `pipelineMode`, you can export the results of the pipeline to a JSON or Markdown file.
@@ -477,6 +509,7 @@ When using `pipelineMode`, you can export the results of the pipeline to a JSON 
 ## MCPMode
 
 MCP mode is an advanced feature that enables language models to use external tools by proxying requests through a local `agon-mcp` server process. When enabled, `agon` starts and manages this server in the background. If the language model determines that a user's request can be fulfilled by one of the available tools (like fetching the current weather), it can issue a `tool_calls` request. `agon` intercepts this, executes the tool via the MCP server, and feeds the result back to the model to formulate a final answer.
+Tool calls are currently forwarded only for Ollama hosts.
 
 ### Setup
 
