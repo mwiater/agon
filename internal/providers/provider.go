@@ -7,6 +7,7 @@ package providers
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/mwiater/agon/internal/appconfig"
@@ -43,6 +44,7 @@ type StreamMetadata struct {
 	PromptEvalDuration int64
 	EvalCount          int
 	EvalDuration       int64
+	LogProbs           json.RawMessage
 }
 
 // StreamRequest encapsulates all the information needed to initiate a chat stream.

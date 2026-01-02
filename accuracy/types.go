@@ -1,6 +1,8 @@
 // accuracy/types.go
 package accuracy
 
+import "encoding/json"
+
 // PromptSuite defines the accuracy test cases loaded from JSON.
 type PromptSuite struct {
 	SystemPrompt string       `json:"system_prompt"`
@@ -26,6 +28,7 @@ type AccuracyResult struct {
 	Prompt             string  `json:"prompt"`
 	ExpectedAnswer     int     `json:"expectedAnswer"`
 	Response           string  `json:"response"`
+	LogProbs           json.RawMessage `json:"logprobs,omitempty"`
 	Correct            bool    `json:"correct"`
 	MarginOfError      int     `json:"marginOfError"`
 	Difficulty         int     `json:"difficulty"`

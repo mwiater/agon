@@ -889,7 +889,7 @@ const reportTemplateHTML = `<!DOCTYPE html>
       <span class="navbar-brand mb-0 h1">{{ .Title }}</span>
       <div class="d-flex align-items-center gap-3">
         <button class="btn btn-sm theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">
-          <span class="material-icons-two-tone" aria-hidden="true">dark_mode</span>
+          <i class="fa-duotone fa-regular fa-moon" aria-hidden="true"></i>
         </button>
         <span class="text-light">Generated: <span id="generatedAt">-</span></span>
       </div>
@@ -924,7 +924,7 @@ const reportTemplateHTML = `<!DOCTYPE html>
         <div class="col-sm-6 col-lg-2">
           <div class="card shadow-sm h-100">
             <div class="card-body">
-              <p style="font-size: 1.5em;" class="text-muted mb-1"><i class="fa-duotone fa-solid fa-bullseye-arrow"></i> Most Accurate</p>
+              <p style="font-size: 1.5em;" class="text-muted mb-1"><i class="fa-duotone fa-regular fa-bullseye-arrow"></i> Most Accurate</p>
               <h5 class="card-title" id="mostAccurateModel">-</h5>
             </div>
           </div>
@@ -932,7 +932,7 @@ const reportTemplateHTML = `<!DOCTYPE html>
         <div class="col-sm-6 col-lg-2">
           <div class="card shadow-sm h-100">
             <div class="card-body">
-              <p style="font-size: 1.5em;" class="text-muted mb-1"><i class="fa-duotone fa-solid fa-code-compare"></i> Best Trade-off</p>
+              <p style="font-size: 1.5em;" class="text-muted mb-1"><i class="fa-duotone fa-regular fa-code-compare"></i> Best Trade-off</p>
               <h5 class="card-title" id="bestTradeoffModel">-</h5>
             </div>
           </div>
@@ -950,17 +950,18 @@ const reportTemplateHTML = `<!DOCTYPE html>
             <table class="table table-striped table-hover table-bordered table-sm" id="modelsTable">
               <thead class="table-light">
                 <tr>
-                  <th class="sortable" data-type="text">Model <span class="material-icons-two-tone sort">import_export</span></th>
-                  <th class="sortable" data-type="number">Avg TPS <span class="material-icons-two-tone sort">import_export</span></th>
-                  <th class="sortable" data-type="number">Avg TTFT (s) <span class="material-icons-two-tone sort">import_export</span></th>
-                  <th class="sortable" data-type="number">Avg Output Tokens <span class="material-icons-two-tone sort">import_export</span></th>
-                  <th class="sortable" data-type="number">Accuracy (%) <span class="material-icons-two-tone sort">import_export</span></th>
-                  <th class="sortable" data-type="number">No. of Questions <span class="material-icons-two-tone sort">import_export</span></th>
-                  <th class="sortable" data-type="number" id="timeoutsHeader">Timeouts <span class="material-icons-two-tone sort">import_export</span></th>
-                  <th class="sortable" data-type="number">Avg Difficulty <span class="material-icons-two-tone sort">import_export</span></th>
-                  <th class="sortable" data-type="number">Throughput Score <span class="material-icons-two-tone sort">import_export</span></th>
-                  <th class="sortable" data-type="number">Latency Score <span class="material-icons-two-tone sort">import_export</span></th>
-                  <th class="sortable" data-type="number">Efficiency Score <span class="material-icons-two-tone sort">import_export</span></th>
+                  <th class="sortable" data-type="text">Model <i class="fa-duotone fa-regular fa-arrows-up-down sort-icon" aria-hidden="true"></i></th>
+                  <th class="sortable" data-type="text">Best For <i class="fa-duotone fa-regular fa-arrows-up-down sort-icon" aria-hidden="true"></i></th>
+                  <th class="sortable" data-type="number">Accuracy Rank <i class="fa-duotone fa-regular fa-arrows-up-down sort-icon" aria-hidden="true"></i></th>
+                  <th class="sortable" data-type="number">Accuracy (%) <i class="fa-duotone fa-regular fa-arrows-up-down sort-icon" aria-hidden="true"></i></th>
+                  <th class="sortable" data-type="number">Questions <i class="fa-duotone fa-regular fa-arrows-up-down sort-icon" aria-hidden="true"></i></th>
+                  <th class="sortable" data-type="number" id="timeoutsHeader">Timeouts <i class="fa-duotone fa-regular fa-arrows-up-down sort-icon" aria-hidden="true"></i></th>
+                  <th class="sortable" data-type="number">Avg TTFT (s) <i class="fa-duotone fa-regular fa-arrows-up-down sort-icon" aria-hidden="true"></i></th>
+                  <th class="sortable" data-type="number">Avg TPS <i class="fa-duotone fa-regular fa-arrows-up-down sort-icon" aria-hidden="true"></i></th>
+                  <th class="sortable" data-type="number">Avg Total (s) <i class="fa-duotone fa-regular fa-arrows-up-down sort-icon" aria-hidden="true"></i></th>
+                  <th class="sortable" data-type="number">Avg Output Tokens <i class="fa-duotone fa-regular fa-arrows-up-down sort-icon" aria-hidden="true"></i></th>
+                  <th class="sortable" data-type="text">Consistency <i class="fa-duotone fa-regular fa-arrows-up-down sort-icon" aria-hidden="true"></i></th>
+                  <th class="sortable" data-type="number">Composite Rank <i class="fa-duotone fa-regular fa-arrows-up-down sort-icon" aria-hidden="true"></i></th>
                 </tr>
               </thead>
               <tbody></tbody>
@@ -1089,50 +1090,169 @@ const reportTemplateHTML = `<!DOCTYPE html>
         return $td;
       }
 
-      function updateSortIcons($header, direction) {
-				$header.closest('tr').find('.sort').each(function() {
-					$(this)[0].innerHTML = 'import_export'
-				});
-
-        if (direction === 'asc') {
-					$header.find('.sort')[0].innerHTML = 'keyboard_double_arrow_up'
-        } else if (direction === 'desc') {
-          $header.find('.sort')[0].innerHTML = 'keyboard_double_arrow_down'
+      function createTextCell(text, dataValue, iconClass) {
+        var $td = $('<td></td>');
+        if (iconClass) {
+          $td.append('<i class="' + iconClass + ' me-2"></i>');
         }
+        $td.append(document.createTextNode(text || '-'));
+        if (dataValue) {
+          $td.attr('data-value', dataValue);
+        }
+        return $td;
+      }
+
+      function updateSortIcons($header, direction) {
+        $header.closest('tr').find('.sort-icon').each(function() {
+          $(this).removeClass('fa-arrow-up fa-arrow-down').addClass('fa-arrows-up-down');
+        });
+
+        var $icon = $header.find('.sort-icon');
+        if (direction === 'asc') {
+          $icon.removeClass('fa-arrows-up-down fa-arrow-down').addClass('fa-arrow-up');
+        } else if (direction === 'desc') {
+          $icon.removeClass('fa-arrows-up-down fa-arrow-up').addClass('fa-arrow-down');
+        }
+      }
+
+      function getCompositeScore(model) {
+        if (model.scores && typeof model.scores.compositeScore === 'number' && model.scores.compositeScore > 0) {
+          return model.scores.compositeScore;
+        }
+        if (model.scores && typeof model.scores.efficiencyScore === 'number') {
+          return model.scores.efficiencyScore;
+        }
+        return 0;
+      }
+
+      function getBestForBadge(model, best) {
+        if (model.modelName === best.accuracy) {
+          return { label: 'Accuracy', icon: 'fa-duotone fa-regular fa-bullseye-arrow' };
+        }
+        if (model.modelName === best.composite) {
+          return { label: 'Balanced', icon: 'fa-duotone fa-regular fa-scale-balanced' };
+        }
+        if (model.modelName === best.latency) {
+          return { label: 'Interactive', icon: 'fa-duotone fa-regular fa-bolt' };
+        }
+        if (model.modelName === best.throughput) {
+          return { label: 'Throughput', icon: 'fa-duotone fa-regular fa-rocket-launch' };
+        }
+        return { label: 'General', icon: 'fa-duotone fa-regular fa-chart-line' };
+      }
+
+      function buildCompositeRanks(models) {
+        var scored = models.map(function(model) {
+          return { name: model.modelName, score: getCompositeScore(model) };
+        });
+        scored.sort(function(a, b) { return b.score - a.score; });
+        var ranks = {};
+        scored.forEach(function(entry, index) {
+          ranks[entry.name] = entry.score > 0 ? index + 1 : null;
+        });
+        return ranks;
+      }
+
+      function buildAccuracyRanks(models) {
+        var scored = [];
+        models.forEach(function(model) {
+          if (model.accuracy && typeof model.accuracy.accuracy === 'number') {
+            scored.push({ name: model.modelName, score: model.accuracy.accuracy });
+          }
+        });
+        scored.sort(function(a, b) { return b.score - a.score; });
+        var ranks = {};
+        scored.forEach(function(entry, index) {
+          ranks[entry.name] = index + 1;
+        });
+        return ranks;
       }
 
       function populateTable(models) {
         var $tbody = $('#modelsTable tbody').empty();
+        var compositeRanks = buildCompositeRanks(models);
+        var accuracyRanks = buildAccuracyRanks(models);
+        var best = {
+          composite: null,
+          accuracy: null,
+          latency: null,
+          throughput: null
+        };
+        var bestComposite = -1;
+        var bestAccuracy = -1;
+        var bestLatency = null;
+        var bestThroughput = -1;
+
+        models.forEach(function(model) {
+          var compositeScore = getCompositeScore(model);
+          if (compositeScore > bestComposite) {
+            bestComposite = compositeScore;
+            best.composite = model.modelName;
+          }
+          if (model.accuracy && typeof model.accuracy.accuracy === 'number') {
+            if (model.accuracy.accuracy > bestAccuracy) {
+              bestAccuracy = model.accuracy.accuracy;
+              best.accuracy = model.modelName;
+            }
+          }
+          if (model.avg && typeof model.avg.timeToFirstTokenSeconds === 'number' && model.avg.timeToFirstTokenSeconds > 0) {
+            if (bestLatency === null || model.avg.timeToFirstTokenSeconds < bestLatency.value) {
+              bestLatency = { name: model.modelName, value: model.avg.timeToFirstTokenSeconds };
+            }
+          }
+          if (model.avg && typeof model.avg.tokensPerSecond === 'number') {
+            if (model.avg.tokensPerSecond > bestThroughput) {
+              bestThroughput = model.avg.tokensPerSecond;
+              best.throughput = model.modelName;
+            }
+          }
+        });
+
+        if (bestLatency) {
+          best.latency = bestLatency.name;
+        }
+
         models.forEach(function(model) {
           var $row = $('<tr></tr>');
           var paretoBadge = model.paretoFront ? ' <span class="badge bg-success text-uppercase ms-1">Pareto</span>' : '';
-          $row.append($('<td><i class="fa-duotone fa-regular fa-user-robot"></i> '+model.modelName+paretoBadge+'</td>'))
-          $row.append(createNumericCell(model.avg.tokensPerSecond, 2));
-          $row.append(createNumericCell(model.avg.timeToFirstTokenSeconds, 2));
-          $row.append(createNumericCell(model.avg.outputTokens, 1));
+          $row.append($('<td><i class="fa-duotone fa-regular fa-user-robot"></i> '+model.modelName+paretoBadge+'</td>'));
+
+          var bestFor = getBestForBadge(model, best);
+          $row.append(createTextCell(bestFor.label, bestFor.label, bestFor.icon));
+
+          var accuracyRank = accuracyRanks[model.modelName] || null;
+          $row.append(createNumericCell(accuracyRank, 0));
+
           var accuracyPct = null;
           if (model.accuracy && typeof model.accuracy.accuracy === 'number') {
             accuracyPct = model.accuracy.accuracy * 100;
           }
           $row.append(createNumericCell(accuracyPct, 1));
+
           var questionCount = null;
           if (model.accuracy && typeof model.accuracy.total === 'number') {
             questionCount = model.accuracy.total;
           }
           $row.append(createNumericCell(questionCount, 0));
+
           var timeoutCount = null;
           if (model.accuracy && typeof model.accuracy.timeouts === 'number') {
             timeoutCount = model.accuracy.timeouts;
           }
           $row.append(createNumericCell(timeoutCount, 0));
-          var avgDifficulty = null;
-          if (model.accuracy && typeof model.accuracy.avgDifficulty === 'number') {
-            avgDifficulty = model.accuracy.avgDifficulty;
-          }
-          $row.append(createNumericCell(avgDifficulty, 2));
-          $row.append(createNumericCell(model.scores.throughputScore, 1));
-          $row.append(createNumericCell(model.scores.latencyScore, 1));
-          $row.append(createNumericCell(model.scores.efficiencyScore, 1));
+
+          $row.append(createNumericCell(model.avg.timeToFirstTokenSeconds, 2));
+          $row.append(createNumericCell(model.avg.tokensPerSecond, 2));
+          $row.append(createNumericCell(model.avg.totalExecutionTimeSeconds, 2));
+          $row.append(createNumericCell(model.avg.outputTokens, 1));
+
+          var stabilityLabel = model.labels && model.labels.stability ? model.labels.stability : '-';
+          var stabilityIcon = 'fa-duotone fa-regular fa-wave-pulse';
+          $row.append(createTextCell(stabilityLabel, stabilityLabel, stabilityIcon));
+
+          var rankValue = compositeRanks[model.modelName];
+          $row.append(createNumericCell(rankValue, 0));
+
           $tbody.append($row);
         });
         highlightTopPerformers($tbody);
@@ -1140,16 +1260,11 @@ const reportTemplateHTML = `<!DOCTYPE html>
 
       function highlightTopPerformers($tbody) {
         var columns = [
-          { index: 1, mode: 'max' },
-          { index: 2, mode: 'min' },
           { index: 3, mode: 'max' },
-          { index: 4, mode: 'max' },
-          { index: 5, mode: 'max' },
+          { index: 5, mode: 'min' },
           { index: 6, mode: 'min' },
           { index: 7, mode: 'max' },
-          { index: 8, mode: 'max' },
-          { index: 9, mode: 'max' },
-          { index: 10, mode: 'max' }
+          { index: 8, mode: 'min' }
         ];
         columns.forEach(function(column) {
           var best = null;
@@ -1689,11 +1804,13 @@ const reportTemplateHTML = `<!DOCTYPE html>
         document.documentElement.setAttribute('data-theme', selected);
         var toggle = document.getElementById('themeToggle');
         if (toggle) {
-          var icon = toggle.querySelector('.material-icons-two-tone');
+          var icon = toggle.querySelector('i');
           var label = selected === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
           toggle.setAttribute('aria-label', label);
           if (icon) {
-            icon.textContent = selected === 'dark' ? 'light_mode' : 'dark_mode';
+            icon.className = selected === 'dark'
+              ? 'fa-duotone fa-regular fa-sun'
+              : 'fa-duotone fa-regular fa-moon';
           }
         }
         try {

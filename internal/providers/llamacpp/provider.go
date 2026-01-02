@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/k0kubun/pp"
 	"github.com/mwiater/agon/internal/appconfig"
 	"github.com/mwiater/agon/internal/logging"
 	"github.com/mwiater/agon/internal/providers"
@@ -259,6 +258,7 @@ func (p *Provider) handleNonStreaming(ctx context.Context, resp *http.Response, 
 			PromptEvalDuration: msToNs(parsed.Timings.PromptMs),
 			EvalCount:          parsed.Timings.PredictedN,
 			EvalDuration:       msToNs(parsed.Timings.PredictedMs),
+			LogProbs:           parsed.Choices[0].LogProbs,
 		}
 		if err := callbacks.OnComplete(meta); err != nil {
 			return err
@@ -343,8 +343,6 @@ func (p *Provider) handleStreaming(ctx context.Context, resp *http.Response, req
 		}
 	}
 
-	pp.Println(resp.Body)
-
 	if len(toolCalls) > 0 {
 		toolOutput, err := executeToolCalls(ctx, req, toolCalls)
 		if err != nil {
@@ -383,6 +381,7 @@ type chatResponse struct {
 			Content   string     `json:"content"`
 			ToolCalls []toolCall `json:"tool_calls,omitempty"`
 		} `json:"message"`
+		LogProbs json.RawMessage `json:"logprobs,omitempty"`
 	} `json:"choices"`
 }
 
@@ -601,6 +600,9 @@ func applyParameters(payload map[string]any, params appconfig.Parameters) {
 	}
 	if params.FrequencyPenalty != nil {
 		payload["frequency_penalty"] = *params.FrequencyPenalty
+	}
+	if params.LogProbs != nil {
+		payload["logprobs"] = *params.LogProbs
 	}
 }
 

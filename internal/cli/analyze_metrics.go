@@ -19,6 +19,7 @@ type analyzeMetricsOptions struct {
 	htmlPath           string
 	analysisPath        string
 	accuracyResultsDir string
+	benchmarksDir      string
 	hostName           string
 	hostNotes          string
 	accuracyOnly       bool
@@ -36,7 +37,13 @@ dashboard for review.`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var results metrics.BenchmarkResults
-		if analyzeMetricsOpts.accuracyOnly {
+		if analyzeMetricsOpts.benchmarksDir != "" {
+			var err error
+			results, err = loadBenchmarksDir(analyzeMetricsOpts.benchmarksDir)
+			if err != nil {
+				return err
+			}
+		} else if analyzeMetricsOpts.accuracyOnly {
 			var err error
 			results, err = loadAccuracyPerformanceResults(analyzeMetricsOpts.accuracyResultsDir)
 			if err != nil {
@@ -96,6 +103,7 @@ dashboard for review.`,
 
 func init() {
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.inputPath, "input", "reports/data/model_performance_metrics.json", "Path to benchmark JSON (required)")
+	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.benchmarksDir, "benchmarks-dir", "", "Optional path to a directory of benchmark JSON files")
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.htmlPath, "html-output", "reports/metrics-report.html", "Destination HTML report path")
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.analysisPath, "analysis-output", "", "Optional path to write the analysis JSON")
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.accuracyResultsDir, "accuracy-results", "accuracy/results", "Optional path to accuracy JSONL results directory")
@@ -131,9 +139,25 @@ func parseBenchmarkResults(raw []byte) (metrics.BenchmarkResults, error) {
 		return results, nil
 	}
 
+	llamaBench, err := parseLlamaCppBench(raw)
+	if err != nil {
+		return nil, err
+	}
+	if len(llamaBench) > 0 {
+		return llamaBench, nil
+	}
+
 	var modelMetrics []metrics.ModelMetrics
 	if err := json.Unmarshal(raw, &modelMetrics); err == nil && len(modelMetrics) > 0 {
-		return convertModelMetrics(modelMetrics), nil
+		filtered := make([]metrics.ModelMetrics, 0, len(modelMetrics))
+		for _, model := range modelMetrics {
+			if model.ModelName != "" {
+				filtered = append(filtered, model)
+			}
+		}
+		if len(filtered) > 0 {
+			return convertModelMetrics(filtered), nil
+		}
 	}
 
 	// Final attempt: allow empty payload that still unmarshals into map.
@@ -188,6 +212,229 @@ func roundToInt(val float64) int {
 		return 0
 	}
 	return int(math.Round(val))
+}
+
+type llamaCppBenchEntry struct {
+	ModelFilename string    `json:"model_filename"`
+	NPrompt       int       `json:"n_prompt"`
+	NGen          int       `json:"n_gen"`
+	AvgNs         float64   `json:"avg_ns"`
+	SamplesNs     []float64 `json:"samples_ns"`
+}
+
+func parseLlamaCppBench(raw []byte) (metrics.BenchmarkResults, error) {
+	var entries []llamaCppBenchEntry
+	if err := json.Unmarshal(raw, &entries); err != nil || len(entries) == 0 {
+		return nil, nil
+	}
+
+	type benchParts struct {
+		prompt *llamaCppBenchEntry
+		gen    *llamaCppBenchEntry
+	}
+
+	partsByModel := make(map[string]benchParts)
+	for _, entry := range entries {
+		if entry.ModelFilename == "" {
+			continue
+		}
+		name := modelNameFromFilename(entry.ModelFilename)
+		if name == "" {
+			continue
+		}
+		parts := partsByModel[name]
+		if entry.NGen > 0 {
+			if parts.gen == nil || entry.NGen > parts.gen.NGen {
+				copyEntry := entry
+				parts.gen = &copyEntry
+			}
+		} else if entry.NPrompt > 0 {
+			if parts.prompt == nil || entry.NPrompt > parts.prompt.NPrompt {
+				copyEntry := entry
+				parts.prompt = &copyEntry
+			}
+		}
+		partsByModel[name] = parts
+	}
+
+	if len(partsByModel) == 0 {
+		return nil, nil
+	}
+
+	results := make(metrics.BenchmarkResults, len(partsByModel))
+	for name, parts := range partsByModel {
+		inputTokens := 0
+		outputTokens := 0
+		if parts.prompt != nil {
+			inputTokens = parts.prompt.NPrompt
+		}
+		if parts.gen != nil {
+			outputTokens = parts.gen.NGen
+			if inputTokens == 0 {
+				inputTokens = parts.gen.NPrompt
+			}
+		}
+
+		iterations := buildLlamaBenchIterations(parts.prompt, parts.gen, inputTokens, outputTokens)
+		avg, min, max := buildStatsFromIterations(iterations)
+
+		results[name] = metrics.ModelBenchmark{
+			ModelName:      name,
+			BenchmarkCount: len(iterations),
+			AverageStats:   avg,
+			MinStats:       min,
+			MaxStats:       max,
+			Iterations:     iterations,
+		}
+	}
+
+	return results, nil
+}
+
+func modelNameFromFilename(path string) string {
+	base := filepath.Base(path)
+	ext := filepath.Ext(base)
+	if ext != "" {
+		return strings.TrimSuffix(base, ext)
+	}
+	return base
+}
+
+func buildLlamaBenchIterations(prompt, gen *llamaCppBenchEntry, inputTokens, outputTokens int) []metrics.Iteration {
+	promptSamples := []float64{}
+	genSamples := []float64{}
+	promptAvg := 0.0
+	genAvg := 0.0
+
+	if prompt != nil {
+		promptSamples = prompt.SamplesNs
+		promptAvg = prompt.AvgNs
+	}
+	if gen != nil {
+		genSamples = gen.SamplesNs
+		genAvg = gen.AvgNs
+	}
+
+	count := 0
+	switch {
+	case len(promptSamples) > 0 && len(genSamples) > 0:
+		if len(promptSamples) < len(genSamples) {
+			count = len(promptSamples)
+		} else {
+			count = len(genSamples)
+		}
+	case len(promptSamples) > 0:
+		count = len(promptSamples)
+	case len(genSamples) > 0:
+		count = len(genSamples)
+	default:
+		if promptAvg > 0 || genAvg > 0 {
+			count = 1
+		}
+	}
+
+	if count == 0 {
+		return nil
+	}
+
+	iterations := make([]metrics.Iteration, 0, count)
+	for i := 0; i < count; i++ {
+		promptNs := promptAvg
+		genNs := genAvg
+		if i < len(promptSamples) {
+			promptNs = promptSamples[i]
+		}
+		if i < len(genSamples) {
+			genNs = genSamples[i]
+		}
+
+		totalNs := promptNs + genNs
+		tps := 0.0
+		if totalNs > 0 && outputTokens > 0 {
+			tps = float64(outputTokens) / (totalNs / 1e9)
+		}
+
+		iterations = append(iterations, metrics.Iteration{
+			Iteration: i + 1,
+			Stats: metrics.Stats{
+				TotalExecutionTime: int64(totalNs),
+				TimeToFirstToken:   int64(promptNs),
+				TokensPerSecond:    tps,
+				InputTokenCount:    inputTokens,
+				OutputTokenCount:   outputTokens,
+			},
+		})
+	}
+
+	return iterations
+}
+
+func buildStatsFromIterations(iterations []metrics.Iteration) (metrics.Stats, metrics.Stats, metrics.Stats) {
+	if len(iterations) == 0 {
+		return metrics.Stats{}, metrics.Stats{}, metrics.Stats{}
+	}
+
+	min := iterations[0].Stats
+	max := iterations[0].Stats
+
+	var (
+		sumTotal   int64
+		sumTTFT    int64
+		sumTPS     float64
+		sumInput   int
+		sumOutput  int
+	)
+
+	for _, iter := range iterations {
+		stats := iter.Stats
+		sumTotal += stats.TotalExecutionTime
+		sumTTFT += stats.TimeToFirstToken
+		sumTPS += stats.TokensPerSecond
+		sumInput += stats.InputTokenCount
+		sumOutput += stats.OutputTokenCount
+
+		if stats.TotalExecutionTime < min.TotalExecutionTime {
+			min.TotalExecutionTime = stats.TotalExecutionTime
+		}
+		if stats.TotalExecutionTime > max.TotalExecutionTime {
+			max.TotalExecutionTime = stats.TotalExecutionTime
+		}
+		if stats.TimeToFirstToken < min.TimeToFirstToken {
+			min.TimeToFirstToken = stats.TimeToFirstToken
+		}
+		if stats.TimeToFirstToken > max.TimeToFirstToken {
+			max.TimeToFirstToken = stats.TimeToFirstToken
+		}
+		if stats.TokensPerSecond < min.TokensPerSecond {
+			min.TokensPerSecond = stats.TokensPerSecond
+		}
+		if stats.TokensPerSecond > max.TokensPerSecond {
+			max.TokensPerSecond = stats.TokensPerSecond
+		}
+		if stats.InputTokenCount < min.InputTokenCount {
+			min.InputTokenCount = stats.InputTokenCount
+		}
+		if stats.InputTokenCount > max.InputTokenCount {
+			max.InputTokenCount = stats.InputTokenCount
+		}
+		if stats.OutputTokenCount < min.OutputTokenCount {
+			min.OutputTokenCount = stats.OutputTokenCount
+		}
+		if stats.OutputTokenCount > max.OutputTokenCount {
+			max.OutputTokenCount = stats.OutputTokenCount
+		}
+	}
+
+	count := float64(len(iterations))
+	avg := metrics.Stats{
+		TotalExecutionTime: int64(float64(sumTotal) / count),
+		TimeToFirstToken:   int64(float64(sumTTFT) / count),
+		TokensPerSecond:    sumTPS / count,
+		InputTokenCount:    int(math.Round(float64(sumInput) / count)),
+		OutputTokenCount:   int(math.Round(float64(sumOutput) / count)),
+	}
+
+	return avg, min, max
 }
 
 type accuracyLine struct {
@@ -517,4 +764,43 @@ func loadAccuracyPerformanceResults(dir string) (metrics.BenchmarkResults, error
 	}
 
 	return results, nil
+}
+
+func loadBenchmarksDir(dir string) (metrics.BenchmarkResults, error) {
+	info, err := os.Stat(dir)
+	if err != nil {
+		return nil, fmt.Errorf("unable to stat benchmarks dir %s: %w", dir, err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("benchmarks path is not a directory: %s", dir)
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read benchmarks dir %s: %w", dir, err)
+	}
+
+	merged := make(metrics.BenchmarkResults)
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
+		path := filepath.Join(dir, entry.Name())
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read benchmark file %s: %w", path, err)
+		}
+		results, err := parseBenchmarkResults(data)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse benchmark file %s: %w", path, err)
+		}
+		for name, bench := range results {
+			if _, exists := merged[name]; exists {
+				return nil, fmt.Errorf("duplicate model %q found in %s", name, path)
+			}
+			merged[name] = bench
+		}
+	}
+
+	return merged, nil
 }
