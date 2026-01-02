@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/k0kubun/pp"
 	"github.com/mwiater/agon/internal/appconfig"
 	"github.com/mwiater/agon/internal/logging"
 	"github.com/mwiater/agon/internal/providers"
@@ -211,6 +212,7 @@ func (p *Provider) handleNonStreaming(ctx context.Context, resp *http.Response, 
 	if err != nil {
 		return err
 	}
+
 	logging.LogRequest("LLM->AGON", hostIdentifier(req.Host), req.Model, "", body)
 
 	var parsed chatResponse
@@ -246,10 +248,17 @@ func (p *Provider) handleNonStreaming(ctx context.Context, resp *http.Response, 
 		if modelName == "" {
 			modelName = req.Model
 		}
+		totalMs := parsed.Timings.PromptMs + parsed.Timings.PredictedMs
 		meta := providers.StreamMetadata{
-			Model:     modelName,
-			CreatedAt: time.Now(),
-			Done:      true,
+			Model:              modelName,
+			CreatedAt:          time.Now(),
+			Done:               true,
+			TotalDuration:      msToNs(totalMs),
+			LoadDuration:       0,
+			PromptEvalCount:    parsed.Timings.PromptN,
+			PromptEvalDuration: msToNs(parsed.Timings.PromptMs),
+			EvalCount:          parsed.Timings.PredictedN,
+			EvalDuration:       msToNs(parsed.Timings.PredictedMs),
 		}
 		if err := callbacks.OnComplete(meta); err != nil {
 			return err
@@ -260,6 +269,7 @@ func (p *Provider) handleNonStreaming(ctx context.Context, resp *http.Response, 
 
 func (p *Provider) handleStreaming(ctx context.Context, resp *http.Response, req providers.StreamRequest, callbacks providers.StreamCallbacks) error {
 	reader := bufio.NewReader(resp.Body)
+
 	var finalModel string
 	var toolCalls []toolCall
 	loggedToolCalls := false
@@ -332,6 +342,9 @@ func (p *Provider) handleStreaming(ctx context.Context, resp *http.Response, req
 			return err
 		}
 	}
+
+	pp.Println(resp.Body)
+
 	if len(toolCalls) > 0 {
 		toolOutput, err := executeToolCalls(ctx, req, toolCalls)
 		if err != nil {
@@ -353,6 +366,17 @@ func (p *Provider) Close() error {
 
 type chatResponse struct {
 	Model   string `json:"model"`
+	Timings struct {
+		CacheN              int     `json:"cache_n"`
+		PredictedMs         float64 `json:"predicted_ms"`
+		PredictedN          int     `json:"predicted_n"`
+		PredictedPerSecond  float64 `json:"predicted_per_second"`
+		PredictedPerTokenMs float64 `json:"predicted_per_token_ms"`
+		PromptMs            float64 `json:"prompt_ms"`
+		PromptN             int     `json:"prompt_n"`
+		PromptPerSecond     float64 `json:"prompt_per_second"`
+		PromptPerTokenMs    float64 `json:"prompt_per_token_ms"`
+	} `json:"timings"`
 	Choices []struct {
 		Message struct {
 			Role      string     `json:"role"`
@@ -451,6 +475,13 @@ func (s *statusField) UnmarshalJSON(data []byte) error {
 
 func modelStatusValue(model llamaModel) string {
 	return strings.TrimSpace(model.Status.Value)
+}
+
+func msToNs(ms float64) int64 {
+	if ms <= 0 {
+		return 0
+	}
+	return int64(ms * float64(time.Millisecond))
 }
 
 func (p *Provider) fetchModels(ctx context.Context, host appconfig.Host, logIO bool) ([]llamaModel, error) {

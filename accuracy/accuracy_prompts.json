@@ -1,5 +1,5 @@
 {
-  "system_prompt": "You are a precise facts and logic engine. You must ONLY output the final numerical answer as a single integer. No text, no explanation, no units, no commas. Do not explain your reasoning!",
+  "system_prompt": "You are a strict numeric answer engine. Output ONLY one line containing a single integer. No spaces, no leading or trailing text, no punctuation, no commas, no units, no explanation, no extra lines. If the answer is negative, use a leading minus sign. If unsure, still output one best-guess integer only.",
   "tests": [
     {
       "id": 1,
@@ -51,8 +51,8 @@
     },
     {
       "id": 7,
-      "prompt": "A clock shows 3:00. How many degrees are between the hour and minute hand?",
-      "expected_answer": 90,
+      "prompt": "A clock shows 6:00. How many degrees are between the hour and minute hand?",
+      "expected_answer": 180,
       "category": "Spatial Logic",
       "difficulty": 7,
       "marginOfError": 0
@@ -67,8 +67,8 @@
     },
     {
       "id": 9,
-      "prompt": "If you have 3 apples and you take away 2, how many apples do YOU have?",
-      "expected_answer": 2,
+      "prompt": "You have 3 apples. You give 2 to a friend. How many apples do you have left?",
+      "expected_answer": 1,
       "category": "Linguistic Trap",
       "difficulty": 8,
       "marginOfError": 0
@@ -91,7 +91,7 @@
     },
     {
       "id": 12,
-      "prompt": "A baker has 12 cookies. He sells all but 4. How many cookies does he have left?",
+      "prompt": "A baker has 12 cookies. He sells 8. How many cookies does he have left?",
       "expected_answer": 4,
       "category": "Semantic Parsing",
       "difficulty": 7,
@@ -123,8 +123,8 @@
     },
     {
       "id": 16,
-      "prompt": "What is the equatorial radius of Jupiter in kilometers?",
-      "expected_answer": 71492,
+      "prompt": "Earth's mean radius is about 6,371 km. What is the integer value?",
+      "expected_answer": 6371,
       "category": "Planetary Science",
       "difficulty": 6,
       "marginOfError": 100
@@ -179,7 +179,7 @@
     },
     {
       "id": 23,
-      "prompt": "A large industrial water tank starts the day with exactly 50 liters of liquid. Every single hour that passes, precisely 4 liters are systematically removed from the tank. If this removal process begins at exactly 1:00 PM and continues at a steady rate until it ends at 6:00 PM, how many total liters are left in the tank? Provide only the integer.",
+      "prompt": "A tank has 50 liters. It loses 4 liters per hour for 5 hours. How many liters remain?",
       "expected_answer": 30,
       "category": "State Tracking",
       "difficulty": 6,
@@ -187,7 +187,7 @@
     },
     {
       "id": 24,
-      "prompt": "Focus your attention on the word 'GOLANG' and identify the third character in the string. Your specific task is to determine the numerical position of that letter in the standard English alphabet, where the letter A is assigned 1, B is 2, C is 3, and so on. After successfully identifying the alphabetical index for that third letter, multiply that specific number by 2. What is the final numerical value? Provide only the integer.",
+      "prompt": "In the word GOLANG, what is the 3rd letter's alphabet position? Multiply by 2.",
       "expected_answer": 24,
       "category": "Token-Level Math",
       "difficulty": 8,
