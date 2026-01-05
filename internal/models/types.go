@@ -4,10 +4,7 @@ package models
 // ModelParameters holds the detailed parameters of a model.
 type ModelParameters struct {
 	Model      string       `json:"model,omitempty"`
-	License    string       `json:"license,omitempty"`
-	Modelfile  string       `json:"modelfile,omitempty"`
 	Parameters string       `json:"parameters,omitempty"`
-	Template   string       `json:"template,omitempty"`
 	Details    ModelDetails `json:"details,omitempty"`
 }
 

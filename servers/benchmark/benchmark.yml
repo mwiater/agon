@@ -1,0 +1,7 @@
+# benchmarks server config
+host: 0.0.0.0
+port: 9999
+type: "ollama" # only "ollama" or "llama.cpp"
+api_base: https://o-udoo01.0nezer0.com
+models_path: /home/matt/.ollama/models
+timeout: 3600 # seconds
