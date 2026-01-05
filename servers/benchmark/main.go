@@ -102,6 +102,14 @@ func (s *Server) handleBench(w http.ResponseWriter, r *http.Request) {
 	switch strings.ToLower(strings.TrimSpace(s.cfg.Type)) {
 	case "llama.cpp":
 		// Ensure model exists on server (strict, avoids arbitrary file reads)
+		if !filepath.IsAbs(modelPath) {
+			if strings.TrimSpace(s.cfg.ModelsPath) == "" {
+				log.Printf("benchmark models_path not configured for llama.cpp")
+				writeJSON(w, http.StatusInternalServerError, ErrResp{OK: false, Error: "models_path is required for llama.cpp"})
+				return
+			}
+			modelPath = filepath.Join(s.cfg.ModelsPath, modelPath)
+		}
 		if _, err := os.Stat(modelPath); err != nil {
 			log.Printf("benchmark model not found (llama.cpp): %s", modelPath)
 			writeJSON(w, http.StatusBadRequest, ErrResp{OK: false, Error: "model file not found: " + modelPath})
