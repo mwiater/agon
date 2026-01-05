@@ -8,7 +8,9 @@
         "granite4:350m"
       ],
       "systemprompt": "You are a helpful assistant",
-      "parameters": {}
+      "parameters": {
+        "logProbs": true
+      }
     },
     {
       "name": "Ollama02",
@@ -18,7 +20,9 @@
         "granite3.1-moe:1b"
       ],
       "systemprompt": "You are a helpful assistant",
-      "parameters": {}
+      "parameters": {
+        "logProbs": true
+      }
     },
     {
       "name": "Ollama03",
@@ -28,7 +32,9 @@
         "llama3.2:1b"
       ],
       "systemprompt": "You are a helpful assistant",
-      "parameters": {}
+      "parameters": {
+        "logProbs": true
+      }
     }
   ],
   "timeout": 600,
