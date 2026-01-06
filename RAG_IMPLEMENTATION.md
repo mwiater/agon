@@ -7,7 +7,7 @@ This plan turns the RAG idea into a staged, verifiable implementation. Each sect
 Goal: be explicit about what external services, models, and storage are required or optional.
 
 Required (minimum, JSONL-only store)
-- Embedding model available on an Ollama host (example: `mxbai-embed-large:335m`).
+- Embedding model available on a llama.cpp host (example: `mxbai-embed-large:335m`).
 - A local JSONL index stored in the repo (ex: `rag_corpus_accuracy_v1/index.jsonl`).
 - No external vector DB or SQLite extension is required for the initial implementation.
 
@@ -16,7 +16,7 @@ Optional (future, not required for initial JSONL path)
 - A standalone vector DB (Qdrant, Chroma, Milvus) if you later prefer a server-backed store.
 
 Installation notes (JSONL-only)
-- No extra install is needed beyond the embedding model already in Ollama.
+- No extra install is needed beyond the embedding model already in llama.cpp.
 - The index file is rebuilt locally with `agon rag index` and committed to the repo for repeatable benchmarks.
 
 Verification
@@ -186,6 +186,6 @@ rg -n "RAG|rag_corpus|rag mode" README.md rag_corpus_accuracy_v1
 ## Notes and open questions to resolve early
 
 - Embedding host selection: use a dedicated host (recommended) or reuse the current model host?
-- Token counting strategy for `context_tokens`: use a simple heuristic (word count) or an Ollama tokenization call?
+- Token counting strategy for `context_tokens`: use a simple heuristic (word count) or a llama.cpp tokenization call?
 - Index persistence: store embeddings in JSONL under `rag_corpus_accuracy_v1/` (default) or in a separate cache directory?
 - Scoring for RAG prompts: exact string checks, required keys in JSON, or a small checklist language?

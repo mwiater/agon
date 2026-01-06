@@ -119,7 +119,7 @@ func (p *Provider) LoadedModels(ctx context.Context, host appconfig.Host) ([]str
 		p.log("Tool bypassed: tool=loaded_models host=%s reason=%v", host.Name, err)
 		return nil, err
 	}
-	p.log("Tool bypassed: tool=loaded_models host=%s reason=delegated to Ollama API", host.Name)
+	p.log("Tool bypassed: tool=loaded_models host=%s reason=delegated to llama.cpp API", host.Name)
 	return models, nil
 }
 
@@ -130,7 +130,7 @@ func (p *Provider) EnsureModelReady(ctx context.Context, host appconfig.Host, mo
 		p.log("Tool bypassed: tool=ensure_model host=%s model=%s reason=%v", host.Name, model, err)
 		return err
 	}
-	p.log("Tool bypassed: tool=ensure_model host=%s model=%s reason=delegated to Ollama API", host.Name, model)
+	p.log("Tool bypassed: tool=ensure_model host=%s model=%s reason=delegated to llama.cpp API", host.Name, model)
 	return nil
 }
 
@@ -318,9 +318,9 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 		return err
 	}
 	if executed {
-		p.log("Tool executed: tool=chat host=%s model=%s forwarded to Ollama", hostName, req.Model)
+		p.log("Tool executed: tool=chat host=%s model=%s forwarded to llama.cpp", hostName, req.Model)
 	} else {
-		p.log("Tool bypassed: tool=chat host=%s model=%s reason=delegated to Ollama API", hostName, req.Model)
+		p.log("Tool bypassed: tool=chat host=%s model=%s reason=delegated to llama.cpp API", hostName, req.Model)
 	}
 	return nil
 }

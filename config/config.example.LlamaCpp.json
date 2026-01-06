@@ -11,9 +11,9 @@
       "parameters": {}
     },
     {
-      "name": "Ollama01",
+      "name": "LlamaCpp01",
       "url": "https://o-udoo01.0nezer0.com",
-      "type": "ollama",
+      "type": "llama.cpp",
       "models": [
         "deepseek-r1:1.5b",
         "gemma3:1b",
@@ -48,3 +48,4 @@
   "exportMarkdown": "",
   "metrics": true
 }
+

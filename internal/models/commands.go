@@ -24,19 +24,12 @@ func createHosts(config appconfig.Config) []LLMHost {
 	for _, hostConfig := range config.Hosts {
 		normalized := strings.ToLower(strings.TrimSpace(hostConfig.Type))
 		switch normalized {
-		case "ollama":
-			hosts = append(hosts, &OllamaHost{
-				Name:           hostConfig.Name,
-				URL:            hostConfig.URL,
-				Models:         hostConfig.Models,
-				client:         client,
-				requestTimeout: timeout,
-			})
-		case "llama.cpp", "llamacpp":
+		case "", "llama.cpp", "llamacpp":
 			hosts = append(hosts, &LlamaCppHost{
 				Name:           hostConfig.Name,
 				URL:            hostConfig.URL,
 				Models:         hostConfig.Models,
+				Parameters:     hostConfig.Parameters,
 				client:         client,
 				requestTimeout: timeout,
 			})
@@ -60,7 +53,7 @@ func PullModels(config *appconfig.Config) {
 		wg.Add(1)
 		go func(h LLMHost) {
 			defer wg.Done()
-			if h.GetType() != "ollama" {
+			if h.GetType() != "llama.cpp" {
 				fmt.Printf("Pulling models is not supported for %s (%s)\n", h.GetName(), h.GetType())
 				return
 			}
@@ -93,7 +86,7 @@ func DeleteModels(config *appconfig.Config) {
 		wg.Add(1)
 		go func(h LLMHost) {
 			defer wg.Done()
-			if h.GetType() != "ollama" {
+			if h.GetType() != "llama.cpp" {
 				fmt.Printf("Deleting models is not supported for %s (%s)\n", h.GetName(), h.GetType())
 				return
 			}
@@ -142,7 +135,7 @@ func UnloadModels(config *appconfig.Config) {
 		wg.Add(1)
 		go func(h LLMHost) {
 			defer wg.Done()
-			if h.GetType() != "ollama" && h.GetType() != "llama.cpp" {
+			if h.GetType() != "llama.cpp" {
 				fmt.Printf("Unloading models is not supported for %s (%s)\n", h.GetName(), h.GetType())
 				return
 			}
@@ -183,7 +176,7 @@ func SyncConfigs(config *appconfig.Config) {
 	pp.Println(config)
 }
 
-// ListModels lists models on each configured host, indicating which are currently loaded for Ollama hosts.
+// ListModels lists models on each configured host, indicating which are currently loaded.
 func ListModels(config *appconfig.Config) {
 	if config == nil {
 		fmt.Println("configuration is not initialized")
@@ -241,11 +234,6 @@ func ListModelParameters(config *appconfig.Config) {
 
 	for _, host := range hosts {
 		fmt.Println(nodeStyle.Render(fmt.Sprintf("%s:", host.GetName())))
-		if host.GetType() != "ollama" {
-			fmt.Printf("Listing model parameters is not supported for %s (%s)\n", host.GetName(), host.GetType())
-			continue
-		}
-
 		params, err := host.GetModelParameters()
 		if err != nil {
 			fmt.Printf("Error getting model parameters from %s: %v\n", host.GetName(), err)
@@ -286,11 +274,6 @@ func ShowModelInfo(config *appconfig.Config) {
 		wg.Add(1)
 		go func(h LLMHost) {
 			defer wg.Done()
-			if h.GetType() != "ollama" {
-				messagesChan <- fmt.Sprintf("Skipping %s: Not an 'ollama' host type (%s)", h.GetName(), h.GetType())
-				return
-			}
-
 			modelParams, err := h.GetModelParameters()
 			if err != nil {
 				fmt.Println("Error fetching model parameters from ", h.GetName(), ": ", err)
@@ -336,4 +319,48 @@ func ShowModelInfo(config *appconfig.Config) {
 	for _, modelName := range uniqueModels {
 		pp.Println(modelName)
 	}
+}
+
+// extractSettings parses the parameters text and returns the sampling settings used by the CLI output.
+func extractSettings(paramsText string) map[string]string {
+	wanted := map[string]string{
+		"temperature":    "n/a",
+		"top_p":          "n/a",
+		"top_k":          "n/a",
+		"repeat_penalty": "n/a",
+		"min_p":          "n/a",
+	}
+
+	lines := strings.Split(paramsText, "\n")
+	for _, line := range lines {
+		s := strings.TrimSpace(strings.ToLower(line))
+		if s == "" {
+			continue
+		}
+
+		if strings.Contains(s, "=") {
+			kv := strings.SplitN(s, "=", 2)
+			key := strings.TrimSpace(kv[0])
+			val := strings.TrimSpace(kv[1])
+			if _, ok := wanted[key]; ok && wanted[key] == "n/a" && val != "" {
+				wanted[key] = val
+			}
+			continue
+		}
+
+		fields := strings.Fields(s)
+		if len(fields) >= 2 {
+			key := fields[0]
+			valIdx := 1
+			if key == "parameter" && len(fields) >= 3 {
+				key = fields[1]
+				valIdx = 2
+			}
+			if _, ok := wanted[key]; ok && wanted[key] == "n/a" {
+				wanted[key] = fields[valIdx]
+			}
+		}
+	}
+
+	return wanted
 }

@@ -7,33 +7,25 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mwiater/agon/internal/appconfig"
 )
 
-// TestOllamaHost tests the functionality of the OllamaHost struct and its
-// associated methods. It sets up a mock HTTP server to simulate the Ollama API
-// and verifies that the methods for listing, pulling, deleting, and unloading
-// models behave as expected. It also checks that model parameters are correctly
-// retrieved and parsed.
-func TestOllamaHost(t *testing.T) {
+// TestLlamaCppHost tests the functionality of the LlamaCppHost struct and its
+// associated methods. It sets up a mock HTTP server to simulate the llama.cpp
+// router-mode API and verifies that the methods for listing, loading, deleting,
+// and unloading models behave as expected. It also checks that model parameters
+// are reported from configuration.
+func TestLlamaCppHost(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/api/tags":
-			if _, err := w.Write([]byte(`{"models":[{"name":"model1"},{"name":"model2"}]}`)); err != nil {
-				t.Fatalf("write response for /api/tags: %v", err)
+		case "/models":
+			if _, err := w.Write([]byte(`{"models":[{"id":"model1","status":"loaded"},{"id":"model2","status":"unloaded"}]}`)); err != nil {
+				t.Fatalf("write response for /models: %v", err)
 			}
-		case "/api/ps":
-			if _, err := w.Write([]byte(`{"models":[{"name":"model1"}]}`)); err != nil {
-				t.Fatalf("write response for /api/ps: %v", err)
-			}
-		case "/api/show":
-			if _, err := w.Write([]byte(`{"parameters":"temperature 0.8"}`)); err != nil {
-				t.Fatalf("write response for /api/show: %v", err)
-			}
-		case "/api/pull":
+		case "/models/load":
 			w.WriteHeader(http.StatusOK)
-		case "/api/delete":
-			w.WriteHeader(http.StatusOK)
-		case "/api/chat":
+		case "/models/unload":
 			w.WriteHeader(http.StatusOK)
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -41,10 +33,12 @@ func TestOllamaHost(t *testing.T) {
 	}))
 	defer server.Close()
 
-	host := &OllamaHost{
+	temp := 0.8
+	host := &LlamaCppHost{
 		Name:           "Test Host",
 		URL:            server.URL,
 		Models:         []string{"model1", "model2"},
+		Parameters:     appconfig.Parameters{Temperature: &temp},
 		client:         server.Client(),
 		requestTimeout: time.Second,
 	}
@@ -53,8 +47,8 @@ func TestOllamaHost(t *testing.T) {
 		t.Errorf("Expected name 'Test Host', got '%s'", host.GetName())
 	}
 
-	if host.GetType() != "ollama" {
-		t.Errorf("Expected type 'ollama', got '%s'", host.GetType())
+	if host.GetType() != "llama.cpp" {
+		t.Errorf("Expected type 'llama.cpp', got '%s'", host.GetType())
 	}
 
 	if len(host.GetModels()) != 2 {
@@ -96,13 +90,8 @@ func TestOllamaHost(t *testing.T) {
 	if len(params) != 2 {
 		t.Errorf("Expected 2 sets of parameters, got %d", len(params))
 	}
-
-	modelParams, err := host.getModelParametersFromAPI("model1")
-	if err != nil {
-		t.Errorf("getModelParametersFromAPI() failed: %v", err)
-	}
-	if !strings.Contains(modelParams.Parameters, "temperature 0.8") {
-		t.Errorf("Expected parameters to contain 'temperature 0.8', got '%s'", modelParams.Parameters)
+	if !strings.Contains(params[0].Parameters, "temperature=0.8") {
+		t.Errorf("Expected parameters to contain 'temperature=0.8', got '%s'", params[0].Parameters)
 	}
 }
 

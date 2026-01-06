@@ -93,12 +93,6 @@ func (s *Server) handleBench(w http.ResponseWriter, r *http.Request) {
 	}
 
 	modelPath := req.Model
-	var (
-		digest          string
-		manifestPath    string
-		manifestAttempt string
-		err             error
-	)
 	switch strings.ToLower(strings.TrimSpace(s.cfg.Type)) {
 	case "llama.cpp":
 		// Ensure model exists on server (strict, avoids arbitrary file reads)
@@ -115,28 +109,6 @@ func (s *Server) handleBench(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, ErrResp{OK: false, Error: "model file not found: " + modelPath})
 			return
 		}
-	case "ollama":
-		log.Printf("benchmark resolving ollama model %q via manifests in %s", req.Model, s.cfg.ModelsPath)
-		modelPath, digest, manifestPath, manifestAttempt, err = resolveOllamaModelPath(s.cfg.ModelsPath, req.Model)
-		if err != nil {
-			log.Printf("benchmark ollama lookup error: %v", err)
-			writeJSON(w, http.StatusBadRequest, ErrResp{OK: false, Error: err.Error()})
-			return
-		}
-		log.Printf("benchmark ollama manifest attempted: %s", manifestAttempt)
-		log.Printf("benchmark ollama manifest: %s digest=%s", manifestPath, digest)
-		modelAbs := modelPath
-		if !filepath.IsAbs(modelAbs) {
-			if abs, err := filepath.Abs(modelAbs); err == nil {
-				modelAbs = abs
-			}
-		}
-		if _, err := os.Stat(modelAbs); err != nil {
-			log.Printf("benchmark model not found (ollama): %s", modelAbs)
-			writeJSON(w, http.StatusBadRequest, ErrResp{OK: false, Error: "ollama model file not found: " + modelAbs})
-			return
-		}
-		modelPath = modelAbs
 	default:
 		log.Printf("benchmark unsupported backend type: %s", s.cfg.Type)
 		writeJSON(w, http.StatusInternalServerError, ErrResp{OK: false, Error: "unsupported backend type: " + s.cfg.Type})
@@ -257,9 +229,9 @@ func loadConfig() (*Config, error) {
 		}
 
 		switch strings.ToLower(strings.TrimSpace(cfg.Type)) {
-		case "ollama", "llama.cpp":
+		case "llama.cpp":
 		default:
-			configErr = fmt.Errorf("invalid type %q (expected \"ollama\" or \"llama.cpp\")", cfg.Type)
+			configErr = fmt.Errorf("invalid type %q (expected \"llama.cpp\")", cfg.Type)
 			return
 		}
 
@@ -271,58 +243,6 @@ func loadConfig() (*Config, error) {
 	})
 
 	return configVal, configErr
-}
-
-type ollamaManifest struct {
-	Layers []struct {
-		MediaType string `json:"mediaType"`
-		Digest    string `json:"digest"`
-	} `json:"layers"`
-}
-
-func resolveOllamaModelPath(modelsPath, modelName string) (modelPath, digest, manifestPath, manifestAttempt string, err error) {
-	nameParts := strings.SplitN(modelName, ":", 2)
-	if len(nameParts) != 2 || nameParts[0] == "" || nameParts[1] == "" {
-		return "", "", "", "", fmt.Errorf("ollama model name must be in the form name:tag")
-	}
-
-	manifestAttempt = filepath.Join(modelsPath, "manifests", "registry.ollama.ai", nameParts[0], nameParts[1])
-	manifestPath = manifestAttempt
-	if _, statErr := os.Stat(manifestPath); statErr != nil {
-		fallback := filepath.Join(modelsPath, "manifests", "registry.ollama.ai", "library", nameParts[0], nameParts[1])
-		if _, statErr := os.Stat(fallback); statErr == nil {
-			manifestPath = fallback
-		} else {
-			return "", "", "", "", fmt.Errorf("ollama manifest not found: %s", manifestPath)
-		}
-	}
-
-	body, err := os.ReadFile(manifestPath)
-	if err != nil {
-		return "", "", "", "", err
-	}
-
-	var manifest ollamaManifest
-	if err := json.Unmarshal(body, &manifest); err != nil {
-		return "", "", "", "", err
-	}
-
-	for _, layer := range manifest.Layers {
-		if layer.MediaType != "application/vnd.ollama.image.model" {
-			continue
-		}
-		digest = strings.TrimSpace(layer.Digest)
-		digest = strings.ReplaceAll(digest, " ", "")
-		digest = strings.TrimPrefix(digest, "sha256:")
-		digest = strings.TrimPrefix(digest, "sha256-")
-		if digest == "" {
-			return "", "", "", "", fmt.Errorf("ollama manifest missing model digest")
-		}
-		modelPath = filepath.Join(modelsPath, "blobs", "sha256-"+digest)
-		return modelPath, digest, manifestPath, manifestAttempt, nil
-	}
-
-	return "", "", "", "", fmt.Errorf("ollama manifest missing model layer")
 }
 
 func buildArgs(req BenchRequest) ([]string, error) {

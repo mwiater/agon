@@ -11,7 +11,7 @@ import (
 var listModelParametersCmd = &cobra.Command{
 	Use:   "modelParameters",
 	Short: "List parameters for each model on each node",
-	Long:  `The 'modelParameters' subcommand iterates models on each configured node and prints their current parameters from /api/show.`,
+	Long:  `The 'modelParameters' subcommand iterates models on each configured node and prints their current parameters (router mode recommended).`,
 	Run: func(cmd *cobra.Command, args []string) {
 		models.ListModelParameters(GetConfig())
 	},

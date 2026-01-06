@@ -2,7 +2,7 @@
 
 // Package providers defines the interfaces for interacting with different AI model providers.
 // It provides a common abstraction layer for sending requests, handling streaming responses,
-// and managing models, regardless of the underlying provider implementation (e.g., Ollama, MCP).
+// and managing models, regardless of the underlying provider implementation (e.g., llama.cpp, MCP).
 package providers
 
 import (

@@ -18,7 +18,7 @@ import (
 
 // ModelMeta holds normalized metadata for a model across hosts.
 type ModelMeta struct {
-	Type     string         `json:"type,omitempty"` // either "llama.cpp" or "ollama"
+	Type     string         `json:"type,omitempty"` // "llama.cpp"
 	Name     string         `json:"name,omitempty"`
 	Endpoint string         `json:"endpoint,omitempty"`
 	Metadata map[string]any `json:"metadata,omitempty"`
@@ -39,11 +39,7 @@ func FetchEndpointModelNames(urls []string) []ModelMeta {
 			continue
 		}
 
-		if found := fetchOllamaModels(client, baseURL, &models); found {
-			continue
-		}
-
-		fmt.Printf("Endpoint is neither \"llama.cpp\" or \"ollama\": %s\n", baseURL)
+		fmt.Printf("Endpoint does not expose /models: %s\n", baseURL)
 		models = append(models, ModelMeta{Name: baseURL, Endpoint: baseURL})
 	}
 
@@ -63,8 +59,6 @@ func FetchModelMetadata(models []ModelMeta) {
 		switch models[i].Type {
 		case "llama.cpp":
 			fetchLlamaModelMetadata(client, &models[i])
-		case "ollama":
-			fetchOllamaModelMetadata(client, &models[i])
 		default:
 			fmt.Printf("Unknown model type for %s: %s\n", models[i].Name, models[i].Type)
 		}
@@ -104,48 +98,6 @@ func fetchLlamaModels(client *http.Client, baseURL string, models *[]ModelMeta) 
 				Endpoint: baseURL,
 			})
 		}
-	}
-
-	return true
-}
-
-func fetchOllamaModels(client *http.Client, baseURL string, models *[]ModelMeta) bool {
-	resp, err := client.Get(baseURL + "/api/tags")
-	if err != nil {
-		return false
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return false
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Printf("Error reading /api/tags response from %s: %v\n", baseURL, err)
-		return true
-	}
-
-	var tagsResp struct {
-		Models []struct {
-			Name string `json:"name"`
-		} `json:"models"`
-	}
-	if err := json.Unmarshal(body, &tagsResp); err != nil {
-		fmt.Printf("Error parsing /api/tags response from %s: %v\n", baseURL, err)
-		return true
-	}
-
-	for _, model := range tagsResp.Models {
-		name := strings.TrimSpace(model.Name)
-		if name == "" {
-			continue
-		}
-		*models = append(*models, ModelMeta{
-			Type:     "ollama",
-			Name:     name,
-			Endpoint: baseURL,
-		})
 	}
 
 	return true
@@ -207,51 +159,6 @@ func fetchLlamaModelMetadata(client *http.Client, model *ModelMeta) {
 
 	if !wasLoaded {
 		unloadLlamaModel(client, model)
-	}
-}
-
-func fetchOllamaModelMetadata(client *http.Client, model *ModelMeta) {
-	if model.Endpoint == "" || model.Name == "" {
-		return
-	}
-
-	payload, err := json.Marshal(map[string]string{"model": model.Name})
-	if err != nil {
-		fmt.Printf("Error encoding /api/show request for %s: %v\n", model.Name, err)
-		return
-	}
-
-	reqURL := strings.TrimRight(model.Endpoint, "/") + "/api/show"
-	req, err := http.NewRequest(http.MethodPost, reqURL, bytes.NewReader(payload))
-	if err != nil {
-		fmt.Printf("Error creating /api/show request for %s: %v\n", model.Name, err)
-		return
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Printf("Error fetching /api/show for %s: %v\n", model.Name, err)
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		fmt.Printf("Non-OK /api/show response for %s: %s\n", model.Name, strings.TrimSpace(string(body)))
-		return
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Printf("Error reading /api/show response for %s: %v\n", model.Name, err)
-		return
-	}
-
-	updateModelMetadataFromJSON(body, model, "/api/show")
-
-	if model.Metadata != nil {
-		WriteModelMetadata([]ModelMeta{*model})
 	}
 }
 

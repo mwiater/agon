@@ -23,7 +23,7 @@ var (
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "agon",
-	Short: "agon — terminal-first companion for multi-host Ollama workflows",
+	Short: "agon — terminal-first companion for multi-host llama.cpp workflows",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureConfigLoaded(); err != nil {
 			return err

@@ -1,9 +1,9 @@
 {
   "hosts": [
     {
-      "name": "Ollama01",
-      "url": "{ollama-api-endpoint-01}",
-      "type": "ollama",
+      "name": "LlamaCpp01",
+      "url": "{LlamaCpp-api-endpoint-01}",
+      "type": "llama.cpp",
       "models": [
         "granite4:350m"
       ],
@@ -11,9 +11,9 @@
       "parameters": {}
     },
     {
-      "name": "Ollama02",
-      "url": "{ollama-api-endpoint-02}",
-      "type": "ollama",
+      "name": "LlamaCpp02",
+      "url": "{LlamaCpp-api-endpoint-02}",
+      "type": "llama.cpp",
       "models": [
         "granite3.1-moe:1b"
       ],
@@ -40,7 +40,7 @@
   "ragCorpusPath": "rag_corpus_accuracy_v1",
   "ragIndexPath": "rag_corpus_accuracy_v1/index.jsonl",
   "ragEmbeddingModel": "mxbai-embed-large:335m",
-  "ragEmbeddingHost": "Ollama01",
+  "ragEmbeddingHost": "LlamaCpp01",
   "ragChunkSizeTokens": 500,
   "ragChunkOverlapTokens": 50,
   "ragTopK": 4,
@@ -49,3 +49,4 @@
   "ragAllowedExtensions": [".md", ".jsonl"],
   "ragExcludeGlobs": ["**/results/**", "**/.git/**"]
 }
+

@@ -12,12 +12,10 @@ import (
 	"github.com/mwiater/agon/internal/providers"
 	"github.com/mwiater/agon/internal/providers/llamacpp"
 	"github.com/mwiater/agon/internal/providers/mcp"
-	"github.com/mwiater/agon/internal/providers/multiplex"
-	"github.com/mwiater/agon/internal/providers/ollama"
 )
 
 // NewChatProvider selects and configures the appropriate chat provider based on the
-// application configuration. It will choose between the MCP and Ollama providers
+// application configuration. It will choose between the MCP provider or llama.cpp
 // and wrap the selected provider with metrics collection if enabled.
 func NewChatProvider(cfg *appconfig.Config) (providers.ChatProvider, error) {
 	if cfg == nil {
@@ -43,18 +41,13 @@ func NewChatProvider(cfg *appconfig.Config) (providers.ChatProvider, error) {
 		case 0:
 			return nil, fmt.Errorf("no hosts configured")
 		case 1:
-			if hostTypes["ollama"] {
-				provider = ollama.New(cfg)
-			} else if hostTypes["llama.cpp"] {
+			if hostTypes["llama.cpp"] {
 				provider = llamacpp.New(cfg)
 			} else {
 				return nil, fmt.Errorf("unsupported host type in config")
 			}
 		default:
-			provider = multiplex.New(map[string]providers.ChatProvider{
-				"ollama":    ollama.New(cfg),
-				"llama.cpp": llamacpp.New(cfg),
-			})
+			return nil, fmt.Errorf("multiple host types are not supported")
 		}
 	}
 
@@ -71,9 +64,7 @@ func collectHostTypes(cfg *appconfig.Config) (map[string]bool, error) {
 	for _, host := range cfg.Hosts {
 		normalized := strings.ToLower(strings.TrimSpace(host.Type))
 		switch normalized {
-		case "", "ollama":
-			types["ollama"] = true
-		case "llama.cpp", "llamacpp":
+		case "", "llama.cpp", "llamacpp":
 			types["llama.cpp"] = true
 		default:
 			return nil, fmt.Errorf("unsupported host type %q", host.Type)

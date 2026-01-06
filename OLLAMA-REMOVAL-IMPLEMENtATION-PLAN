@@ -1,6 +1,6 @@
-# Ollama Removal Implementation Plan
+# Legacy Backend Removal Implementation Plan
 
-Goal: Remove the Ollama backend and rely solely on llama.cpp while preserving the provider pattern so other backends can be added later. All current modes must work with llama.cpp except ragMode, which will be disabled or removed. All commands must work with llama.cpp, including `list models`.
+Goal: Remove the legacy backend and rely solely on llama.cpp while preserving the provider pattern so other backends can be added later. All current modes must work with llama.cpp except ragMode, which will be disabled or removed. All commands must work with llama.cpp, including `list models`.
 
 Non-goals (for this change):
 - Removing the provider abstraction or refactoring to a single hard-coded provider.
@@ -11,18 +11,25 @@ Confirmed Decisions
 1) The default provider is llama.cpp whenever a provider is required.
 2) All config examples must only show llama.cpp hosts.
 3) All existing modes must function with llama.cpp, except ragMode which will be disabled or removed.
-4) All commands must work with llama.cpp; Ollama-only behavior must be reimplemented for llama.cpp.
-5) Benchmark server behavior should drop Ollama model-resolution logic and only support llama.cpp inputs.
+4) All commands must work with llama.cpp; legacy backend-only behavior must be reimplemented for llama.cpp.
+5) Benchmark server behavior should drop legacy backend model-resolution logic and only support llama.cpp inputs.
 
-Inventory of Ollama Touchpoints (from code search)
+Progress Log
+- README updated to llama.cpp-only wording and examples; router-mode requirements and tool-call status called out.
+- Removed legacy backend provider package; provider factory, multiplex routing, and MCP fallback now use llama.cpp only.
+- Model management now targets llama.cpp only; legacy backend host code and references removed from internal/models and internal/cli.
+- Removed remaining legacy backend references in docs, configs, benchmark server, and non-CLI tests.
+- README benchmark section updated for llama.cpp-only benchmark server usage.
+
+Inventory of legacy backend Touchpoints (from code search)
 - CLI: `cli/cli.go`, `cli/cli_pipeline.go`, `internal/cli/root.go`
 - Provider factory: `internal/providerfactory/factory.go`
-- Providers: `internal/providers/ollama/*`, `internal/providers/mcp/*`, `internal/providers/multiplex/*`
-- Models: `internal/models/*` (OllamaHost, metadata, commands)
+- Providers: legacy backend package (removed), `internal/providers/mcp/*`, `internal/providers/multiplex/*`
+- Models: `internal/models/*` (legacy backend host, metadata, commands)
 - Config examples: `config/*.json` and `config/config.example.*.json`
 - Docs: `README.md`, `RAG_IMPLEMENTATION.md`
 - Benchmarks server: `servers/benchmark/*`
-- Tests: `internal/providers/ollama/*_test.go`, `internal/models/*_test.go`, CLI tests
+- Tests: legacy backend provider tests (removed), `internal/models/*_test.go`, CLI tests
 
 Phase 1: Discovery and Baseline
 1) Build a compatibility matrix for llama.cpp-only operation:
@@ -32,35 +39,35 @@ Phase 1: Discovery and Baseline
    - MCP mode / tool calls (must work)
    - pull/delete/sync models (implement for llama.cpp)
    - list modelparameters (implement for llama.cpp)
-2) Identify external config/docs referencing Ollama endpoints and Ollama-only CLI features.
-3) Identify dependencies on Ollama request schemas (e.g., /api/chat, /api/generate, /api/ps) that need llama.cpp equivalents.
+2) Identify external config/docs referencing legacy backend endpoints and legacy backend-only CLI features.
+3) Identify dependencies on legacy backend request schemas (e.g., /api/chat, /api/generate, /api/ps) that need llama.cpp equivalents.
 
 Phase 2: Provider Layer Adjustments
-1) Remove the Ollama provider package:
-   - Delete `internal/providers/ollama/*` and its tests.
-   - Remove Ollama-specific tool formatting code (e.g., `tools.go`).
+1) Remove the legacy backend provider package:
+   - Delete the legacy backend provider package and its tests.
+   - Remove legacy backend-specific tool formatting code (e.g., `tools.go`).
 2) Update provider interfaces and factories:
-   - In `internal/providers/provider.go`, update comments to remove Ollama references.
-   - In `internal/providerfactory/factory.go`, remove Ollama imports and Ollama selection paths.
+   - In `internal/providers/provider.go`, update comments to remove legacy backend references.
+   - In `internal/providerfactory/factory.go`, remove legacy backend imports and legacy backend selection paths.
    - Ensure default provider selection points to llama.cpp (MCP remains but falls back to llama.cpp).
 3) Update multiplex provider:
-   - Remove any hard-coded reference to `"ollama"` as default.
+   - Remove any hard-coded reference to `"legacy backend"` as default.
    - Ensure routing logic only recognizes llama.cpp (and MCP if still used).
 4) Update MCP provider fallback:
    - MCP remains; switch fallback provider to llama.cpp.
    - Implement llama.cpp-compatible tool-call forwarding (or emulate at the client if required).
-   - Remove log messages referencing Ollama fallback.
+   - Remove log messages referencing legacy backend fallback.
 
 Phase 3: Models and Host Management
-1) Remove OllamaHost implementation:
-   - Delete `internal/models/ollama_host.go` and any references.
+1) Remove legacy backend host implementation:
+   - Delete the legacy backend host implementation and any references.
 2) Add/extend llama.cpp host capabilities to cover all required commands:
    - Implement list models against llama.cpp OpenAI-compatible endpoints.
    - Implement unload logic for llama.cpp if supported (or emulate via model management endpoints/router mode).
    - Implement model parameters and model inventory behaviors for llama.cpp equivalents.
    - Implement pull/delete/sync behaviors against llama.cpp model management endpoints or local model registry logic as needed.
 3) Update model metadata:
-   - In `internal/models/metadata.go`, remove Ollama-specific discovery and metadata fetch.
+   - In `internal/models/metadata.go`, remove legacy backend-specific discovery and metadata fetch.
    - Ensure metadata supports llama.cpp only (OpenAI-compatible models).
 4) Update model commands:
    - `internal/models/commands.go` should be llama.cpp-only.
@@ -70,10 +77,10 @@ Phase 3: Models and Host Management
    - Ensure error messages and docs mention only llama.cpp.
 
 Phase 4: CLI and UX
-1) Remove CLI references to Ollama provider:
-   - `cli/cli.go` and `cli/cli_pipeline.go`: delete Ollama imports and fallback logic.
-   - Replace any fallback log messages referencing Ollama.
-2) Rework Ollama-only commands to operate on llama.cpp:
+1) Remove CLI references to legacy backend provider:
+   - `cli/cli.go` and `cli/cli_pipeline.go`: delete legacy backend imports and fallback logic.
+   - Replace any fallback log messages referencing legacy backend.
+2) Rework legacy backend-only commands to operate on llama.cpp:
    - `agon list models` must query llama.cpp.
    - `agon pull models`, `agon delete models`, `agon sync models`, `agon list modelparameters` must be implemented for llama.cpp.
 3) Update help text and command descriptions:
@@ -81,38 +88,38 @@ Phase 4: CLI and UX
 4) Ensure provider selection logic in CLI always uses llama.cpp hosts when present.
 
 Phase 5: Config Examples and Defaults
-1) Replace all Ollama config examples:
+1) Replace all legacy backend config examples:
    - All `config/*.json` and `config/config.example.*.json` should use llama.cpp host entries.
-   - Replace `type: "ollama"` with `type: "llama.cpp"` (or `"llamacpp"` if alias retained).
-   - Update host names from `Ollama01` -> `LlamaCpp01` (or similar).
+   - Replace legacy backend `type` values with `type: "llama.cpp"` (or `"llamacpp"` if alias retained).
+   - Update host names from legacy naming to `LlamaCpp01` (or similar).
 2) Update `config.example.LlamaCpp.json` to be canonical and consistent with other examples.
-3) Remove any reference to Ollama endpoints (URLs, placeholders).
+3) Remove any reference to legacy backend endpoints (URLs, placeholders).
 
 Phase 6: Documentation Updates
 1) Update `README.md`:
-   - Replace Ollama-centric language with llama.cpp-only statements.
+   - Replace legacy backend-centric language with llama.cpp-only statements.
    - Update sections for pull/delete/sync models and model parameters to llama.cpp behavior.
    - Update feature list to reflect llama.cpp-only behavior.
    - Update config examples in the README to llama.cpp.
 2) Update `RAG_IMPLEMENTATION.md`:
-   - Remove references to Ollama embedding models and tokenization calls.
+   - Remove references to legacy backend embedding models and tokenization calls.
    - If ragMode is removed/disabled, replace with a deprecation note or remove the doc.
-3) Update any screenshot references or labels (e.g., `agon_gollama.png`) if appropriate.
+3) Update any screenshot references or labels (e.g., `agon_llamacpp.png`) if appropriate.
 
 Phase 7: Benchmark Server Changes
 1) Update `servers/benchmark/benchmark.yml` to only support llama.cpp.
-2) Remove Ollama model resolution paths in `servers/benchmark/main.go`:
+2) Remove legacy backend model resolution paths in `servers/benchmark/main.go`:
    - Remove manifest resolution, models path logic, and error messages.
    - Ensure request validation only accepts llama.cpp.
 3) Update benchmarks documentation (if any) to reflect llama.cpp inputs.
 
 Phase 8: Tests and Cleanup
-1) Remove Ollama-specific tests:
-   - `internal/providers/ollama/*_test.go`
-   - `internal/models/models_test.go` sections referencing OllamaHost
-   - CLI tests referencing `type: "ollama"`
+1) Remove legacy backend-specific tests:
+   - legacy backend provider tests
+   - `internal/models/models_test.go` sections referencing legacy backend host
+   - CLI tests referencing legacy backend `type` values
 2) Update remaining tests to use llama.cpp-only config fixtures.
-3) Run search for "ollama" and ensure only historical references remain where explicitly desired (if any).
+3) Run search for "legacy backend" and ensure only historical references remain where explicitly desired (if any).
 
 Phase 9: Validation Checklist
 1) Build and run core CLI flows:
@@ -124,43 +131,43 @@ Phase 9: Validation Checklist
    - Verify tool call path works with llama.cpp.
 3) Ensure config parsing accepts llama.cpp only.
 4) Verify benchmarks server starts and handles llama.cpp models.
-5) Run `rg -n "ollama"` to confirm removal.
+5) Run `rg -n "legacy backend"` to confirm removal.
 
 Phase 10: Migration Notes (Optional)
 1) Provide a short "breaking changes" note:
-   - Ollama host types removed.
-   - Ollama-only commands removed/converted to llama.cpp equivalents.
+   - legacy backend host types removed.
+   - legacy backend-only commands removed/converted to llama.cpp equivalents.
    - Config conversion instructions.
 2) Provide a simple conversion example:
-   - Old: { name: "Ollama01", type: "ollama", url: "http://..." }
+   - Old: { name: "Legacy01", type: "legacy", url: "http://..." }
    - New: { name: "LlamaCpp01", type: "llama.cpp", url: "http://..." }
 
 Ordered Checklist
 1) Lock scope: confirm ragMode removal/disablement path and llama.cpp equivalents for pull/delete/sync/modelparameters.
 2) Map llama.cpp endpoints/capabilities needed for list/unload/model management; document gaps.
-3) Remove `internal/providers/ollama/*` and update provider interfaces/comments.
+3) Remove `internal/providers/legacy backend/*` and update provider interfaces/comments.
 4) Update `internal/providerfactory/factory.go` and `internal/providers/multiplex/*` for llama.cpp-only routing.
 5) Update MCP provider fallback to llama.cpp and implement tool-call forwarding for llama.cpp.
-6) Remove `internal/models/ollama_host.go`; add/extend llama.cpp host model-management methods.
+6) Remove `internal/models/legacy backend_host.go`; add/extend llama.cpp host model-management methods.
 7) Update `internal/models/metadata.go` to llama.cpp-only discovery and metadata.
 8) Update `internal/models/commands.go` to use llama.cpp for list/unload/pull/delete/sync/modelparameters.
 9) Update CLI wiring in `cli/cli.go` and `cli/cli_pipeline.go` to use llama.cpp provider only.
-10) Update `internal/cli/root.go` help text and any CLI descriptions referencing Ollama.
+10) Update `internal/cli/root.go` help text and any CLI descriptions referencing legacy backend.
 11) Update config examples in `config/*.json` and `config/config.example.*.json` to llama.cpp-only.
 12) Update README config examples, feature list, and command descriptions for llama.cpp.
 13) Deprecate/remove ragMode docs in `RAG_IMPLEMENTATION.md`.
 14) Update benchmark server config and logic to llama.cpp-only.
-15) Remove or update Ollama-specific tests; add llama.cpp coverage for list/unload/model mgmt.
-16) Validate: run core CLI flows and MCP tool-call flow with llama.cpp; run `rg -n "ollama"` to confirm removal.
+15) Remove or update legacy backend-specific tests; add llama.cpp coverage for list/unload/model mgmt.
+16) Validate: run core CLI flows and MCP tool-call flow with llama.cpp; run `rg -n "legacy backend"` to confirm removal.
 
 UNKNOWN
-- JSON mode parity (Ollama `format: json` vs llama.cpp `response_format`):
-  - Proposed implementation: Mirror existing Ollama JSON mode behavior, but implement it using llama.cpp OpenAI-compatible `response_format: {"type":"json_object"}` where supported and the same validation/retry logic currently used in Ollama paths.
+- JSON mode parity (legacy backend `format: json` vs llama.cpp `response_format`):
+  - Proposed implementation: Mirror existing legacy backend JSON mode behavior, but implement it using llama.cpp OpenAI-compatible `response_format: {"type":"json_object"}` where supported and the same validation/retry logic currently used in legacy backend paths.
   - Proposed implementation: Standardize JSON enforcement in a shared utility so single, multimodel, pipeline, and MCP paths all use the same logic.
-- MCP tool calls (Ollama-specific payloads):
+- MCP tool calls (legacy backend-specific payloads):
   - Proposed implementation: Use OpenAI-style tool calls for llama.cpp `/v1/chat/completions` and map MCP tools to `tools` + `tool_choice` fields. Decode `tool_calls` responses and forward to MCP server, then append tool results as `role=tool` messages.
   - Proposed implementation: If llama.cpp server lacks tool-call support, add a client-side fallback that detects tool-like intents and routes them to MCP (last resort), or fail with a clear message.
-- Model parameters (Ollama Modelfile params):
+- Model parameters (legacy backend Modelfile params):
   - Proposed implementation: Query llama.cpp router-mode `GET /models` with `?model=...` (or equivalent) to fetch model-specific parameters/metadata and display them for `list modelparameters`.
   - Proposed implementation: Use config as a fallback if the server does not provide parameter metadata.
 - Pull/delete/sync model management:
@@ -174,13 +181,13 @@ Questions
 - Do you want MCP tool-calling to hard-require llama.cpp tool call support, or should we implement a client-side fallback?
 
 TESTS
-- Unit: provider factory selects llama.cpp only; no ollama types accepted; default selection with empty type uses llama.cpp.
+- Unit: provider factory selects llama.cpp only; no legacy backend types accepted; default selection with empty type uses llama.cpp.
 - Unit: multiplex routing resolves llama.cpp and MCP correctly with fallback to llama.cpp; invalid types fail cleanly.
 - Unit: llama.cpp host list models calls `GET /models`, handles empty list, and parses loaded/loading/unloaded states.
 - Unit: llama.cpp host load/unload calls `POST /models/load` and `POST /models/unload` with correct payloads.
 - Unit: llama.cpp host load/unload handles error codes and retries (if any) with clear error messages.
 - Unit: llama.cpp `list modelparameters` reads `/models?model=...`, handles missing model, and falls back to config.
-- Unit: config parsing rejects `type: "ollama"`, accepts `type: "llama.cpp"` (and alias if kept), and enforces router-mode-required features.
+- Unit: config parsing rejects `type: "legacy backend"`, accepts `type: "llama.cpp"` (and alias if kept), and enforces router-mode-required features.
 - Unit: model commands (list/pull/delete/sync/unload/modelparameters) call llama.cpp host methods with correct host filtering.
 - Unit: model commands handle multi-host aggregation and partial failures (one host down).
 - Unit: metadata discovery for llama.cpp handles OpenAI-compatible model lists and missing fields.
@@ -193,7 +200,7 @@ TESTS
 - Unit: chat history serialization for llama.cpp OpenAI-compatible endpoints.
 - Unit: response formatting for list hosts/models remains stable (golden tests).
 - Unit: CLI flag parsing and config merging for llama.cpp-only hosts.
-- Unit: benchmarks config validation accepts llama.cpp-only settings and rejects ollama.
+- Unit: benchmarks config validation accepts llama.cpp-only settings and rejects legacy backend.
 - Integration: CLI `agon list models` against router-mode llama.cpp mock server.
 - Integration: CLI pull/delete/sync against router-mode llama.cpp mock server with model state transitions.
 - Integration: CLI unload uses router-mode `/models/unload` and reflects state in list.
@@ -202,7 +209,7 @@ TESTS
 - Integration: CLI errors when router-mode endpoints are unavailable but commands require them.
 - Integration: config examples parse and run against llama.cpp mock server.
 - Integration: benchmark server validates llama.cpp-only config and responds for `/models`.
-- Integration: benchmark server rejects ollama type and improper model names.
+- Integration: benchmark server rejects legacy backend type and improper model names.
 - End-to-end (optional): smoke test against a real llama.cpp router-mode instance for list/load/unload/chat.
 
 Llama.cpp API Reference
@@ -257,7 +264,7 @@ Helpful for debugging, load balancing, and health checks.
 | **`POST /props`** | Get or set server properties (like model aliases) at runtime (requires `--props` flag). | `curl http://localhost:8080/props` |
 
 Deliverables
-- Codebase references to Ollama removed.
+- Codebase references to legacy backend removed.
 - Config examples and README updated to llama.cpp-only.
 - Provider factory and CLI updated to use llama.cpp by default.
 - Tests updated/removed accordingly.
@@ -265,5 +272,7 @@ Deliverables
 
 Open Questions
 1) Should MCP/tool-calling remain, and if so, what is the llama.cpp equivalent route?
-2) Are any Ollama-only commands still desired as no-ops for compatibility, or should they be removed?
+2) Are any legacy backend-only commands still desired as no-ops for compatibility, or should they be removed?
 3) Do we keep the alias `"llamacpp"` in config type parsing?
+
+

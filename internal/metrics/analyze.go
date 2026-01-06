@@ -1,4 +1,4 @@
-﻿// internal/metrics/analyze.go
+// internal/metrics/analyze.go
 package metrics
 
 import (

@@ -18,8 +18,8 @@ func TestLoad(t *testing.T) {
         "hosts": [
             {
                 "name": "Test Host",
-                "url": "http://localhost:11434",
-                "type": "ollama",
+                "url": "http://localhost:8080",
+                "type": "llama.cpp",
                 "models": ["model1", "model2"]
             }
         ]

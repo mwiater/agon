@@ -1,9 +1,9 @@
 {
   "hosts": [
     {
-      "name": "Ollama01",
-      "url": "{ollama-api-endpoint-04}",
-      "type": "ollama",
+      "name": "LlamaCpp01",
+      "url": "{LlamaCpp-api-endpoint-04}",
+      "type": "llama.cpp",
       "models": [
         "deepseek-r1:1.5b",
         "gemma3:1b",
@@ -35,9 +35,9 @@
       }
     },
     {
-      "name": "Ollama02",
-      "url": "{ollama-api-endpoint-04}",
-      "type": "ollama",
+      "name": "LlamaCpp02",
+      "url": "{LlamaCpp-api-endpoint-04}",
+      "type": "llama.cpp",
       "models": [
         "deepseek-r1:1.5b",
         "gemma3:1b",
@@ -69,9 +69,9 @@
       }
     },
     {
-      "name": "Ollama03",
-      "url": "{ollama-api-endpoint-04}",
-      "type": "ollama",
+      "name": "LlamaCpp03",
+      "url": "{LlamaCpp-api-endpoint-04}",
+      "type": "llama.cpp",
       "models": [
         "deepseek-r1:1.5b",
         "gemma3:1b",
@@ -103,9 +103,9 @@
       }
     },
     {
-      "name": "Ollama04",
-      "url": "{ollama-api-endpoint-04}",
-      "type": "ollama",
+      "name": "LlamaCpp04",
+      "url": "{LlamaCpp-api-endpoint-04}",
+      "type": "llama.cpp",
       "models": [
         "deepseek-r1:1.5b",
         "gemma3:1b",
@@ -150,3 +150,4 @@
   "exportMarkdown": "",
   "metrics": true
 }
+

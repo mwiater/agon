@@ -13,7 +13,7 @@ import (
 	"github.com/mwiater/agon/internal/appconfig"
 	"github.com/mwiater/agon/internal/logging"
 	"github.com/mwiater/agon/internal/providers"
-	"github.com/mwiater/agon/internal/providers/ollama"
+	"github.com/mwiater/agon/internal/providers/llamacpp"
 )
 
 // New spins up the MCP server process and performs the initialize handshake.
@@ -57,7 +57,7 @@ func New(ctx context.Context, cfg *appconfig.Config) (*Provider, error) {
 		stdin:     stdin,
 		reader:    bufio.NewReader(stdout),
 		writer:    bufio.NewWriter(stdin),
-		fallback:  ollama.New(cfg),
+		fallback:  llamacpp.New(cfg),
 		rpcMeta:   make(map[string]rpcMetadata),
 		toolIndex: make(map[string]providers.ToolDefinition),
 	}

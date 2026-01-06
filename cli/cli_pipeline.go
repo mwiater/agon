@@ -22,7 +22,7 @@ import (
 	"github.com/mwiater/agon/internal/logging"
 	"github.com/mwiater/agon/internal/providerfactory"
 	"github.com/mwiater/agon/internal/providers"
-	"github.com/mwiater/agon/internal/providers/ollama"
+	"github.com/mwiater/agon/internal/providers/llamacpp"
 	"github.com/mwiater/agon/internal/util"
 )
 
@@ -1612,7 +1612,7 @@ func (m *pipelineModel) exportPipelineMarkdown(path string) error {
 func StartPipelineGUI(ctx context.Context, cfg *Config, cancel context.CancelFunc) error {
 	provider, err := providerfactory.NewChatProvider(cfg)
 	if err != nil {
-		provider = ollama.New(cfg)
+		provider = llamacpp.New(cfg)
 	}
 
 	m := initialPipelineModel(ctx, cfg, provider)
@@ -1631,8 +1631,8 @@ func StartPipelineGUI(ctx context.Context, cfg *Config, cancel context.CancelFun
 			provider, err = providerfactory.NewChatProvider(cfg)
 			if err != nil {
 				if cfg.MCPMode {
-					logging.LogEvent("MCP provider unavailable: %v — falling back to direct Ollama access", err)
-					provider = ollama.New(cfg)
+					logging.LogEvent("MCP provider unavailable: %v — falling back to direct llama.cpp access", err)
+					provider = llamacpp.New(cfg)
 				} else {
 					return err
 				}

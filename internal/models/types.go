@@ -31,7 +31,7 @@ type LLMHost interface {
 	UnloadModel(model string)
 	// GetName returns the name of the host.
 	GetName() string
-	// GetType returns the type of the host (e.g., "ollama").
+	// GetType returns the type of the host (e.g., "llama.cpp").
 	GetType() string
 	// GetModels returns the list of models configured for this host.
 	GetModels() []string

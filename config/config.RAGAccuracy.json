@@ -1,9 +1,9 @@
 {
     "hosts": [
     {
-      "name": "Ollama01",
+      "name": "LlamaCpp01",
       "url": "https://o-udoo01.0nezer0.com",
-      "type": "ollama",
+      "type": "llama.cpp",
       "models": [
         "gemma3:270m"
       ],
@@ -11,9 +11,9 @@
       "parameters": {}
     },
     {
-      "name": "Ollama02",
+      "name": "LlamaCpp02",
       "url": "https://o-udoo02.0nezer0.com",
-      "type": "ollama",
+      "type": "llama.cpp",
       "models": [
         "granite4:350m"
       ],
@@ -21,9 +21,9 @@
       "parameters": {}
     },
     {
-      "name": "Ollama03",
+      "name": "LlamaCpp03",
       "url": "https://o-udoo03.0nezer0.com",
-      "type": "ollama",
+      "type": "llama.cpp",
       "models": [
         "smollm2:360m"
       ],
@@ -31,9 +31,9 @@
       "parameters": {}
     },
     {
-      "name": "Ollama04",
+      "name": "LlamaCpp04",
       "url": "https://o-udoo04.0nezer0.com",
-      "type": "ollama",
+      "type": "llama.cpp",
       "models": [
         "smollm2:1.7b"
       ],
@@ -60,7 +60,7 @@
   "ragCorpusPath": "rag_corpus_accuracy_v1",
   "ragIndexPath": "rag_corpus_accuracy_v1/index.jsonl",
   "ragEmbeddingModel": "mxbai-embed-large:335m",
-  "ragEmbeddingHost": "Ollama01",
+  "ragEmbeddingHost": "LlamaCpp01",
   "ragChunkSizeTokens": 500,
   "ragChunkOverlapTokens": 50,
   "ragTopK": 4,
@@ -69,3 +69,4 @@
   "ragAllowedExtensions": [".md", ".jsonl"],
   "ragExcludeGlobs": ["**/results/**", "**/.git/**"]
 }
+

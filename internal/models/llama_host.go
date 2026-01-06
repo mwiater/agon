@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mwiater/agon/internal/appconfig"
 	"github.com/mwiater/agon/internal/logging"
 )
 
@@ -20,6 +21,7 @@ type LlamaCppHost struct {
 	Name           string
 	URL            string
 	Models         []string
+	Parameters     appconfig.Parameters
 	client         *http.Client
 	requestTimeout time.Duration
 }
@@ -71,34 +73,24 @@ func (h *LlamaCppHost) doRequest(method, path string, body io.Reader, contentTyp
 	return resp, cancel, nil
 }
 
-// PullModel is not supported for llama.cpp hosts.
+// PullModel loads a model on a llama.cpp host using router-mode endpoints.
 func (h *LlamaCppHost) PullModel(model string) {
-	fmt.Printf("Pulling models is not supported for %s (%s)\n", h.Name, h.GetType())
+	if err := h.loadModel(model); err != nil {
+		fmt.Printf("Error loading model %s on %s: %v\n", model, h.Name, err)
+	}
 }
 
-// DeleteModel is not supported for llama.cpp hosts.
+// DeleteModel unloads a model from a llama.cpp host (router mode required).
 func (h *LlamaCppHost) DeleteModel(model string) {
-	fmt.Printf("Deleting models is not supported for %s (%s)\n", h.Name, h.GetType())
+	if err := h.unloadModel(model); err != nil {
+		fmt.Printf("Error deleting model %s on %s: %v\n", model, h.Name, err)
+	}
 }
 
 // UnloadModel unloads a model from a llama.cpp host using the /models/unload endpoint.
 func (h *LlamaCppHost) UnloadModel(model string) {
-	payload := map[string]string{"model": model}
-	body, _ := json.Marshal(payload)
-
-	logging.LogRequest("AGON->LLM", hostIdentifier(h), model, "", body)
-	resp, cancel, err := h.doRequest(http.MethodPost, "/models/unload", bytes.NewReader(body), "application/json")
-	if err != nil {
+	if err := h.unloadModel(model); err != nil {
 		fmt.Printf("Error unloading model %s on %s: %v\n", model, h.Name, err)
-		return
-	}
-	defer cancel()
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(resp.Body)
-	logging.LogRequest("LLM->AGON", hostIdentifier(h), model, "", respBody)
-	if resp.StatusCode >= 400 {
-		fmt.Printf("Error unloading model %s on %s: %s\n", model, h.Name, strings.TrimSpace(string(respBody)))
 	}
 }
 
@@ -168,9 +160,27 @@ func (h *LlamaCppHost) GetRunningModels() (map[string]struct{}, error) {
 	return running, nil
 }
 
-// GetModelParameters is not supported for llama.cpp hosts.
+// GetModelParameters reports configured parameters for each model on the host.
 func (h *LlamaCppHost) GetModelParameters() ([]ModelParameters, error) {
-	return nil, fmt.Errorf("model parameters are not supported for %s (%s)", h.Name, h.GetType())
+	models := append([]string(nil), h.Models...)
+	if len(models) == 0 {
+		if listed, err := h.ListRawModels(); err == nil {
+			models = listed
+		}
+	}
+	if len(models) == 0 {
+		return nil, fmt.Errorf("no models configured for %s", h.Name)
+	}
+
+	paramsText := formatParameterText(h.Parameters)
+	params := make([]ModelParameters, 0, len(models))
+	for _, model := range models {
+		params = append(params, ModelParameters{
+			Model:      model,
+			Parameters: paramsText,
+		})
+	}
+	return params, nil
 }
 
 type llamaModel struct {
@@ -236,6 +246,46 @@ func (h *LlamaCppHost) listModels() ([]llamaModel, error) {
 	return nil, fmt.Errorf("unrecognized /models response from %s", h.Name)
 }
 
+func (h *LlamaCppHost) loadModel(model string) error {
+	payload := map[string]string{"model": model}
+	body, _ := json.Marshal(payload)
+
+	logging.LogRequest("AGON->LLM", hostIdentifier(h), model, "", body)
+	resp, cancel, err := h.doRequest(http.MethodPost, "/models/load", bytes.NewReader(body), "application/json")
+	if err != nil {
+		return err
+	}
+	defer cancel()
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	logging.LogRequest("LLM->AGON", hostIdentifier(h), model, "", respBody)
+	if resp.StatusCode >= http.StatusBadRequest && !isAlreadyLoadedResponse(respBody) {
+		return fmt.Errorf("load failed: %s", strings.TrimSpace(string(respBody)))
+	}
+	return nil
+}
+
+func (h *LlamaCppHost) unloadModel(model string) error {
+	payload := map[string]string{"model": model}
+	body, _ := json.Marshal(payload)
+
+	logging.LogRequest("AGON->LLM", hostIdentifier(h), model, "", body)
+	resp, cancel, err := h.doRequest(http.MethodPost, "/models/unload", bytes.NewReader(body), "application/json")
+	if err != nil {
+		return err
+	}
+	defer cancel()
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	logging.LogRequest("LLM->AGON", hostIdentifier(h), model, "", respBody)
+	if resp.StatusCode >= http.StatusBadRequest {
+		return fmt.Errorf("unload failed: %s", strings.TrimSpace(string(respBody)))
+	}
+	return nil
+}
+
 func modelDisplayName(model llamaModel) string {
 	if strings.TrimSpace(model.ID) != "" {
 		return strings.TrimSpace(model.ID)
@@ -290,4 +340,44 @@ func hostIdentifier(host *LlamaCppHost) string {
 		return url
 	}
 	return "llama.cpp-host"
+}
+
+func formatParameterText(params appconfig.Parameters) string {
+	lines := []string{}
+
+	if params.Temperature != nil {
+		lines = append(lines, fmt.Sprintf("temperature=%v", *params.Temperature))
+	}
+	if params.TopP != nil {
+		lines = append(lines, fmt.Sprintf("top_p=%v", *params.TopP))
+	}
+	if params.TopK != nil {
+		lines = append(lines, fmt.Sprintf("top_k=%v", *params.TopK))
+	}
+	if params.MinP != nil {
+		lines = append(lines, fmt.Sprintf("min_p=%v", *params.MinP))
+	}
+	if params.RepeatPenalty != nil {
+		lines = append(lines, fmt.Sprintf("repeat_penalty=%v", *params.RepeatPenalty))
+	}
+	if params.TFSZ != nil {
+		lines = append(lines, fmt.Sprintf("tfs_z=%v", *params.TFSZ))
+	}
+	if params.TypicalP != nil {
+		lines = append(lines, fmt.Sprintf("typical_p=%v", *params.TypicalP))
+	}
+	if params.RepeatLastN != nil {
+		lines = append(lines, fmt.Sprintf("repeat_last_n=%v", *params.RepeatLastN))
+	}
+	if params.PresencePenalty != nil {
+		lines = append(lines, fmt.Sprintf("presence_penalty=%v", *params.PresencePenalty))
+	}
+	if params.FrequencyPenalty != nil {
+		lines = append(lines, fmt.Sprintf("frequency_penalty=%v", *params.FrequencyPenalty))
+	}
+	if params.LogProbs != nil {
+		lines = append(lines, fmt.Sprintf("logprobs=%v", *params.LogProbs))
+	}
+
+	return strings.Join(lines, "\n")
 }

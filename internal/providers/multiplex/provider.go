@@ -74,7 +74,7 @@ func (p *Provider) providerForHost(host appconfig.Host) (providers.ChatProvider,
 		return provider, nil
 	}
 	if hostType == "" {
-		if provider, ok := p.providers["ollama"]; ok {
+		if provider, ok := p.providers["llama.cpp"]; ok {
 			return provider, nil
 		}
 	}
@@ -84,9 +84,7 @@ func (p *Provider) providerForHost(host appconfig.Host) (providers.ChatProvider,
 func normalizeType(hostType string) string {
 	normalized := strings.ToLower(strings.TrimSpace(hostType))
 	switch normalized {
-	case "", "ollama":
-		return "ollama"
-	case "llama.cpp", "llamacpp":
+	case "", "llama.cpp", "llamacpp":
 		return "llama.cpp"
 	default:
 		return normalized
