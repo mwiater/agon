@@ -173,6 +173,38 @@ UNKNOWN
 Questions
 - Do you want MCP tool-calling to hard-require llama.cpp tool call support, or should we implement a client-side fallback?
 
+TESTS
+- Unit: provider factory selects llama.cpp only; no ollama types accepted; default selection with empty type uses llama.cpp.
+- Unit: multiplex routing resolves llama.cpp and MCP correctly with fallback to llama.cpp; invalid types fail cleanly.
+- Unit: llama.cpp host list models calls `GET /models`, handles empty list, and parses loaded/loading/unloaded states.
+- Unit: llama.cpp host load/unload calls `POST /models/load` and `POST /models/unload` with correct payloads.
+- Unit: llama.cpp host load/unload handles error codes and retries (if any) with clear error messages.
+- Unit: llama.cpp `list modelparameters` reads `/models?model=...`, handles missing model, and falls back to config.
+- Unit: config parsing rejects `type: "ollama"`, accepts `type: "llama.cpp"` (and alias if kept), and enforces router-mode-required features.
+- Unit: model commands (list/pull/delete/sync/unload/modelparameters) call llama.cpp host methods with correct host filtering.
+- Unit: model commands handle multi-host aggregation and partial failures (one host down).
+- Unit: metadata discovery for llama.cpp handles OpenAI-compatible model lists and missing fields.
+- Unit: JSON mode request shaping uses llama.cpp `response_format` and matches prior validation/retry behavior.
+- Unit: JSON mode validation handles invalid JSON, partial JSON, and streaming termination cases.
+- Unit: MCP tool-call mapping to OpenAI tool schema, tool result stitching, and error propagation.
+- Unit: MCP mode without tool calls passes through unchanged responses.
+- Unit: pipeline mode request assembly works for llama.cpp across stages.
+- Unit: multimodel mode fan-out and merge behavior works for llama.cpp.
+- Unit: chat history serialization for llama.cpp OpenAI-compatible endpoints.
+- Unit: response formatting for list hosts/models remains stable (golden tests).
+- Unit: CLI flag parsing and config merging for llama.cpp-only hosts.
+- Unit: benchmarks config validation accepts llama.cpp-only settings and rejects ollama.
+- Integration: CLI `agon list models` against router-mode llama.cpp mock server.
+- Integration: CLI pull/delete/sync against router-mode llama.cpp mock server with model state transitions.
+- Integration: CLI unload uses router-mode `/models/unload` and reflects state in list.
+- Integration: CLI JSON mode for single/multimodel/pipeline using llama.cpp mock responses.
+- Integration: CLI MCP mode tool-call flow using llama.cpp tool-call responses and MCP mock server.
+- Integration: CLI errors when router-mode endpoints are unavailable but commands require them.
+- Integration: config examples parse and run against llama.cpp mock server.
+- Integration: benchmark server validates llama.cpp-only config and responds for `/models`.
+- Integration: benchmark server rejects ollama type and improper model names.
+- End-to-end (optional): smoke test against a real llama.cpp router-mode instance for list/load/unload/chat.
+
 Llama.cpp API Reference
 
 ### 1. Core Inference Endpoints (Native)
