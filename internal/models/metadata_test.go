@@ -82,8 +82,15 @@ func TestModelMetadataPath(t *testing.T) {
 	if !strings.Contains(path, "agonData") || !strings.Contains(path, "modelMetadata") {
 		t.Fatalf("unexpected metadata path: %s", path)
 	}
-	if !strings.Contains(path, "llama.cpp") {
-		t.Fatalf("expected model type in path, got %s", path)
+	if !strings.Contains(path, "m1.json") {
+		t.Fatalf("expected model name in path, got %s", path)
+	}
+}
+
+func TestModelMetadataPathWithGPU(t *testing.T) {
+	path := modelMetadataPath(ModelMeta{Type: "llama.cpp", Name: "m1", GPU: "gpu-1"})
+	if !strings.Contains(path, "gpu-1_m1.json") {
+		t.Fatalf("expected gpu prefix in path, got %s", path)
 	}
 }
 

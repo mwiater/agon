@@ -42,7 +42,7 @@ var benchmarkModelCmd = &cobra.Command{
 		endpoint, _ := cmd.Flags().GetString("benchmark-endpoint")
 
 		fileBase := benchmark.Slugify(fmt.Sprintf("%s_%s", gpuName, modelName))
-		fileName := filepath.Join("benchmark", "benchmarks", fileBase+".json")
+		fileName := filepath.Join("agonData", "modelBenchmarks", fileBase+".json")
 		if _, err := os.Stat(fileName); err == nil {
 			log.Printf("Benchmark already exists, skipping: %s", fileName)
 			return nil
@@ -50,7 +50,7 @@ var benchmarkModelCmd = &cobra.Command{
 			return fmt.Errorf("check benchmark file: %w", err)
 		}
 
-		if err := os.MkdirAll(filepath.Join("benchmark", "benchmarks"), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Join("agonData", "modelBenchmarks"), 0o755); err != nil {
 			return fmt.Errorf("create benchmarks directory: %w", err)
 		}
 

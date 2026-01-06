@@ -24,7 +24,7 @@ import (
 
 const (
 	promptSuitePath = "accuracy/accuracy_prompts.json"
-	resultsDir      = "accuracy/results"
+	resultsDir      = "agonData/modelAccuracy"
 )
 
 // RunAccuracy executes the accuracy suite for each configured host/model pair.

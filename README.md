@@ -228,6 +228,8 @@ Benchmark mode is a feature that allows you to run a common user prompt against 
 
 If you want a standalone benchmark server, use `servers/benchmark` (llama.cpp only). Configure `servers/benchmark/benchmark.yml` with a `models_path` pointing to your GGUF directory, then run the server and POST to `/benchmark` with the model filename (relative to `models_path`) or an absolute path.
 
+Benchmark results are written to `agonData/modelBenchmarks/`.
+
 Benchmark mode uses the following definitions:
 
 ```
@@ -239,7 +241,7 @@ Benchmark mode uses the following definitions:
 
 Accuracy mode runs a fixed prompt suite against each host/model pair and records per-prompt correctness. Like Benchmark mode, your configuration file **must only have one model per host.** The system prompt and tests are loaded from `accuracy/accuracy_prompts.json`, including `difficulty` and `marginOfError` for each test.
 
-Results are appended to `accuracy/results/<model>.json` (one entry per prompt per run). Each entry includes the prompt, the model response, the expected answer, and a boolean indicating correctness. This makes it easy to run the suite multiple times and track consistency over time. See the `config/config.example.AccuracyMode.json` example.
+Results are appended to `agonData/modelAccuracy/<model>.json` (one entry per prompt per run). Each entry includes the prompt, the model response, the expected answer, and a boolean indicating correctness. This makes it easy to run the suite multiple times and track consistency over time. See the `config/config.example.AccuracyMode.json` example.
 
 ## Metrics
 
@@ -284,7 +286,7 @@ Starts the main interactive chat UI. The UI mode is determined by the configurat
 
 ### `agon accuracy`
 
-*   **`agon accuracy`**: Runs the accuracy suite defined in `accuracy/accuracy_prompts.json` against each host/model pair and appends results to `accuracy/results/`. Requires `accuracyMode: true` and one model per host.
+*   **`agon accuracy`**: Runs the accuracy suite defined in `accuracy/accuracy_prompts.json` against each host/model pair and appends results to `agonData/modelAccuracy/`. Requires `accuracyMode: true` and one model per host.
 
 ### `agon pull`
 

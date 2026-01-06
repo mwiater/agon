@@ -21,13 +21,14 @@ type ModelMeta struct {
 	Type     string         `json:"type,omitempty"` // "llama.cpp"
 	Name     string         `json:"name,omitempty"`
 	Endpoint string         `json:"endpoint,omitempty"`
+	GPU      string         `json:"gpu,omitempty"`
 	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
 // FetchEndpointModelNames queries each URL for known model endpoints and returns unique model names.
 func FetchEndpointModelNames(urls []string) []ModelMeta {
 	var models []ModelMeta
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := &http.Client{Timeout: 15 * time.Second}
 
 	for _, rawURL := range urls {
 		baseURL := strings.TrimRight(strings.TrimSpace(rawURL), "/")
@@ -47,11 +48,15 @@ func FetchEndpointModelNames(urls []string) []ModelMeta {
 }
 
 // FetchModelMetadata queries each model for detailed metadata and prints results.
-func FetchModelMetadata(models []ModelMeta) {
-	client := &http.Client{Timeout: 30 * time.Second}
+func FetchModelMetadata(models []ModelMeta, gpu string) {
+	client := &http.Client{Timeout: 15 * time.Second}
 
 	for i := range models {
+		if strings.TrimSpace(gpu) != "" {
+			models[i].GPU = strings.TrimSpace(gpu)
+		}
 		if metadataExists(models[i]) {
+			fmt.Printf("Skipping metadata fetch for %s: file already exists\n", models[i].Name)
 			continue
 		}
 
@@ -111,15 +116,26 @@ func fetchLlamaModelMetadata(client *http.Client, model *ModelMeta) {
 	wasLoaded, err := isLlamaModelLoaded(client, model)
 	if err != nil {
 		fmt.Printf("Error checking load state for %s: %v\n", model.Name, err)
+		return
 	}
 	if !wasLoaded {
-		if err := loadLlamaModel(client, model); err != nil {
-			fmt.Printf("Error loading model %s on %s: %v\n", model.Name, model.Endpoint, err)
-			return
-		}
-		if err := waitForLlamaModelLoaded(client, model, 30*time.Second); err != nil {
-			fmt.Printf("Error waiting for model %s to load on %s: %v\n", model.Name, model.Endpoint, err)
-			return
+		const maxAttempts = 3
+		loadTimeout := 2 * time.Minute
+		for attempt := 1; attempt <= maxAttempts; attempt++ {
+			if err := loadLlamaModel(client, model); err != nil {
+				fmt.Printf("Error loading model %s on %s (attempt %d/%d): %v\n", model.Name, model.Endpoint, attempt, maxAttempts, err)
+			} else if err := waitForLlamaModelLoaded(client, model, loadTimeout); err != nil {
+				status := "unknown"
+				if current, statusErr := getLlamaModelStatus(client, model); statusErr == nil && current != "" {
+					status = current
+				}
+				fmt.Printf("Error waiting for model %s to load on %s (attempt %d/%d): %v (Status: %s)\n", model.Name, model.Endpoint, attempt, maxAttempts, err, status)
+			} else {
+				break
+			}
+			if attempt == maxAttempts {
+				return
+			}
 		}
 	}
 
@@ -231,6 +247,9 @@ func loadLlamaModel(client *http.Client, model *ModelMeta) error {
 	defer resp.Body.Close()
 
 	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusMethodNotAllowed {
+		return nil
+	}
 	if resp.StatusCode >= http.StatusBadRequest && !isAlreadyLoadedResponse(respBody) {
 		return fmt.Errorf("llama.cpp: /models/load returned %s: %s", resp.Status, strings.TrimSpace(string(respBody)))
 	}
@@ -272,34 +291,42 @@ func isAlreadyLoadedResponse(body []byte) bool {
 }
 
 func isLlamaModelLoaded(client *http.Client, model *ModelMeta) (bool, error) {
+	status, err := getLlamaModelStatus(client, model)
+	if err != nil {
+		return false, err
+	}
+	return strings.EqualFold(status, "loaded"), nil
+}
+
+func getLlamaModelStatus(client *http.Client, model *ModelMeta) (string, error) {
 	reqURL := strings.TrimRight(model.Endpoint, "/") + "/models"
 	resp, err := client.Get(reqURL)
 	if err != nil {
-		return false, err
+		return "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return false, fmt.Errorf("non-OK /models response: %s", resp.Status)
+		return "", fmt.Errorf("non-OK /models response: %s", resp.Status)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return false, err
+		return "", err
 	}
 
 	llamaModels, err := parseLlamaModels(body)
 	if err != nil {
-		return false, err
+		return "", err
 	}
 
 	for _, item := range llamaModels {
 		if strings.EqualFold(modelDisplayName(item), model.Name) {
-			return strings.EqualFold(modelStatusValue(item), "loaded"), nil
+			return strings.ToLower(strings.TrimSpace(modelStatusValue(item))), nil
 		}
 	}
 
-	return false, nil
+	return "", nil
 }
 
 func waitForLlamaModelLoaded(client *http.Client, model *ModelMeta, timeout time.Duration) error {
@@ -352,7 +379,10 @@ func metadataExists(model ModelMeta) bool {
 
 func modelMetadataPath(model ModelMeta) string {
 	name := sanitizeModelFilename(model.Name)
-	filename := fmt.Sprintf("%s_%s.json", model.Type, name)
+	filename := fmt.Sprintf("%s.json", name)
+	if gpu := sanitizeModelFilename(model.GPU); gpu != "" {
+		filename = fmt.Sprintf("%s_%s.json", gpu, name)
+	}
 	return filepath.Join("agonData", "modelMetadata", filename)
 }
 

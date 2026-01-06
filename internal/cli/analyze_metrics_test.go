@@ -145,7 +145,10 @@ func TestLoadAccuracyStatsAndPerformance(t *testing.T) {
 }
 
 func TestLoadBenchmarksDir(t *testing.T) {
-	dir := t.TempDir()
+	dir := filepath.Join(t.TempDir(), "agonData", "modelBenchmarks")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
 	content := metrics.BenchmarkResults{
 		"m1": {ModelName: "m1"},
 	}

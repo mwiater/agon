@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -203,7 +204,11 @@ func writeResults(results map[string]*BenchmarkResult, benchmarkCount int) error
 		modelNames = append(modelNames, name)
 	}
 
-	fileName := fmt.Sprintf("benchmark/benchmarks/%s-%d.json", Slugify(strings.Join(modelNames, "-")), benchmarkCount)
+	dir := filepath.Join("agonData", "modelBenchmarks")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("error creating results directory: %w", err)
+	}
+	fileName := filepath.Join(dir, fmt.Sprintf("%s-%d.json", Slugify(strings.Join(modelNames, "-")), benchmarkCount))
 
 	file, err := os.Create(fileName)
 	if err != nil {

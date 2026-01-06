@@ -103,7 +103,7 @@ func TestRunAccuracyWritesJSONL(t *testing.T) {
 		t.Fatalf("RunAccuracy error: %v", err)
 	}
 
-	resultPath := filepath.Join("accuracy", "results", "model1.jsonl")
+	resultPath := filepath.Join("agonData", "modelAccuracy", "model1.jsonl")
 	result := readFirstResult(t, resultPath)
 	if result.Model != "model1" || result.Host != "Host01" {
 		t.Fatalf("unexpected result host/model: %#v", result)
@@ -154,7 +154,7 @@ func TestRunAccuracyDeadlineExceeded(t *testing.T) {
 		t.Fatalf("RunAccuracy error: %v", err)
 	}
 
-	resultPath := filepath.Join("accuracy", "results", "model1.jsonl")
+	resultPath := filepath.Join("agonData", "modelAccuracy", "model1.jsonl")
 	result := readFirstResult(t, resultPath)
 	if !result.DeadlineExceeded {
 		t.Fatalf("expected deadlineExceeded=true, got %#v", result)

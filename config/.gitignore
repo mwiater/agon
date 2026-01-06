@@ -12,5 +12,4 @@
 !config.example.BenchmarkMode.json
 !config.example.AccuracyMode.json
 !config.example.RAGAccuracy.json
-!config.RAGAccuracy.json
 !config.example.LlamaCpp.json

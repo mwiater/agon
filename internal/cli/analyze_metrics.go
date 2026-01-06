@@ -106,7 +106,7 @@ func init() {
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.benchmarksDir, "benchmarks-dir", "", "Optional path to a directory of benchmark JSON files")
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.htmlPath, "html-output", "reports/metrics-report.html", "Destination HTML report path")
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.analysisPath, "analysis-output", "", "Optional path to write the analysis JSON")
-	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.accuracyResultsDir, "accuracy-results", "accuracy/results", "Optional path to accuracy JSONL results directory")
+	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.accuracyResultsDir, "accuracy-results", "agonData/modelAccuracy", "Optional path to accuracy JSONL results directory")
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.hostName, "host-name", "", "Optional cluster/host label to embed in the analysis")
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.hostNotes, "host-notes", "", "Optional host notes to embed in the analysis")
 	analyzeMetricsCmd.Flags().BoolVar(&analyzeMetricsOpts.accuracyOnly, "accuracy-only", true, "Build the report from accuracy JSONL data instead of benchmark JSON")
