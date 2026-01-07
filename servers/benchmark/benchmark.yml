@@ -2,6 +2,6 @@
 host: 0.0.0.0
 port: 9999
 type: "llama.cpp" # only "llama.cpp"
-api_base: https://o-udoo01.0nezer0.com
-models_path: /home/matt/models
+api_base: http://192.168.0.33:8888
+models_path: C:\Users\matt\projects\gollama\models
 timeout: 3600 # seconds

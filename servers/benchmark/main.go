@@ -70,6 +70,11 @@ func main() {
 	log.Printf("benchmark config: host=%s port=%d type=%s api_base=%s models_path=%s", cfg.Host, cfg.Port, cfg.Type, cfg.APIBase, cfg.ModelsPath)
 	log.Printf("benchmark timeout: %ds", cfg.TimeoutSeconds)
 	log.Printf("listening on %s (GOOS=%s)", srv.Addr, runtime.GOOS)
+	path, err := os.Getwd()
+	if err != nil {
+		log.Println(err)
+	}
+	fmt.Println(path)
 	log.Fatal(srv.ListenAndServe())
 }
 

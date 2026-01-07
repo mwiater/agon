@@ -3,3 +3,7 @@ agon.log
 dist/*
 skunkworks/*
 TEST-IMPLEMENTAION.md
+llama.cpp-windows/*
+servers/benchmark/benchmark-server.exe
+servers/benchmark/benchmark-server
+

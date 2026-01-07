@@ -17,9 +17,10 @@ import (
 type analyzeMetricsOptions struct {
 	inputPath          string
 	htmlPath           string
-	analysisPath        string
+	analysisPath       string
 	accuracyResultsDir string
 	benchmarksDir      string
+	metadataDir        string
 	hostName           string
 	hostNotes          string
 	accuracyOnly       bool
@@ -36,54 +37,23 @@ derived metrics, and emit both the analysis JSON and a self-contained HTML
 dashboard for review.`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var results metrics.BenchmarkResults
-		if analyzeMetricsOpts.benchmarksDir != "" {
-			var err error
-			results, err = loadBenchmarksDir(analyzeMetricsOpts.benchmarksDir)
-			if err != nil {
-				return err
-			}
-		} else if analyzeMetricsOpts.accuracyOnly {
-			var err error
-			results, err = loadAccuracyPerformanceResults(analyzeMetricsOpts.accuracyResultsDir)
-			if err != nil {
-				return err
-			}
-		} else {
-			if analyzeMetricsOpts.inputPath == "" {
-				return fmt.Errorf("input benchmark file is required (pass --input)")
-			}
-			data, err := os.ReadFile(analyzeMetricsOpts.inputPath)
-			if err != nil {
-				return fmt.Errorf("unable to read benchmark file %s: %w", analyzeMetricsOpts.inputPath, err)
-			}
-
-			results, err = parseBenchmarkResults(data)
-			if err != nil {
-				return fmt.Errorf("unable to parse benchmark JSON %s: %w", analyzeMetricsOpts.inputPath, err)
-			}
-		}
-
-		host := metrics.HostInfo{
-			ClusterName: analyzeMetricsOpts.hostName,
-			Notes:       analyzeMetricsOpts.hostNotes,
-		}
-
-		accuracyStats, err := loadAccuracyStats(analyzeMetricsOpts.accuracyResultsDir)
+		combined, err := metrics.LoadCombinedMetrics(
+			analyzeMetricsOpts.accuracyResultsDir,
+			analyzeMetricsOpts.benchmarksDir,
+			analyzeMetricsOpts.metadataDir,
+		)
 		if err != nil {
 			return err
 		}
 
-		analysis := metrics.AnalyzeMetrics(results, host, accuracyStats)
-
 		if analyzeMetricsOpts.analysisPath != "" {
-			if err := writeAnalysisJSON(analyzeMetricsOpts.analysisPath, analysis); err != nil {
+			if err := writeAnalysisJSON(analyzeMetricsOpts.analysisPath, combined); err != nil {
 				return err
 			}
 			cmd.Printf("Analysis JSON written to %s\n", analyzeMetricsOpts.analysisPath)
 		}
 
-		html, err := metrics.GenerateReport(analysis)
+		html, err := metrics.GenerateCombinedReport(combined)
 		if err != nil {
 			return fmt.Errorf("failed generating HTML report: %w", err)
 		}
@@ -103,7 +73,8 @@ dashboard for review.`,
 
 func init() {
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.inputPath, "input", "reports/data/model_performance_metrics.json", "Path to benchmark JSON (required)")
-	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.benchmarksDir, "benchmarks-dir", "", "Optional path to a directory of benchmark JSON files")
+	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.benchmarksDir, "benchmarks-dir", "agonData/modelBenchmarks", "Path to a directory of benchmark JSON files")
+	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.metadataDir, "metadata-dir", "agonData/modelMetadata", "Path to a directory of model metadata JSON files")
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.htmlPath, "html-output", "reports/metrics-report.html", "Destination HTML report path")
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.analysisPath, "analysis-output", "", "Optional path to write the analysis JSON")
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.accuracyResultsDir, "accuracy-results", "agonData/modelAccuracy", "Optional path to accuracy JSONL results directory")
@@ -114,7 +85,7 @@ func init() {
 	analyzeCmd.AddCommand(analyzeMetricsCmd)
 }
 
-func writeAnalysisJSON(path string, analysis metrics.Analysis) error {
+func writeAnalysisJSON(path string, analysis metrics.CombinedMetrics) error {
 	dir := filepath.Dir(path)
 	if dir != "." && dir != "" {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -378,11 +349,11 @@ func buildStatsFromIterations(iterations []metrics.Iteration) (metrics.Stats, me
 	max := iterations[0].Stats
 
 	var (
-		sumTotal   int64
-		sumTTFT    int64
-		sumTPS     float64
-		sumInput   int
-		sumOutput  int
+		sumTotal  int64
+		sumTTFT   int64
+		sumTPS    float64
+		sumInput  int
+		sumOutput int
 	)
 
 	for _, iter := range iterations {
@@ -438,27 +409,27 @@ func buildStatsFromIterations(iterations []metrics.Iteration) (metrics.Stats, me
 }
 
 type accuracyLine struct {
-	Model         string `json:"model"`
-	Correct       bool   `json:"correct"`
-	Difficulty    int    `json:"difficulty"`
-	MarginOfError int    `json:"marginOfError"`
-	DeadlineExceeded bool `json:"deadlineExceeded"`
-	DeadlineTimeoutSec int `json:"deadlineTimeout"`
-	TimeToFirstToken int     `json:"time_to_first_token"`
-	TokensPerSecond  float64 `json:"tokens_per_second"`
-	InputTokens      int     `json:"input_tokens"`
-	OutputTokens     int     `json:"output_tokens"`
-	TotalDurationMs  int     `json:"total_duration_ms"`
+	Model              string  `json:"model"`
+	Correct            bool    `json:"correct"`
+	Difficulty         int     `json:"difficulty"`
+	MarginOfError      int     `json:"marginOfError"`
+	DeadlineExceeded   bool    `json:"deadlineExceeded"`
+	DeadlineTimeoutSec int     `json:"deadlineTimeout"`
+	TimeToFirstToken   int     `json:"time_to_first_token"`
+	TokensPerSecond    float64 `json:"tokens_per_second"`
+	InputTokens        int     `json:"input_tokens"`
+	OutputTokens       int     `json:"output_tokens"`
+	TotalDurationMs    int     `json:"total_duration_ms"`
 }
 
 type accuracyTotals struct {
-	Total         int
-	Correct       int
-	DifficultySum int
-	MarginSum     int
-	Timeouts      int
+	Total          int
+	Correct        int
+	DifficultySum  int
+	MarginSum      int
+	Timeouts       int
 	TimeoutSeconds int
-	ByDifficulty  map[int]accuracyTotals
+	ByDifficulty   map[int]accuracyTotals
 }
 
 func loadAccuracyStats(dir string) (map[string]metrics.AccuracyStats, error) {
