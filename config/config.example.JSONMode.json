@@ -5,20 +5,13 @@
       "url": "{LlamaCpp-api-endpoint-01}",
       "type": "llama.cpp",
       "models": [
-        "deepseek-r1:1.5b",
-        "gemma3:1b",
-        "granite3.1-moe:1b",
-        "granite3.1-moe:3b",
-        "granite4:1b",
-        "granite4:350m",
-        "granite4:micro",
-        "llama3.2:1b",
-        "llama3.2:3b",
-        "phi4-mini:3.8b",
-        "smollm2:360m",
-        "smollm2:1.7b",
-        "qwen3:1.7b",
-        "embeddinggemma:300m"
+        "gemma-3-4b-it-Q4_K_M",
+        "Falcon3-3B-Instruct-q5_k_m",
+        "gemma-2-2b-it-Q4_K_M",
+        "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M",
+        "qwen2.5-1.5b-instruct-q4_k_m",
+        "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
+        "internlm2_5-1_8b-chat-Q4_K_M"
       ],
       "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point. Your response must be retruned as valid JSON",
       "parameters": {}
@@ -28,20 +21,13 @@
       "url": "{LlamaCpp-api-endpoint-02}",
       "type": "llama.cpp",
       "models": [
-        "deepseek-r1:1.5b",
-        "gemma3:1b",
-        "granite3.1-moe:1b",
-        "granite3.1-moe:3b",
-        "granite4:1b",
-        "granite4:350m",
-        "granite4:micro",
-        "llama3.2:1b",
-        "llama3.2:3b",
-        "phi4-mini:3.8b",
-        "smollm2:360m",
-        "smollm2:1.7b",
-        "qwen3:1.7b",
-        "embeddinggemma:300m"
+        "gemma-3-4b-it-Q4_K_M",
+        "Falcon3-3B-Instruct-q5_k_m",
+        "gemma-2-2b-it-Q4_K_M",
+        "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M",
+        "qwen2.5-1.5b-instruct-q4_k_m",
+        "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
+        "internlm2_5-1_8b-chat-Q4_K_M"
       ],
       "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point. Your response must be retruned as valid JSON",
       "parameters": {}
@@ -51,20 +37,13 @@
       "url": "{LlamaCpp-api-endpoint-03}",
       "type": "llama.cpp",
       "models": [
-        "deepseek-r1:1.5b",
-        "gemma3:1b",
-        "granite3.1-moe:1b",
-        "granite3.1-moe:3b",
-        "granite4:1b",
-        "granite4:350m",
-        "granite4:micro",
-        "llama3.2:1b",
-        "llama3.2:3b",
-        "phi4-mini:3.8b",
-        "smollm2:360m",
-        "smollm2:1.7b",
-        "qwen3:1.7b",
-        "embeddinggemma:300m"
+        "gemma-3-4b-it-Q4_K_M",
+        "Falcon3-3B-Instruct-q5_k_m",
+        "gemma-2-2b-it-Q4_K_M",
+        "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M",
+        "qwen2.5-1.5b-instruct-q4_k_m",
+        "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
+        "internlm2_5-1_8b-chat-Q4_K_M"
       ],
       "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point. Your response must be retruned as valid JSON",
       "parameters": {}
@@ -74,20 +53,13 @@
       "url": "{LlamaCpp-api-endpoint-04}",
       "type": "llama.cpp",
       "models": [
-        "deepseek-r1:1.5b",
-        "gemma3:1b",
-        "granite3.1-moe:1b",
-        "granite3.1-moe:3b",
-        "granite4:1b",
-        "granite4:350m",
-        "granite4:micro",
-        "llama3.2:1b",
-        "llama3.2:3b",
-        "phi4-mini:3.8b",
-        "smollm2:360m",
-        "smollm2:1.7b",
-        "qwen3:1.7b",
-        "embeddinggemma:300m"
+        "gemma-3-4b-it-Q4_K_M",
+        "Falcon3-3B-Instruct-q5_k_m",
+        "gemma-2-2b-it-Q4_K_M",
+        "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M",
+        "qwen2.5-1.5b-instruct-q4_k_m",
+        "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
+        "internlm2_5-1_8b-chat-Q4_K_M"
       ],
       "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point. Your response must be retruned as valid JSON",
       "parameters": {}
@@ -106,4 +78,3 @@
   "exportMarkdown": "",
   "metrics": true
 }
-

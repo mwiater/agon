@@ -4,7 +4,7 @@ package agon
 import (
 	"log"
 
-	"github.com/mwiater/agon/accuracy"
+	"github.com/mwiater/agon/internal/accuracy"
 	"github.com/spf13/cobra"
 )
 

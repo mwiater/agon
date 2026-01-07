@@ -239,7 +239,7 @@ Benchmark mode uses the following definitions:
 
 ### Accuracy Mode
 
-Accuracy mode runs a fixed prompt suite against each host/model pair and records per-prompt correctness. Like Benchmark mode, your configuration file **must only have one model per host.** The system prompt and tests are loaded from `accuracy/accuracy_prompts.json`, including `difficulty` and `marginOfError` for each test.
+Accuracy mode runs a fixed prompt suite against each host/model pair and records per-prompt correctness. Like Benchmark mode, your configuration file **must only have one model per host.** The system prompt and tests are loaded from `internal/accuracy/accuracy_prompts.json`, including `difficulty` and `marginOfError` for each test.
 
 Results are appended to `agonData/modelAccuracy/<model>.json` (one entry per prompt per run). Each entry includes the prompt, the model response, the expected answer, and a boolean indicating correctness. This makes it easy to run the suite multiple times and track consistency over time. See the `config/config.example.AccuracyMode.json` example.
 
@@ -286,27 +286,140 @@ Starts the main interactive chat UI. The UI mode is determined by the configurat
 
 ### `agon accuracy`
 
-*   **`agon accuracy`**: Runs the accuracy suite defined in `accuracy/accuracy_prompts.json` against each host/model pair and appends results to `agonData/modelAccuracy/`. Requires `accuracyMode: true` and one model per host.
+*   **`agon accuracy`**: Runs the accuracy suite defined in `internal/accuracy/accuracy_prompts.json` against each host/model pair and appends results to `agonData/modelAccuracy/`. Requires `accuracyMode: true` and one model per host.
+
+**Example**
+```bash
+agon accuracy --config config/config.example.AccuracyMode.json
+```
 
 ### `agon pull`
 
 *   **`agon pull models`**: Pulls any models from your config that are missing on the respective llama.cpp hosts (router mode required).
 
+**Example**
+```bash
+agon pull models --config config/config.example.LlamaCpp.json
+```
+
 ### `agon delete`
 
 *   **`agon delete models`**: Deletes specified models from their llama.cpp hosts (router mode required).
+
+**Example**
+```bash
+agon delete models --config config/config.example.LlamaCpp.json
+```
 
 ### `agon sync`
 
 *   **`agon sync models`**: Synchronizes each llama.cpp host to have exactly the models listed in the config (router mode required).
 
+**Example**
+```bash
+agon sync models --config config/config.example.LlamaCpp.json
+```
+
+*   **`agon sync configs`**: Synchronizes per-host config files from the main config.
+
+**Example**
+```bash
+agon sync configs --config config/config.json
+```
+
 ### `agon unload`
 
 *   **`agon unload models`**: Unloads models from memory on their hosts to free up resources.
 
+**Example**
+```bash
+agon unload models --config config/config.example.LlamaCpp.json
+```
+
 ### `agon show`
 
 *   **`agon show config`**: Displays the current, fully resolved configuration.
+
+**Example**
+```bash
+agon show config --config config/config.example.LlamaCpp.json
+```
+
+*   **`agon show modelInfo`**: Shows model details from the configuration file.
+
+**Example**
+```bash
+agon show modelInfo --config config/config.example.LlamaCpp.json
+```
+
+### `agon analyze`
+
+*   **`agon analyze metrics`**: Generates metric analysis and an HTML report from benchmark outputs.
+
+**Example**
+```bash
+agon analyze metrics --benchmarks-dir agonData/modelBenchmarks --metadata-dir agonData/modelMetadata
+```
+
+### `agon benchmark`
+
+*   **`agon benchmark models`**: Runs benchmarks for models defined in the config file.
+*   **`agon benchmark model`**: Runs a single benchmark against a benchmark server endpoint.
+
+**Examples**
+```bash
+agon benchmark models --config config/config.example.BenchmarkMode.json
+```
+
+```bash
+agon benchmark model --model llama-3-2-1b-instruct-q8_0.gguf --gpu radeon-rx-570 --benchmark-endpoint http://localhost:9999/benchmark
+```
+
+### `agon fetch`
+
+*   **`agon fetch modelmetadata`**: Fetches model metadata from configured hosts.
+
+**Example**
+```bash
+agon fetch modelmetadata --endpoints http://localhost:8080,http://localhost:8081 --gpu radeon-rx-570
+```
+
+### `agon list`
+
+*   **`agon list commands`**: Lists all available commands.
+*   **`agon list modelParameters`**: Lists model parameters for each node.
+
+**Examples**
+```bash
+agon list commands
+```
+
+```bash
+agon list modelParameters --config config/config.example.ModelParameters.json
+```
+
+### `agon rag`
+
+*   **`agon rag index`**: Builds the RAG JSONL index.
+*   **`agon rag preview`**: Previews RAG retrieval and context assembly.
+
+**Examples**
+```bash
+agon rag index --config config/config.example.RAGAccuracy.json
+```
+
+```bash
+agon rag preview "what is agon?" --config config/config.example.RAGAccuracy.json
+```
+
+### `agon run`
+
+*   **`agon run accuracy`**: Runs the accuracy batch workflow.
+
+**Example**
+```bash
+agon run accuracy
+```
 
 ## Examples
 
@@ -552,6 +665,32 @@ dist/agon_linux_amd64_v1/agon
 dist/agon_windows_amd64_v1/agon.exe
 dist/agon-mcp_linux_amd64_v1/agon-mcp
 dist/agon-mcp_windows_amd64_v1/agon-mcp.exe
+```
+
+## golangci-lint
+
+### Installation
+
+Install the linter with:
+
+```bash
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+```
+
+Make sure `$GOPATH/bin` (or `$GOBIN`) is on your `PATH` so `golangci-lint` is available.
+
+### Usage
+
+Run lint checks from the repo root:
+
+```bash
+golangci-lint run
+```
+
+To focus on a specific package:
+
+```bash
+golangci-lint run ./internal/...
 ```
 
 ## Testing

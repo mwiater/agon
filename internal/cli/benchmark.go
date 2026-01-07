@@ -11,14 +11,19 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mwiater/agon/benchmark"
+	"github.com/mwiater/agon/internal/benchmark"
 	"github.com/mwiater/agon/internal/metrics"
 	"github.com/spf13/cobra"
 )
 
-// benchmarkCmd represents the benchmark command.
+// benchmarkCmd groups benchmark-related CLI commands.
 var benchmarkCmd = &cobra.Command{
 	Use:   "benchmark",
+	Short: "Group commands for running benchmarks",
+}
+
+var benchmarkModelsCmd = &cobra.Command{
+	Use:   "models",
 	Short: "Run benchmarks for models defined in the config file",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		log.Println("benchmark command called")
@@ -95,6 +100,7 @@ var benchmarkModelCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(benchmarkCmd)
+	benchmarkCmd.AddCommand(benchmarkModelsCmd)
 	benchmarkCmd.AddCommand(benchmarkModelCmd)
 
 	benchmarkModelCmd.Flags().StringP("model", "m", "", "model name to benchmark")

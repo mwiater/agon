@@ -5,7 +5,13 @@
       "url": "{LlamaCpp-api-endpoint-01}",
       "type": "llama.cpp",
       "models": [
-        "granite4:350m"
+        "gemma-3-4b-it-Q4_K_M",
+        "Falcon3-3B-Instruct-q5_k_m",
+        "gemma-2-2b-it-Q4_K_M",
+        "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M",
+        "qwen2.5-1.5b-instruct-q4_k_m",
+        "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
+        "internlm2_5-1_8b-chat-Q4_K_M"
       ],
       "systemprompt": "You are a helpful assistant",
       "parameters": {}
@@ -15,7 +21,13 @@
       "url": "{LlamaCpp-api-endpoint-02}",
       "type": "llama.cpp",
       "models": [
-        "granite3.1-moe:1b"
+        "gemma-3-4b-it-Q4_K_M",
+        "Falcon3-3B-Instruct-q5_k_m",
+        "gemma-2-2b-it-Q4_K_M",
+        "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M",
+        "qwen2.5-1.5b-instruct-q4_k_m",
+        "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
+        "internlm2_5-1_8b-chat-Q4_K_M"
       ],
       "systemprompt": "You are a helpful assistant",
       "parameters": {}
@@ -37,8 +49,8 @@
   "exportMarkdown": "",
   "metrics": true,
   "ragMode": true,
-  "ragCorpusPath": "rag_corpus_accuracy_v1",
-  "ragIndexPath": "rag_corpus_accuracy_v1/index.jsonl",
+  "ragCorpusPath": "agonData/rag_corpus_accuracy_v1",
+  "ragIndexPath": "agonData/rag_corpus_accuracy_v1/index.jsonl",
   "ragEmbeddingModel": "mxbai-embed-large:335m",
   "ragEmbeddingHost": "LlamaCpp01",
   "ragChunkSizeTokens": 500,
@@ -46,7 +58,12 @@
   "ragTopK": 4,
   "ragContextTokenLimit": 1200,
   "ragSimilarity": "cosine",
-  "ragAllowedExtensions": [".md", ".jsonl"],
-  "ragExcludeGlobs": ["**/results/**", "**/.git/**"]
+  "ragAllowedExtensions": [
+    ".md",
+    ".jsonl"
+  ],
+  "ragExcludeGlobs": [
+    "**/results/**",
+    "**/.git/**"
+  ]
 }
-

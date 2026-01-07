@@ -268,48 +268,7 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
     </div>
   </nav>
   <main class="container-fluid my-4">
-    <div class="row g-3">
-      <div class="col-sm-6 col-lg-2">
-        <div class="card shadow-sm h-100">
-          <div class="card-body">
-            <p style="font-size: 1.5em;" class="text-muted mb-1"><i class="fa-duotone fa-regular fa-rabbit-running fa-fw"></i> Fastest Model</p>
-            <h5 class="card-title" id="fastestModel">-</h5>
-          </div>
-        </div>
-      </div>
-      <div class="col-sm-6 col-lg-2">
-        <div class="card shadow-sm h-100">
-          <div class="card-body">
-            <p style="font-size: 1.5em;" class="text-muted mb-1"><i class="fa-duotone fa-regular fa-gauge-low"></i> Best Latency</p>
-            <h5 class="card-title" id="bestLatencyModel">-</h5>
-          </div>
-        </div>
-      </div>
-      <div class="col-sm-6 col-lg-2">
-        <div class="card shadow-sm h-100">
-          <div class="card-body">
-            <p style="font-size: 1.5em;" class="text-muted mb-1"><i class="fa-duotone fa-regular fa-gauge-high"></i> Most Efficient</p>
-            <h5 class="card-title" id="mostEfficientModel">-</h5>
-          </div>
-        </div>
-      </div>
-      <div class="col-sm-6 col-lg-2">
-        <div class="card shadow-sm h-100">
-          <div class="card-body">
-            <p style="font-size: 1.5em;" class="text-muted mb-1"><i class="fa-duotone fa-regular fa-bullseye-arrow"></i> Most Accurate</p>
-            <h5 class="card-title" id="mostAccurateModel">-</h5>
-          </div>
-        </div>
-      </div>
-      <div class="col-sm-6 col-lg-2">
-        <div class="card shadow-sm h-100">
-          <div class="card-body">
-            <p style="font-size: 1.5em;" class="text-muted mb-1"><i class="fa-duotone fa-regular fa-code-compare"></i> Best Trade-off</p>
-            <h5 class="card-title" id="bestTradeoffModel">-</h5>
-          </div>
-        </div>
-      </div>
-    </div>
+    <div id="summaryRows"></div>
 
     <section class="mt-4">
       <div class="card shadow-sm">
@@ -679,49 +638,80 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
       }
 
       function populateSummary(models) {
-        var bestThroughput = null;
-        var bestLatency = null;
-        var bestEfficiency = null;
-        var bestAccuracy = null;
-        var bestTradeoff = null;
-        var pareto = [];
-
+        var grouped = {};
         models.forEach(function(model) {
-          var throughput = model.aggregates && model.aggregates.throughput ? model.aggregates.throughput.avg_tokens_per_second : 0;
-          var latency = model.aggregates && model.aggregates.latency ? model.aggregates.latency.avg_total_ms : 0;
-          var efficiency = model.aggregates && model.aggregates.efficiency ? model.aggregates.efficiency.accuracy_per_second : 0;
-          var accuracy = model.aggregates && model.aggregates.accuracy ? model.aggregates.accuracy.accuracy : 0;
-          var paretoFront = model.aggregates && model.aggregates.comparisons ? model.aggregates.comparisons.pareto_front : false;
-
-          if (throughput > 0 && (!bestThroughput || throughput > bestThroughput.value)) {
-            bestThroughput = { label: modelLabel(model), value: throughput };
-          }
-          if (latency > 0 && (!bestLatency || latency < bestLatency.value)) {
-            bestLatency = { label: modelLabel(model), value: latency };
-          }
-          if (efficiency > 0 && (!bestEfficiency || efficiency > bestEfficiency.value)) {
-            bestEfficiency = { label: modelLabel(model), value: efficiency };
-          }
-          if (accuracy > 0 && (!bestAccuracy || accuracy > bestAccuracy.value)) {
-            bestAccuracy = { label: modelLabel(model), value: accuracy };
-          }
-          if (paretoFront) {
-            pareto.push({ label: modelLabel(model), value: efficiency || 0 });
-          }
+          var gpu = model.gpu || 'unknown';
+          grouped[gpu] = grouped[gpu] || [];
+          grouped[gpu].push(model);
         });
 
-        if (pareto.length) {
-          pareto.sort(function(a, b) { return b.value - a.value; });
-          bestTradeoff = pareto[0];
-        } else {
-          bestTradeoff = bestEfficiency;
+        var $container = $('#summaryRows').empty();
+        var gpus = Object.keys(grouped).sort();
+        if (!gpus.length) {
+          return;
         }
 
-        $('#fastestModel').text(bestThroughput ? bestThroughput.label : '-');
-        $('#bestLatencyModel').text(bestLatency ? bestLatency.label : '-');
-        $('#mostEfficientModel').text(bestEfficiency ? bestEfficiency.label : '-');
-        $('#mostAccurateModel').text(bestAccuracy ? bestAccuracy.label : '-');
-        $('#bestTradeoffModel').text(bestTradeoff ? bestTradeoff.label : '-');
+        gpus.forEach(function(gpu) {
+          var entries = grouped[gpu];
+          var bestThroughput = null;
+          var bestLatency = null;
+          var bestEfficiency = null;
+          var bestAccuracy = null;
+          var bestTradeoff = null;
+          var pareto = [];
+
+          entries.forEach(function(model) {
+            var throughput = model.aggregates && model.aggregates.throughput ? model.aggregates.throughput.avg_tokens_per_second : 0;
+            var latency = model.aggregates && model.aggregates.latency ? model.aggregates.latency.avg_total_ms : 0;
+            var efficiency = model.aggregates && model.aggregates.efficiency ? model.aggregates.efficiency.accuracy_per_second : 0;
+            var accuracy = model.aggregates && model.aggregates.accuracy ? model.aggregates.accuracy.accuracy : 0;
+            var paretoFront = model.aggregates && model.aggregates.comparisons ? model.aggregates.comparisons.pareto_front : false;
+
+            if (throughput > 0 && (!bestThroughput || throughput > bestThroughput.value)) {
+              bestThroughput = { label: modelLabel(model), value: throughput };
+            }
+            if (latency > 0 && (!bestLatency || latency < bestLatency.value)) {
+              bestLatency = { label: modelLabel(model), value: latency };
+            }
+            if (efficiency > 0 && (!bestEfficiency || efficiency > bestEfficiency.value)) {
+              bestEfficiency = { label: modelLabel(model), value: efficiency };
+            }
+            if (accuracy > 0 && (!bestAccuracy || accuracy > bestAccuracy.value)) {
+              bestAccuracy = { label: modelLabel(model), value: accuracy };
+            }
+            if (paretoFront) {
+              pareto.push({ label: modelLabel(model), value: efficiency || 0 });
+            }
+          });
+
+          if (pareto.length) {
+            pareto.sort(function(a, b) { return b.value - a.value; });
+            bestTradeoff = pareto[0];
+          } else {
+            bestTradeoff = bestEfficiency;
+          }
+
+          var row = $('<div class="row g-3 mb-3"></div>');
+          var header = $('<div class="col-12"><h6 class="text-uppercase text-muted mb-0">GPU: ' + gpu + '</h6></div>');
+          row.append(header);
+          row.append(buildSummaryCard('fa-duotone fa-regular fa-rabbit-running fa-fw', 'Fastest Model', bestThroughput));
+          row.append(buildSummaryCard('fa-duotone fa-regular fa-gauge-low', 'Best Latency', bestLatency));
+          row.append(buildSummaryCard('fa-duotone fa-regular fa-gauge-high', 'Most Efficient', bestEfficiency));
+          row.append(buildSummaryCard('fa-duotone fa-regular fa-bullseye-arrow', 'Most Accurate', bestAccuracy));
+          row.append(buildSummaryCard('fa-duotone fa-regular fa-code-compare', 'Best Trade-off', bestTradeoff));
+          $container.append(row);
+        });
+      }
+
+      function buildSummaryCard(iconClass, label, entry) {
+        var col = $('<div class="col-sm-6 col-lg-2"></div>');
+        var card = $('<div class="card shadow-sm h-100"></div>');
+        var body = $('<div class="card-body"></div>');
+        body.append('<p style="font-size: 1.5em;" class="text-muted mb-1"><i class="' + iconClass + '"></i> ' + label + '</p>');
+        body.append('<h5 class="card-title">' + (entry ? entry.label : '-') + '</h5>');
+        card.append(body);
+        col.append(card);
+        return col;
       }
 
       function populateTable(models) {

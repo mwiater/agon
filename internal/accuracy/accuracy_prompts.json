@@ -1,0 +1,205 @@
+{
+  "system_prompt": "You are a strict numeric answer engine. Output ONLY one line containing a single integer. No spaces, no leading or trailing text, no punctuation, no commas, no units, no explanation, no extra lines, no markdown, and no code fences. If the answer is negative, use a leading minus sign. If unsure, still output one best-guess integer only.",
+  "tests": [
+    {
+      "id": 1,
+      "prompt": "What is the atomic number of Helium? Respond with a single integer only.",
+      "expected_answer": 2,
+      "category": "Basic Retrieval",
+      "difficulty": 2,
+      "marginOfError": 0
+    },
+    {
+      "id": 2,
+      "prompt": "How many legs does a spider have? Respond with a single integer only.",
+      "expected_answer": 8,
+      "category": "Biology Retrieval",
+      "difficulty": 2,
+      "marginOfError": 0
+    },
+    {
+      "id": 3,
+      "prompt": "What is the result of 144 divided by 4? Respond with a single integer only.",
+      "expected_answer": 36,
+      "category": "Simple Arithmetic",
+      "difficulty": 4,
+      "marginOfError": 0
+    },
+    {
+      "id": 4,
+      "prompt": "In the sequence 5, 10, 20, 40, what is the next number? Respond with a single integer only.",
+      "expected_answer": 80,
+      "category": "Pattern Recognition",
+      "difficulty": 5,
+      "marginOfError": 0
+    },
+    {
+      "id": 5,
+      "prompt": "What is the sum of the angles in a triangle (in degrees)? Respond with a single integer only.",
+      "expected_answer": 180,
+      "category": "Geometry Retrieval",
+      "difficulty": 3,
+      "marginOfError": 0
+    },
+    {
+      "id": 6,
+      "prompt": "If x = 5 and y = x + 10, what is y? Respond with a single integer only.",
+      "expected_answer": 15,
+      "category": "Variable Logic",
+      "difficulty": 4,
+      "marginOfError": 0
+    },
+    {
+      "id": 7,
+      "prompt": "A clock shows 6:00. How many degrees are between the hour and minute hand? Respond with a single integer only.",
+      "expected_answer": 180,
+      "category": "Spatial Logic",
+      "difficulty": 7,
+      "marginOfError": 0
+    },
+    {
+      "id": 8,
+      "prompt": "How many faces does a standard cube have? Respond with a single integer only.",
+      "expected_answer": 6,
+      "category": "Spatial Retrieval",
+      "difficulty": 3,
+      "marginOfError": 0
+    },
+    {
+      "id": 9,
+      "prompt": "You have 3 apples. You give 2 to a friend. How many apples do you have left? Respond with a single integer only.",
+      "expected_answer": 1,
+      "category": "Linguistic Trap",
+      "difficulty": 8,
+      "marginOfError": 0
+    },
+    {
+      "id": 10,
+      "prompt": "What is 10% of 2000? Respond with a single integer only.",
+      "expected_answer": 200,
+      "category": "Percentage",
+      "difficulty": 4,
+      "marginOfError": 0
+    },
+    {
+      "id": 11,
+      "prompt": "How many centimeters are in 2 meters? Respond with a single integer only.",
+      "expected_answer": 200,
+      "category": "Unit Conversion",
+      "difficulty": 4,
+      "marginOfError": 0
+    },
+    {
+      "id": 12,
+      "prompt": "A baker has 12 cookies. He sells 8. How many cookies does he have left? Respond with a single integer only.",
+      "expected_answer": 4,
+      "category": "Semantic Parsing",
+      "difficulty": 7,
+      "marginOfError": 0
+    },
+    {
+      "id": 13,
+      "prompt": "What is the square of 13? Respond with a single integer only.",
+      "expected_answer": 169,
+      "category": "Math Retrieval",
+      "difficulty": 5,
+      "marginOfError": 0
+    },
+    {
+      "id": 14,
+      "prompt": "If a rectangle is 5cm wide and 10cm long, what is its area in cm? Respond with a single integer only.",
+      "expected_answer": 50,
+      "category": "Geometry Calculation",
+      "difficulty": 4,
+      "marginOfError": 0
+    },
+    {
+      "id": 15,
+      "prompt": "How many days are in the month of September? Respond with a single integer only.",
+      "expected_answer": 30,
+      "category": "Temporal Retrieval",
+      "difficulty": 3,
+      "marginOfError": 0
+    },
+    {
+      "id": 16,
+      "prompt": "Earth's mean radius is about 6,371 km. What is the integer value? Respond with a single integer only.",
+      "expected_answer": 6371,
+      "category": "Planetary Science",
+      "difficulty": 6,
+      "marginOfError": 100
+    },
+    {
+      "id": 17,
+      "prompt": "How many bones are in the adult human body? Respond with a single integer only.",
+      "expected_answer": 206,
+      "category": "Anatomy",
+      "difficulty": 4,
+      "marginOfError": 0
+    },
+    {
+      "id": 18,
+      "prompt": "What is the speed of light in a vacuum in meters per second? Respond with a single integer only.",
+      "expected_answer": 299792458,
+      "category": "Physical Constants",
+      "difficulty": 8,
+      "marginOfError": 500
+    },
+    {
+      "id": 19,
+      "prompt": "How many bits are in 4 bytes? Respond with a single integer only.",
+      "expected_answer": 32,
+      "category": "Computing",
+      "difficulty": 3,
+      "marginOfError": 0
+    },
+    {
+      "id": 20,
+      "prompt": "How many states are in the United States of America? Respond with a single integer only.",
+      "expected_answer": 50,
+      "category": "Geography",
+      "difficulty": 1,
+      "marginOfError": 0
+    },
+    {
+      "id": 21,
+      "prompt": "Which of these integers is the greatest: 45, 102, or 88? Output only the final number. Respond with a single integer only.",
+      "expected_answer": 102,
+      "category": "Comparative Magnitude",
+      "difficulty": 5,
+      "marginOfError": 0
+    },
+    {
+      "id": 22,
+      "prompt": "In formal logic, if we assume that all healthy plants are green, is a plant that is not green necessarily unhealthy? Please think through this conditional statement and answer with 1 for 'Yes' or 0 for 'No'. Provide only the integer as your output. Respond with a single integer only.",
+      "expected_answer": 1,
+      "category": "Negation Logic",
+      "difficulty": 7,
+      "marginOfError": 0
+    },
+    {
+      "id": 23,
+      "prompt": "A tank has 50 liters. It loses 4 liters per hour for 5 hours. How many liters remain? Respond with a single integer only.",
+      "expected_answer": 30,
+      "category": "State Tracking",
+      "difficulty": 6,
+      "marginOfError": 0
+    },
+    {
+      "id": 24,
+      "prompt": "In the word GOLANG, what is the 3rd letter's alphabet position? Multiply by 2. Respond with a single integer only.",
+      "expected_answer": 24,
+      "category": "Token-Level Math",
+      "difficulty": 8,
+      "marginOfError": 0
+    },
+    {
+      "id": 25,
+      "prompt": "In mathematics, we often categorize integers based on shared properties like being a perfect square. Consider the following sequence: four, nine, sixteen, twenty-five, and thirty. Most of these values are perfect squares, which means they are the result of an integer being multiplied by itself. However, there is one number that is the 'odd one out' because it fails this specific condition. Examine the numbers provided, identify the one that is not a perfect square, and then output that number as your final result. Provide only the integer. Respond with a single integer only.",
+      "expected_answer": 30,
+      "category": "Categorical Exclusion",
+      "difficulty": 7,
+      "marginOfError": 0
+    }
+  ]
+}
