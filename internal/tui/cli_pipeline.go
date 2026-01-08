@@ -1,7 +1,7 @@
-// cli/cli_pipeline.go
+// internal/tui/cli_pipeline.go
 // Package cli contains the interactive terminal interfaces for Agon, including
 // the pipeline mode UI defined in this file.
-package cli
+package tui
 
 import (
 	"context"

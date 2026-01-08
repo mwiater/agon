@@ -1,5 +1,5 @@
-// cli/cli_jsonmode_integration_test.go
-package cli
+// internal/tui/cli_jsonmode_integration_test.go
+package tui
 
 import (
 	"context"

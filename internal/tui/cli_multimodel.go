@@ -1,5 +1,5 @@
-// cli/cli_multimodel.go
-package cli
+// internal/tui/cli_multimodel.go
+package tui
 
 import (
 	"context"

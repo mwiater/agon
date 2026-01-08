@@ -1,5 +1,5 @@
-// cli/mcp_status.go
-package cli
+// internal/tui/mcp_status.go
+package tui
 
 import (
 	"github.com/charmbracelet/lipgloss"

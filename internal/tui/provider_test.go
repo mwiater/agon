@@ -1,5 +1,5 @@
-// cli/provider_test.go
-package cli
+// internal/tui/provider_test.go
+package tui
 
 import (
 	"context"

@@ -1,5 +1,5 @@
-// cli/cli_test.go
-package cli
+// internal/tui/cli_test.go
+package tui
 
 import (
 	"context"
