@@ -215,7 +215,8 @@ func ListModels(config *appconfig.Config) {
 	for _, node := range sortedNodes {
 		fmt.Println(nodeStyle.Render(fmt.Sprintf("%s:", node)))
 		for _, model := range nodeModels[node] {
-			cleanedModelString := strings.TrimSpace(strings.ReplaceAll(model, "-", ""))
+			cleanedModelString := strings.TrimSpace(model)
+			cleanedModelString = strings.TrimPrefix(cleanedModelString, "- ")
 			fmt.Println("  >>> " + cleanedModelString)
 		}
 		fmt.Println()

@@ -695,24 +695,9 @@ golangci-lint run ./internal/...
 
 ## Testing
 
-Run the full test suite:
-
 ```bash
+go clean -testcache
 go test ./...
-```
-
-### llama.cpp Integration Check
-
-To validate a real llama.cpp endpoint, run:
-
-```bash
-go run scripts/llamacpp_integration_check.go -config config/config.example.LlamaCpp.json
-```
-
-Optional overrides:
-
-```bash
-go run scripts/llamacpp_integration_check.go -url http://localhost:8080 -model your-model.gguf
 ```
 
 To generate a coverage report:
