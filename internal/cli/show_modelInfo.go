@@ -1,4 +1,4 @@
-// internal/cli/show_modelInfo.go
+// internal/cli/show_modelinfo.go
 
 package agon
 

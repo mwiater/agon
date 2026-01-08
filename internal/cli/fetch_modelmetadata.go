@@ -2,9 +2,6 @@
 package agon
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/mwiater/agon/internal/models"
 	"github.com/spf13/cobra"
 )
@@ -16,15 +13,7 @@ var fetchModelMetadataCmd = &cobra.Command{
 	Short: "Fetch model metadata from configured hosts",
 	Long:  "The 'modelmetadata' subcommand fetches model IDs from configured host URLs and prints the normalized metadata.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(fetchModelMetadataURLs) == 0 {
-			return fmt.Errorf("missing required --endpoints flag")
-		}
-		if strings.Contains(fetchModelMetadataGPU, " ") || strings.Contains(fetchModelMetadataGPU, "_") {
-			return fmt.Errorf("--gpu value must not contain spaces or underscores")
-		}
-		modelNames := models.FetchEndpointModelNames(fetchModelMetadataURLs)
-		models.FetchModelMetadata(modelNames, fetchModelMetadataGPU)
-		return nil
+		return models.FetchModelMetadataFromEndpoints(fetchModelMetadataURLs, fetchModelMetadataGPU)
 	},
 }
 
