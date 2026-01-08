@@ -130,6 +130,18 @@ func TestIsAlreadyLoadedResponse(t *testing.T) {
 }
 
 func TestMetadataExists(t *testing.T) {
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmpDir := t.TempDir()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("chdir temp: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
 	model := ModelMeta{Type: "llama.cpp", Name: "unit-test-model"}
 	path := modelMetadataPath(model)
 	dir := filepath.Dir(path)

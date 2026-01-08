@@ -45,7 +45,7 @@ func AnalyzeMetrics(opts AnalyzeOptions, out io.Writer) error {
 	}
 
 	if opts.HTMLPath == "" {
-		opts.HTMLPath = "reports/metrics-report.html"
+		opts.HTMLPath = "agonData/reports/metrics-report.html"
 	}
 
 	if err := os.WriteFile(opts.HTMLPath, []byte(html), 0o644); err != nil {

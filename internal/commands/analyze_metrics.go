@@ -22,10 +22,10 @@ dashboard for review.`,
 }
 
 func init() {
-	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.InputPath, "input", "reports/data/model_performance_metrics.json", "Path to benchmark JSON (required)")
+	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.InputPath, "input", "internal/reports/data/model_performance_metrics.json", "Path to benchmark JSON (required)")
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.BenchmarksDir, "benchmarks-dir", "agonData/modelBenchmarks", "Path to a directory of benchmark JSON files")
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.MetadataDir, "metadata-dir", "agonData/modelMetadata", "Path to a directory of model metadata JSON files")
-	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.HTMLPath, "html-output", "reports/metrics-report.html", "Destination HTML report path")
+	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.HTMLPath, "html-output", "agonData/reports/metrics-report.html", "Destination HTML report path")
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.AnalysisPath, "analysis-output", "", "Optional path to write the analysis JSON")
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.AccuracyResultsDir, "accuracy-results", "agonData/modelAccuracy", "Optional path to accuracy JSONL results directory")
 	analyzeMetricsCmd.Flags().StringVar(&analyzeMetricsOpts.HostName, "host-name", "", "Optional cluster/host label to embed in the analysis")

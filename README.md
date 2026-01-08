@@ -245,9 +245,9 @@ Results are appended to `agonData/modelAccuracy/<model>.json` (one entry per pro
 
 ## Metrics
 
-If `metrics: true` in a config file you run, all response metrics are aggregated and saved in: `reports/data/model_performance_metrics.json`. This way, over time, as you use the tool, model metrics are caprtured under different sceanrios, hopefully giving some long-term insights on models over time. I have `metrics: true` in all of my configs in order to collect this data over time for a different perspective on model metrics.
+If `metrics: true` in a config file you run, all response metrics are aggregated and saved in: `internal/reports/data/model_performance_metrics.json`. This way, over time, as you use the tool, model metrics are caprtured under different sceanrios, hopefully giving some long-term insights on models over time. I have `metrics: true` in all of my configs in order to collect this data over time for a different perspective on model metrics.
 
-You can run: `agon analyze metrics` which will output a standalone html file (`reports/metrics-report.html`) containing model metric details, comparison leaderboard, and recommendations:
+You can run: `agon analyze metrics` which will output a standalone html file (`agonData/reports/metrics-report.html`) containing model metric details, comparison leaderboard, and recommendations:
 
 ![Multichat Mode](.screens/agon_benchmark_report.png)
 
