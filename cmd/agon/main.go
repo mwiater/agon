@@ -6,7 +6,7 @@ import (
 	"log"
 
 	"github.com/mwiater/agon/internal/appconfig"
-	cmd "github.com/mwiater/agon/internal/cli"
+	cmd "github.com/mwiater/agon/internal/commands"
 	"github.com/mwiater/agon/internal/logging"
 	"github.com/mwiater/agon/internal/metrics"
 )
