@@ -1,4 +1,4 @@
-// internal/commands/pull_models.go
+// internal/commands/models_pull.go
 package agon
 
 import (

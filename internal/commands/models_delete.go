@@ -1,4 +1,4 @@
-// internal/commands/delete_models.go
+// internal/commands/models_delete.go
 package agon
 
 import (

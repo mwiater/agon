@@ -1,4 +1,4 @@
-// internal/tui/cli_multimodel_test.go
+// internal/tui/tui_multimodel_test.go
 package tui
 
 import (

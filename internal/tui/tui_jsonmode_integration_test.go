@@ -1,4 +1,4 @@
-// internal/tui/cli_jsonmode_integration_test.go
+// internal/tui/tui_jsonmode_integration_test.go
 package tui
 
 import (

@@ -1,4 +1,4 @@
-// internal/commands/fetch_modelmetadata.go
+// internal/commands/models_metadata_fetch.go
 package agon
 
 import (

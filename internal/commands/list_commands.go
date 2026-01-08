@@ -4,7 +4,6 @@ package agon
 import (
 	"strings"
 
-	"github.com/mwiater/agon/internal/commandlist"
 	"github.com/spf13/cobra"
 )
 
@@ -16,14 +15,14 @@ var commandsCmd = &cobra.Command{
 	Long:  `The 'commands' subcommand lists all commands and subcommands in a hierarchical, indented format, with the command path in the first column and its short description in the second column.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		commandData := collectCommandData(rootCmd, "", "")
-		filtered := make([]commandlist.CommandInfo, 0, len(commandData))
+		filtered := make([]CommandInfo, 0, len(commandData))
 		for _, data := range commandData {
 			if strings.Contains(data.Path, "completion") {
 				continue
 			}
 			filtered = append(filtered, data)
 		}
-		commandlist.ListCommands(cmd.OutOrStdout(), filtered)
+		ListCommands(cmd.OutOrStdout(), filtered)
 	},
 }
 
@@ -33,15 +32,15 @@ func init() {
 
 // collectCommandData collects command metadata for display, walking the
 // command tree and returning a flattened slice of path/description pairs.
-func collectCommandData(cmd *cobra.Command, currentPath string, indent string) []commandlist.CommandInfo {
-	var allData []commandlist.CommandInfo
+func collectCommandData(cmd *cobra.Command, currentPath string, indent string) []CommandInfo {
+	var allData []CommandInfo
 
 	fullPath := currentPath + cmd.Name()
 	if currentPath != "" {
 		fullPath = currentPath + " " + cmd.Name()
 	}
 
-	data := commandlist.CommandInfo{
+	data := CommandInfo{
 		Path:        indent + fullPath,
 		Description: cmd.Short,
 	}

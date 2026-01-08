@@ -1,4 +1,4 @@
-// internal/commands/unload_models.go
+// internal/commands/models_unload.go
 package agon
 
 import (

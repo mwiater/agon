@@ -1,4 +1,4 @@
-// internal/commands/model_commands_integration_test.go
+// internal/commands/models_commands_integration_test.go
 package agon
 
 import (

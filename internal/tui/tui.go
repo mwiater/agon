@@ -1,4 +1,4 @@
-// internal/tui/cli.go
+// internal/tui/tui.go
 // Package cli provides the command-line interface for the Agon application.
 package tui
 

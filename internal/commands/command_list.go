@@ -1,4 +1,4 @@
-package commandlist
+package agon
 
 import (
 	"fmt"

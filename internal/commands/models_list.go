@@ -1,4 +1,4 @@
-// internal/commands/list_models.go
+// internal/commands/models_list.go
 package agon
 
 import (

@@ -1,4 +1,4 @@
-// internal/commands/sync_configs.go
+// internal/commands/models_sync_configs.go
 package agon
 
 import (

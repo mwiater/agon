@@ -1,4 +1,4 @@
-// internal/tui/cli_test.go
+// internal/tui/tui_test.go
 package tui
 
 import (
