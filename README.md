@@ -226,7 +226,7 @@ MCP mode is an advanced feature that enables language models to use external too
 
 Benchmark mode is a feature that allows you to run a common user prompt against models in parallel for n iteration. For this to run, your configuration file **must only have one model per host.** There is no UI with this mode, it is just meant to repeat the same requests against models several times in order to get a more complete average response time. If you have one model assigned to each host, it will run the benchmark requests against those models automatically. See the `config/config.example.BenchmarkMode.json` example.
 
-If you want a standalone benchmark server, use `servers/benchmark` (llama.cpp only). Configure `servers/benchmark/benchmark.yml` with a `models_path` pointing to your GGUF directory, then run the server and POST to `/benchmark` with the model filename (relative to `models_path`) or an absolute path.
+If you want a standalone benchmark server, use `servers/benchmark` (llama.cpp only). Configure `servers/benchmark/agon-benchmark.yml` with a `models_path` pointing to your GGUF directory, then run the server and POST to `/benchmark` with the model filename (relative to `models_path`) or an absolute path.
 
 Benchmark results are written to `agonData/modelBenchmarks/`.
 
@@ -245,7 +245,7 @@ Results are appended to `agonData/modelAccuracy/<model>.json` (one entry per pro
 
 ## Metrics
 
-If `metrics: true` in a config file you run, all response metrics are aggregated and saved in: `internal/reports/data/model_performance_metrics.json`. This way, over time, as you use the tool, model metrics are caprtured under different sceanrios, hopefully giving some long-term insights on models over time. I have `metrics: true` in all of my configs in order to collect this data over time for a different perspective on model metrics.
+If `metrics: true` in a config file you run, all response metrics are aggregated and saved in: `agonData/modelMetrics/model_performance_metrics.json`. This way, over time, as you use the tool, model metrics are caprtured under different sceanrios, hopefully giving some long-term insights on models over time. I have `metrics: true` in all of my configs in order to collect this data over time for a different perspective on model metrics.
 
 You can run: `agon analyze metrics` which will output a standalone html file (`agonData/reports/metrics-report.html`) containing model metric details, comparison leaderboard, and recommendations:
 

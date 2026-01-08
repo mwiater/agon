@@ -1,4 +1,4 @@
-// mcp/main.go
+// servers/mcp/main.go
 // Minimal MCP server over stdio (JSON-RPC 2.0 + Content-Length framing)
 // Tools: available_tools, current_time, current_weather
 package main
@@ -14,7 +14,7 @@ import (
 	"strings"
 
 	"github.com/mwiater/agon/internal/appconfig"
-	"github.com/mwiater/agon/mcp/tools"
+	"github.com/mwiater/agon/servers/mcp/tools"
 )
 
 var (

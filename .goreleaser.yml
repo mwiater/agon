@@ -26,8 +26,24 @@ builds:
   # Build 2: "agon-mcp"
   - id: "agon-mcp"
     # 'main' is used again for the second binary's entrypoint
-    main: ./mcp/main.go
+    main: ./servers/mcp/main.go
     binary: agon-mcp
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+    goarch:
+      - amd64
+    ldflags:
+      - -X main.version={{.Version}}
+      - -X main.commit={{.ShortCommit}}
+      - -X main.date={{.Date}}
+
+  # Build 3: "agon-benchmark"
+  - id: "agon-benchmark"
+    main: ./servers/benchmark/main.go
+    binary: agon-benchmark
     env:
       - CGO_ENABLED=0
     goos:

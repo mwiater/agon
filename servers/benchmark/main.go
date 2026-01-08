@@ -220,7 +220,7 @@ var (
 
 func loadConfig() (*Config, error) {
 	configOnce.Do(func() {
-		path := filepath.Join("servers", "benchmark", "benchmark.yml")
+		path := filepath.Join("servers", "benchmark", "agon-benchmark.yml")
 		data, err := os.ReadFile(path)
 		if err != nil {
 			configErr = err

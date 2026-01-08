@@ -37,7 +37,7 @@ func GetInstance() *Aggregator {
 func NewAggregator() *Aggregator {
 	agg := &Aggregator{
 		metrics:  make(map[string]*ModelMetrics),
-		filePath: "internal/reports/data/model_performance_metrics.json",
+		filePath: "agonData/modelMetrics/model_performance_metrics.json",
 		metricsEnabled: false, // Metrics are disabled by default
 	}
 
