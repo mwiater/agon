@@ -22,6 +22,12 @@ import (
 
 const userPrompt = "List 3 different fruits in alphabetical order? None of the three can be an apple."
 
+var (
+	newChatProvider = providerfactory.NewChatProvider
+	unloadModels    = models.UnloadModels
+	writeResultsFn  = writeResults
+)
+
 // BenchmarkModels runs benchmarks for models defined in the configuration.
 func BenchmarkModels(cfg *appconfig.Config) error {
 	if !cfg.BenchmarkMode {
@@ -38,7 +44,7 @@ func BenchmarkModels(cfg *appconfig.Config) error {
 		}
 	}
 
-	models.UnloadModels(cfg)
+	unloadModels(cfg)
 
 	var modelNames []string
 	for _, host := range cfg.Hosts {
@@ -60,7 +66,7 @@ func BenchmarkModels(cfg *appconfig.Config) error {
 		wg.Add(1)
 		go func(host appconfig.Host) {
 			defer wg.Done()
-			provider, err := providerfactory.NewChatProvider(cfg)
+			provider, err := newChatProvider(cfg)
 			if err != nil {
 				log.Printf("error creating provider for host %s: %v", host.Name, err)
 				return
@@ -145,7 +151,7 @@ func BenchmarkModels(cfg *appconfig.Config) error {
 		calculateAggregates(result)
 	}
 
-	return writeResults(results, cfg.BenchmarkCount)
+	return writeResultsFn(results, cfg.BenchmarkCount)
 }
 
 // calculateAggregates calculates the average, min, and max statistics for a benchmark result.
