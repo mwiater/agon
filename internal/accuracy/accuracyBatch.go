@@ -106,7 +106,7 @@ func RunAccuracyBatch(parameterTemplate string) error {
 	timeoutSeconds := int(appconfig.Config{}.RequestTimeout().Seconds())
 	templateName := strings.TrimSpace(parameterTemplate)
 	if templateName == "" {
-		templateName = string(appconfig.ProfileGenericChat)
+		templateName = string(appconfig.ProfileAccuracy)
 	}
 
 	var wg sync.WaitGroup
@@ -221,6 +221,7 @@ func runAccuracyForModel(provider providers.ChatProvider, host appconfig.Host, m
 			Prompt:             t.Prompt,
 			ExpectedAnswer:     t.ExpectedAnswer,
 			Response:           response,
+			EvaluatedResponse:  normalizeResponse(response),
 			LogProbs:           meta.LogProbs,
 			Correct:            correct,
 			MarginOfError:      t.MarginOfError,

@@ -17,7 +17,7 @@ var runAccuracyCmd = &cobra.Command{
 
 func init() {
 	runCmd.AddCommand(runAccuracyCmd)
-	runAccuracyCmd.Flags().StringVar(&runAccuracyOpts.ParameterTemplate, "parameterTemplate", "generic", "Parameter template to apply (generic|fact_checker|creative)")
+	runAccuracyCmd.Flags().StringVar(&runAccuracyOpts.ParameterTemplate, "parameterTemplate", "accuracy", "Parameter template to apply (accuracy|generic|fact_checker|creative)")
 }
 
 var runAccuracyOpts struct {

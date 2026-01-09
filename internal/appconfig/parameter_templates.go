@@ -13,6 +13,7 @@ const (
 	ProfileGenericChat ProfileName = "generic"
 	ProfileFactChecker ProfileName = "fact_checker"
 	ProfileCreative    ProfileName = "creative"
+	ProfileAccuracy    ProfileName = "accuracy"
 )
 
 // ParamsForProfile selects a parameter profile by name.
@@ -23,6 +24,8 @@ func ParamsForProfile(name string) LlamaParams {
 	n := normalizeProfileName(name)
 
 	switch ProfileName(n) {
+	case ProfileAccuracy:
+		return DefaultAccuracyParams()
 	case ProfileFactChecker:
 		return DefaultFactCheckerParams()
 	case ProfileCreative:
@@ -37,20 +40,38 @@ func ParamsForProfile(name string) LlamaParams {
 // DefaultGenericChatParams is the default profile when none is set in YAML.
 func DefaultGenericChatParams() LlamaParams {
 	return LlamaParams{
-		Temperature: ptrFloat(0.7),
-		TopP:        ptrFloat(0.9),
-		TopK:        ptrInt(40),
-		MinP:        ptrFloat(0.05),
-		TypicalP:    ptrFloat(0.95),
+		Temperature: ptrFloat(0.8),  // Slightly higher for better flow
+		TopP:        ptrFloat(1.0),  // Disable TopP to let MinP do the work
+		TopK:        ptrInt(0),      // Disable TopK
+		MinP:        ptrFloat(0.08), // Dynamic cutoff: very effective for 8B models
+		TypicalP:    ptrFloat(1.0),
 
-		RepeatLastN:      ptrInt(256),
-		RepeatPenalty:    ptrFloat(1.12),
-		PresencePenalty:  ptrFloat(0.3),
-		FrequencyPenalty: ptrFloat(0.15),
+		RepeatLastN:      ptrInt(64),
+		RepeatPenalty:    ptrFloat(1.1), // Lowered: high penalties cause "thesaurus syndrome"
+		PresencePenalty:  ptrFloat(0.0), // Keep neutral for standard chat
+		FrequencyPenalty: ptrFloat(0.0),
 
 		Seed:     ptrInt64(-1),
+		NPredict: ptrInt(1024),
+		//Stream:   ptrBool(false),
+	}
+}
+
+// DefaultAccuracyParams is tuned for absolute precision, zero-shot logic,
+// and strict adherence to formatting constraints.
+func DefaultAccuracyParams() LlamaParams {
+	return LlamaParams{
+		Temperature: ptrFloat(0.1),
+		TopP:        ptrFloat(0.95), // Slightly wider for R1 stability
+		MinP:        ptrFloat(0.1),
+
+		// 512 is safe. Standard models will only use ~5 tokens.
+		// R1 models will use ~200 for thinking and then stop.
 		NPredict: ptrInt(512),
-		//Stream:   ptrBool(true),
+
+		RepeatPenalty: ptrFloat(1.0),
+		Seed:          ptrInt64(42),
+		//Stream:   ptrBool(false),
 	}
 }
 
@@ -79,20 +100,20 @@ func DefaultFactCheckerParams() LlamaParams {
 // stylistic variance (at the cost of determinism).
 func DefaultCreativeParams() LlamaParams {
 	return LlamaParams{
-		Temperature: ptrFloat(0.95),
-		TopP:        ptrFloat(0.95),
-		TopK:        ptrInt(100),
-		MinP:        ptrFloat(0.03),
-		TypicalP:    ptrFloat(0.98),
+		Temperature: ptrFloat(1.5), // High heat for "sparkle"...
+		TopP:        ptrFloat(1.0),
+		TopK:        ptrInt(0),
+		MinP:        ptrFloat(0.15), // ...but a strict filter to prune "garbage" tokens
+		TypicalP:    ptrFloat(0.9),  // Keeps the output feeling "natural"
 
-		RepeatLastN:      ptrInt(512),
+		RepeatLastN:      ptrInt(256),
 		RepeatPenalty:    ptrFloat(1.05),
-		PresencePenalty:  ptrFloat(0.6),
-		FrequencyPenalty: ptrFloat(0.3),
+		PresencePenalty:  ptrFloat(0.5), // Encourages introducing new topics/words
+		FrequencyPenalty: ptrFloat(0.2), // Discourages repeating the same phrases
 
 		Seed:     ptrInt64(-1),
-		NPredict: ptrInt(1024),
-		//Stream:   ptrBool(true),
+		NPredict: ptrInt(2048),
+		//Stream:   ptrBool(false),
 	}
 }
 
@@ -261,6 +282,8 @@ func normalizeProfileName(s string) string {
 	switch s {
 	case "", "default", "chat", "generic_chat", "generic-chat":
 		return string(ProfileGenericChat)
+	case "accuracy", "acc":
+		return string(ProfileAccuracy)
 	case "fact", "factchecker", "fact-checker", "fact_check", "fact-check":
 		return string(ProfileFactChecker)
 	case "creative_writing", "creative-writing", "writer":

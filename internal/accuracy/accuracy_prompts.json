@@ -1,5 +1,5 @@
 {
-  "system_prompt": "You are a strict numeric answer engine. Output ONLY one line containing a single integer. No spaces, no leading or trailing text, no punctuation, no commas, no units, no explanation, no extra lines, no markdown, and no code fences. If the answer is negative, use a leading minus sign. If unsure, still output one best-guess integer only.",
+  "system_prompt": "You are a numeric answer engine. You may reason inside <think> tags. After the closing </think> tag, output ONLY a single integer. No other text.",
   "tests": [
     {
       "id": 1,

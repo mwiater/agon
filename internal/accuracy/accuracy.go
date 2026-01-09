@@ -154,6 +154,7 @@ func RunAccuracy(cfg *appconfig.Config) error {
 					Prompt:             t.Prompt,
 					ExpectedAnswer:     t.ExpectedAnswer,
 					Response:           response,
+					EvaluatedResponse:  normalizeResponse(response),
 					LogProbs:           meta.LogProbs,
 					Correct:            correct,
 					MarginOfError:      t.MarginOfError,
@@ -225,6 +226,7 @@ func runRagCompare(cfg *appconfig.Config, provider providers.ChatProvider, host 
 		Prompt:             test.Prompt,
 		ExpectedAnswer:     test.ExpectedAnswer,
 		Response:           response,
+		EvaluatedResponse:  normalizeResponse(response),
 		LogProbs:           meta.LogProbs,
 		Correct:            correct,
 		MarginOfError:      test.MarginOfError,
@@ -303,6 +305,7 @@ func runRagCompare(cfg *appconfig.Config, provider providers.ChatProvider, host 
 		Prompt:             test.Prompt,
 		ExpectedAnswer:     test.ExpectedAnswer,
 		Response:           response,
+		EvaluatedResponse:  normalizeResponse(response),
 		LogProbs:           meta.LogProbs,
 		Correct:            correct,
 		MarginOfError:      test.MarginOfError,
@@ -456,7 +459,7 @@ func applyTimingMetrics(result *AccuracyResult, meta providers.StreamMetadata) {
 }
 
 func matchesExpected(response string, expected, marginOfError int) bool {
-	trimmed := strings.TrimSpace(stripThinkBlocks(response))
+	trimmed := normalizeResponse(response)
 	if trimmed == "" {
 		return false
 	}
@@ -488,26 +491,22 @@ func withinTolerance(actual, expected, tolerance int) bool {
 	return diff <= tolerance
 }
 
-func stripThinkBlocks(response string) string {
+func normalizeResponse(response string) string {
 	trimmed := strings.TrimSpace(response)
 	if trimmed == "" {
 		return trimmed
 	}
-	const startTag = "<think>"
 	const endTag = "</think>"
-	for {
-		start := strings.Index(trimmed, startTag)
-		if start == -1 {
-			break
-		}
-		end := strings.Index(trimmed[start+len(startTag):], endTag)
-		if end == -1 {
-			break
-		}
-		end += start + len(startTag) + len(endTag)
-		trimmed = strings.TrimSpace(trimmed[:start] + trimmed[end:])
+	if end := strings.LastIndex(trimmed, endTag); end != -1 {
+		trimmed = trimmed[end+len(endTag):]
 	}
-	return trimmed
+	trimmed = strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\r' {
+			return -1
+		}
+		return r
+	}, trimmed)
+	return strings.TrimSpace(trimmed)
 }
 
 func isDeadlineExceeded(err error) bool {

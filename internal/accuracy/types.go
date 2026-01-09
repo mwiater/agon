@@ -28,6 +28,7 @@ type AccuracyResult struct {
 	Prompt              string          `json:"prompt"`
 	ExpectedAnswer      int             `json:"expectedAnswer"`
 	Response            string          `json:"response"`
+	EvaluatedResponse   string          `json:"evaluatedResponse,omitempty"`
 	LogProbs            json.RawMessage `json:"logprobs,omitempty"`
 	Correct             bool            `json:"correct"`
 	MarginOfError       int             `json:"marginOfError"`
