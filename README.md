@@ -240,7 +240,7 @@ Benchmark mode uses the following definitions:
 
 If `metrics: true` in a config file you run, all response metrics are aggregated and saved in: `agonData/modelMetrics/model_performance_metrics.json`. This way, over time, as you use the tool, model metrics are caprtured under different sceanrios, hopefully giving some long-term insights on models over time. I have `metrics: true` in all of my configs in order to collect this data over time for a different perspective on model metrics.
 
-You can run: `agon analyze metrics` which will output a standalone html file (`agonData/reports/metrics-report.html`) containing model metric details, comparison leaderboard, and recommendations:
+You can run: `agon analyze metrics` which will output a standalone html file (`agonData/reports/metrics-report.<parameterTemplate>_profile.html`) containing model metric details, comparison leaderboard, and recommendations. The `<parameterTemplate>` value comes from the accuracy JSONL data generated during `agon run accuracy`:
 
 ![Multichat Mode](.screens/agon_benchmark_report.png)
 
@@ -338,7 +338,7 @@ agon show modelInfo --config config/config.example.LlamaCpp.json
 
 ### `agon analyze`
 
-*   **`agon analyze metrics`**: Generates metric analysis and an HTML report from benchmark outputs.
+*   **`agon analyze metrics`**: Generates metric analysis and an HTML report from benchmark outputs (includes the parameter template name from accuracy results in the report filename).
 
 **Example**
 ```bash

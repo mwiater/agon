@@ -158,15 +158,15 @@ func runEndpointQueue(endpoint string, models []modelEndpointPair, suite PromptS
 		if err := provider.EnsureModelReady(context.Background(), host, model.Name); err != nil {
 			return fmt.Errorf("error ensuring model %s is ready on host %s: %w", model.Name, endpoint, err)
 		}
-		if err := runAccuracyForModel(provider, host, model, suite, timeoutSeconds); err != nil {
-			return err
-		}
+			if err := runAccuracyForModel(provider, host, model, suite, timeoutSeconds, parameterTemplate); err != nil {
+				return err
+			}
 	}
 
 	return nil
 }
 
-func runAccuracyForModel(provider providers.ChatProvider, host appconfig.Host, model modelEndpointPair, suite PromptSuite, timeoutSeconds int) error {
+func runAccuracyForModel(provider providers.ChatProvider, host appconfig.Host, model modelEndpointPair, suite PromptSuite, timeoutSeconds int, parameterTemplate string) error {
 	totalPrompts := len(suite.Tests)
 	for i, t := range suite.Tests {
 		iteration := i + 1
@@ -197,6 +197,7 @@ func runAccuracyForModel(provider providers.ChatProvider, host appconfig.Host, m
 					TotalDurationMs:    totalDurationMs,
 					DeadlineExceeded:   true,
 					DeadlineTimeoutSec: timeoutSeconds,
+					ParameterTemplate:  parameterTemplate,
 				}
 				applyTimingMetrics(&result, meta)
 
@@ -210,7 +211,8 @@ func runAccuracyForModel(provider providers.ChatProvider, host appconfig.Host, m
 		}
 
 		correct := matchesExpected(response, t.ExpectedAnswer, t.MarginOfError)
-		fmt.Printf("[%d/%d] %s / %s - Result: correct=%t response=%q expected=%d\n", iteration, totalPrompts, host.Name, model.Name, correct, response, t.ExpectedAnswer)
+		evaluated := normalizeResponse(response)
+		fmt.Printf("[%d/%d] %s / %s - Result: correct=%t response=%q evaluated=%q expected=%d\n", iteration, totalPrompts, host.Name, model.Name, correct, response, evaluated, t.ExpectedAnswer)
 
 		ttftMs, tokensPerSecond, inputTokens, outputTokens, totalDurationMs := accuracyMetrics(meta)
 		result := AccuracyResult{
@@ -221,7 +223,7 @@ func runAccuracyForModel(provider providers.ChatProvider, host appconfig.Host, m
 			Prompt:             t.Prompt,
 			ExpectedAnswer:     t.ExpectedAnswer,
 			Response:           response,
-			EvaluatedResponse:  normalizeResponse(response),
+			EvaluatedResponse:  evaluated,
 			LogProbs:           meta.LogProbs,
 			Correct:            correct,
 			MarginOfError:      t.MarginOfError,
@@ -233,6 +235,7 @@ func runAccuracyForModel(provider providers.ChatProvider, host appconfig.Host, m
 			TotalDurationMs:    totalDurationMs,
 			DeadlineExceeded:   false,
 			DeadlineTimeoutSec: timeoutSeconds,
+			ParameterTemplate:  parameterTemplate,
 		}
 		applyTimingMetrics(&result, meta)
 

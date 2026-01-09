@@ -93,7 +93,7 @@ After=network-online.target
 
 [Service]
 ExecStart={llama-server-path} --host 0.0.0.0 --port 9991 --models-dir {models-dir} --models-max 1
---no-models-autoload --metrics
+--no-models-autoload --metrics --no-webui
 User={user}
 Group={group}
 Restart=always
@@ -158,7 +158,7 @@ WantedBy=multi-user.target
       - Startup directory:
         `C:\Users\<you>\llama.cpp`
       - Arguments:
-        `--host 0.0.0.0 --port 9991 --models-dir C:\Users\<you>\models\llama --models-max 1 --no-models-autoload --metrics`
+        `--host 0.0.0.0 --port 9991 --models-dir C:\Users\<you>\models\llama --models-max 1 --no-models-autoload --metrics --no-webui`
    5. Click "Install service".
    6. Start the service:
       `Start-Service llamacpp`

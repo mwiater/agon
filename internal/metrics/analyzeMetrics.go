@@ -44,6 +44,7 @@ type AccuracyRecord struct {
 	PredictedPerSecond  float64         `json:"predicted_per_second,omitempty"`
 	DeadlineExceeded    bool            `json:"deadlineExceeded"`
 	DeadlineTimeout     int64           `json:"deadlineTimeout"`
+	ParameterTemplate   string          `json:"parameterTemplate,omitempty"`
 }
 
 // LogProbs captures token-level likelihood details from accuracy records.

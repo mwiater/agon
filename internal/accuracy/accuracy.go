@@ -130,6 +130,7 @@ func RunAccuracy(cfg *appconfig.Config) error {
 							TotalDurationMs:    totalDurationMs,
 							DeadlineExceeded:   true,
 							DeadlineTimeoutSec: timeoutSeconds,
+							ParameterTemplate:  r.host.ParameterTemplate,
 						}
 						applyTimingMetrics(&result, meta)
 
@@ -166,6 +167,7 @@ func RunAccuracy(cfg *appconfig.Config) error {
 					TotalDurationMs:    totalDurationMs,
 					DeadlineExceeded:   false,
 					DeadlineTimeoutSec: timeoutSeconds,
+					ParameterTemplate:  r.host.ParameterTemplate,
 				}
 				applyTimingMetrics(&result, meta)
 
@@ -206,6 +208,7 @@ func runRagCompare(cfg *appconfig.Config, provider providers.ChatProvider, host 
 				DeadlineExceeded:   true,
 				DeadlineTimeoutSec: timeoutSeconds,
 				RagMode:            "off",
+				ParameterTemplate:  host.ParameterTemplate,
 			}
 			applyTimingMetrics(&result, meta)
 			if err := appendResult(modelName, result); err != nil {
@@ -239,6 +242,7 @@ func runRagCompare(cfg *appconfig.Config, provider providers.ChatProvider, host 
 		DeadlineExceeded:   false,
 		DeadlineTimeoutSec: timeoutSeconds,
 		RagMode:            "off",
+		ParameterTemplate:  host.ParameterTemplate,
 	}
 	applyTimingMetrics(&result, meta)
 	if err := appendResult(modelName, result); err != nil {
@@ -285,6 +289,7 @@ func runRagCompare(cfg *appconfig.Config, provider providers.ChatProvider, host 
 				ContextTokens:      retrieval.ContextTokens,
 				TopK:               len(retrieval.Chunks),
 				SourceCoverage:     retrieval.SourceCoverage,
+				ParameterTemplate:  host.ParameterTemplate,
 			}
 			applyTimingMetrics(&result, meta)
 			if err := appendResult(modelName, result); err != nil {
@@ -323,6 +328,7 @@ func runRagCompare(cfg *appconfig.Config, provider providers.ChatProvider, host 
 		TopK:               len(retrieval.Chunks),
 		SourceCoverage:     retrieval.SourceCoverage,
 		CitationsUsed:      false,
+		ParameterTemplate:  host.ParameterTemplate,
 	}
 	applyTimingMetrics(&result, meta)
 	if err := appendResult(modelName, result); err != nil {

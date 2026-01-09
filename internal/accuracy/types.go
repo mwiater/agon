@@ -56,4 +56,5 @@ type AccuracyResult struct {
 	TopK                int             `json:"top_k,omitempty"`
 	SourceCoverage      int             `json:"source_coverage,omitempty"`
 	CitationsUsed       bool            `json:"citations_used,omitempty"`
+	ParameterTemplate   string          `json:"parameterTemplate,omitempty"`
 }

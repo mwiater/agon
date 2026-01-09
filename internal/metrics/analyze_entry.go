@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // AnalyzeOptions captures the inputs for generating the metrics analysis/report.
@@ -49,12 +50,51 @@ func AnalyzeMetrics(opts AnalyzeOptions, out io.Writer) error {
 		opts.HTMLPath = "agonData/reports/metrics-report.html"
 	}
 
+	opts.HTMLPath = appendTemplateSuffix(opts.HTMLPath, detectParameterTemplate(combined))
+
 	if err := os.WriteFile(opts.HTMLPath, []byte(html), 0o644); err != nil {
 		return fmt.Errorf("unable to write HTML report %s: %w", opts.HTMLPath, err)
 	}
 
 	fmt.Fprintf(out, "Report written to %s\n", opts.HTMLPath)
 	return nil
+}
+
+func appendTemplateSuffix(path, templateName string) string {
+	trimmed := strings.TrimSpace(templateName)
+	if trimmed == "" {
+		return path
+	}
+	suffix := "." + trimmed + "_profile.html"
+	if strings.HasSuffix(path, suffix) {
+		return path
+	}
+	ext := filepath.Ext(path)
+	base := strings.TrimSuffix(path, ext)
+	if base == "" {
+		base = path
+	}
+	return base + suffix
+}
+
+func detectParameterTemplate(combined CombinedMetrics) string {
+	seen := make(map[string]struct{})
+	for _, bundle := range combined.Models {
+		for _, record := range bundle.Accuracy {
+			trimmed := strings.TrimSpace(record.ParameterTemplate)
+			if trimmed == "" {
+				continue
+			}
+			seen[trimmed] = struct{}{}
+			if len(seen) > 1 {
+				return ""
+			}
+		}
+	}
+	for template := range seen {
+		return template
+	}
+	return ""
 }
 
 func writeAnalysisJSON(path string, analysis CombinedMetrics) error {
