@@ -216,7 +216,27 @@ func (p *Provider) handleNonStreaming(ctx context.Context, resp *http.Response, 
 
 	var parsed chatResponse
 	if err := json.Unmarshal(body, &parsed); err != nil {
-		return err
+		raw := strings.TrimSpace(string(body))
+		if strings.Contains(raw, "data:") {
+			streamResp := &http.Response{Body: io.NopCloser(bytes.NewReader(body))}
+			return p.handleStreaming(ctx, streamResp, req, callbacks)
+		}
+		if callbacks.OnChunk != nil && raw != "" {
+			if err := callbacks.OnChunk(providers.ChatMessage{Role: "assistant", Content: raw}); err != nil {
+				return err
+			}
+		}
+		if callbacks.OnComplete != nil {
+			meta := providers.StreamMetadata{
+				Model:     req.Model,
+				CreatedAt: time.Now(),
+				Done:      true,
+			}
+			if err := callbacks.OnComplete(meta); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 	if len(parsed.Choices) == 0 {
 		return fmt.Errorf("llama.cpp: chat response contained no choices")
@@ -570,7 +590,10 @@ func isAlreadyLoadedError(statusCode int, body []byte) bool {
 	return false
 }
 
-func applyParameters(payload map[string]any, params appconfig.Parameters) {
+func applyParameters(payload map[string]any, params appconfig.LlamaParams) {
+	if params.Temperature != nil {
+		payload["temperature"] = *params.Temperature
+	}
 	if params.TopK != nil {
 		payload["top_k"] = *params.TopK
 	}
@@ -580,17 +603,35 @@ func applyParameters(payload map[string]any, params appconfig.Parameters) {
 	if params.MinP != nil {
 		payload["min_p"] = *params.MinP
 	}
-	if params.TFSZ != nil {
-		payload["tfs_z"] = *params.TFSZ
-	}
 	if params.TypicalP != nil {
 		payload["typical_p"] = *params.TypicalP
 	}
+	if params.DynaTempRange != nil {
+		payload["dynatemp_range"] = *params.DynaTempRange
+	}
+	if params.DynaTempExponent != nil {
+		payload["dynatemp_exponent"] = *params.DynaTempExponent
+	}
+	if params.Mirostat != nil {
+		payload["mirostat"] = *params.Mirostat
+	}
+	if params.MirostatTau != nil {
+		payload["mirostat_tau"] = *params.MirostatTau
+	}
+	if params.MirostatEta != nil {
+		payload["mirostat_eta"] = *params.MirostatEta
+	}
+	if params.XTCProbability != nil {
+		payload["xtc_probability"] = *params.XTCProbability
+	}
+	if params.XTCThreshold != nil {
+		payload["xtc_threshold"] = *params.XTCThreshold
+	}
+	if params.Samplers != nil {
+		payload["samplers"] = *params.Samplers
+	}
 	if params.RepeatLastN != nil {
 		payload["repeat_last_n"] = *params.RepeatLastN
-	}
-	if params.Temperature != nil {
-		payload["temperature"] = *params.Temperature
 	}
 	if params.RepeatPenalty != nil {
 		payload["repeat_penalty"] = *params.RepeatPenalty
@@ -601,8 +642,89 @@ func applyParameters(payload map[string]any, params appconfig.Parameters) {
 	if params.FrequencyPenalty != nil {
 		payload["frequency_penalty"] = *params.FrequencyPenalty
 	}
-	if params.LogProbs != nil {
-		payload["logprobs"] = *params.LogProbs
+	if params.DryMultiplier != nil {
+		payload["dry_multiplier"] = *params.DryMultiplier
+	}
+	if params.DryBase != nil {
+		payload["dry_base"] = *params.DryBase
+	}
+	if params.DryAllowedLength != nil {
+		payload["dry_allowed_length"] = *params.DryAllowedLength
+	}
+	if params.DryPenaltyLastN != nil {
+		payload["dry_penalty_last_n"] = *params.DryPenaltyLastN
+	}
+	if params.DrySequenceBreakers != nil {
+		payload["dry_sequence_breakers"] = *params.DrySequenceBreakers
+	}
+	if params.NPredict != nil {
+		payload["n_predict"] = *params.NPredict
+	}
+	if params.Stop != nil {
+		payload["stop"] = *params.Stop
+	}
+	if params.IgnoreEOS != nil {
+		payload["ignore_eos"] = *params.IgnoreEOS
+	}
+	if params.TMaxPredictMS != nil {
+		payload["t_max_predict_ms"] = *params.TMaxPredictMS
+	}
+	if params.Seed != nil {
+		payload["seed"] = *params.Seed
+	}
+	if params.LogitBias != nil {
+		payload["logit_bias"] = params.LogitBias
+	}
+	if params.NProbs != nil {
+		payload["n_probs"] = *params.NProbs
+	}
+	if params.PostSamplingProbs != nil {
+		payload["post_sampling_probs"] = *params.PostSamplingProbs
+	}
+	if params.ReturnTokens != nil {
+		payload["return_tokens"] = *params.ReturnTokens
+	}
+	if params.MinKeep != nil {
+		payload["min_keep"] = *params.MinKeep
+	}
+	if params.NKeep != nil {
+		payload["n_keep"] = *params.NKeep
+	}
+	if params.CachePrompt != nil {
+		payload["cache_prompt"] = *params.CachePrompt
+	}
+	if params.NCacheReuse != nil {
+		payload["n_cache_reuse"] = *params.NCacheReuse
+	}
+	if params.Stream != nil {
+		payload["stream"] = *params.Stream
+	}
+	if params.TimingsPerToken != nil {
+		payload["timings_per_token"] = *params.TimingsPerToken
+	}
+	if params.ReturnProgress != nil {
+		payload["return_progress"] = *params.ReturnProgress
+	}
+	if params.ResponseFields != nil {
+		payload["response_fields"] = *params.ResponseFields
+	}
+	if params.NIndent != nil {
+		payload["n_indent"] = *params.NIndent
+	}
+	if params.IDSlot != nil {
+		payload["id_slot"] = *params.IDSlot
+	}
+	if params.Grammar != nil {
+		payload["grammar"] = *params.Grammar
+	}
+	if params.JSONSchema != nil {
+		payload["json_schema"] = params.JSONSchema
+	}
+	if params.NCmpl != nil {
+		payload["n_cmpl"] = *params.NCmpl
+	}
+	if params.Lora != nil {
+		payload["lora"] = *params.Lora
 	}
 }
 

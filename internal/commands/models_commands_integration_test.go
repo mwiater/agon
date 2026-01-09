@@ -127,7 +127,7 @@ func TestListModelsRouter(t *testing.T) {
 		})
 	})
 
-	if !strings.Contains(out, "modela") || !strings.Contains(out, "modelb") {
+	if !strings.Contains(out, "model-a") || !strings.Contains(out, "model-b") {
 		t.Fatalf("expected model names in output, got: %s", out)
 	}
 }

@@ -53,7 +53,7 @@ type StreamRequest struct {
 	Model            string
 	History          []ChatMessage
 	SystemPrompt     string
-	Parameters       appconfig.Parameters
+	Parameters       appconfig.LlamaParams
 	JSONMode         bool
 	Tools            []ToolDefinition
 	DisableStreaming bool

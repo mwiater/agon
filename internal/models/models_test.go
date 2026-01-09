@@ -38,7 +38,7 @@ func TestLlamaCppHost(t *testing.T) {
 		Name:           "Test Host",
 		URL:            server.URL,
 		Models:         []string{"model1", "model2"},
-		Parameters:     appconfig.Parameters{Temperature: &temp},
+		Parameters:     appconfig.LlamaParams{Temperature: &temp},
 		client:         server.Client(),
 		requestTimeout: time.Second,
 	}

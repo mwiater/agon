@@ -21,7 +21,7 @@ type LlamaCppHost struct {
 	Name           string
 	URL            string
 	Models         []string
-	Parameters     appconfig.Parameters
+	Parameters     appconfig.LlamaParams
 	client         *http.Client
 	requestTimeout time.Duration
 }
@@ -342,7 +342,7 @@ func hostIdentifier(host *LlamaCppHost) string {
 	return "llama.cpp-host"
 }
 
-func formatParameterText(params appconfig.Parameters) string {
+func formatParameterText(params appconfig.LlamaParams) string {
 	lines := []string{}
 
 	if params.Temperature != nil {
@@ -360,9 +360,6 @@ func formatParameterText(params appconfig.Parameters) string {
 	if params.RepeatPenalty != nil {
 		lines = append(lines, fmt.Sprintf("repeat_penalty=%v", *params.RepeatPenalty))
 	}
-	if params.TFSZ != nil {
-		lines = append(lines, fmt.Sprintf("tfs_z=%v", *params.TFSZ))
-	}
 	if params.TypicalP != nil {
 		lines = append(lines, fmt.Sprintf("typical_p=%v", *params.TypicalP))
 	}
@@ -375,8 +372,14 @@ func formatParameterText(params appconfig.Parameters) string {
 	if params.FrequencyPenalty != nil {
 		lines = append(lines, fmt.Sprintf("frequency_penalty=%v", *params.FrequencyPenalty))
 	}
-	if params.LogProbs != nil {
-		lines = append(lines, fmt.Sprintf("logprobs=%v", *params.LogProbs))
+	if params.NPredict != nil {
+		lines = append(lines, fmt.Sprintf("n_predict=%v", *params.NPredict))
+	}
+	if params.Seed != nil {
+		lines = append(lines, fmt.Sprintf("seed=%v", *params.Seed))
+	}
+	if params.NProbs != nil {
+		lines = append(lines, fmt.Sprintf("n_probs=%v", *params.NProbs))
 	}
 
 	return strings.Join(lines, "\n")

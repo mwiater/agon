@@ -11,10 +11,15 @@ var runAccuracyCmd = &cobra.Command{
 	Use:   "accuracy",
 	Short: "Run accuracy batch workflows",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return accuracy.RunAccuracyBatch()
+		return accuracy.RunAccuracyBatch(runAccuracyOpts.ParameterTemplate)
 	},
 }
 
 func init() {
 	runCmd.AddCommand(runAccuracyCmd)
+	runAccuracyCmd.Flags().StringVar(&runAccuracyOpts.ParameterTemplate, "parameterTemplate", "generic", "Parameter template to apply (generic|fact_checker|creative)")
+}
+
+var runAccuracyOpts struct {
+	ParameterTemplate string
 }

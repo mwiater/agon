@@ -14,7 +14,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode"
 
 	"github.com/mwiater/agon/internal/appconfig"
 	"github.com/mwiater/agon/internal/providerfactory"
@@ -143,6 +142,7 @@ func RunAccuracy(cfg *appconfig.Config) error {
 				}
 
 				correct := matchesExpected(response, t.ExpectedAnswer, t.MarginOfError)
+				fmt.Printf("Full response: %s\n", response)
 				fmt.Printf("[%d/%d] %s / %s - Result: correct=%t response=%q expected=%d\n", iteration, total, r.host.Name, r.model, correct, response, t.ExpectedAnswer)
 
 				ttftMs, tokensPerSecond, inputTokens, outputTokens, totalDurationMs := accuracyMetrics(meta)
@@ -213,6 +213,7 @@ func runRagCompare(cfg *appconfig.Config, provider providers.ChatProvider, host 
 		return err
 	}
 	correct := matchesExpected(response, test.ExpectedAnswer, test.MarginOfError)
+	fmt.Printf("Full response (RAG off): %s\n", response)
 	ttftMs, tokensPerSecond, inputTokens, outputTokens, totalDurationMs := accuracyMetrics(meta)
 	result := AccuracyResult{
 		Timestamp:          time.Now().Format(time.RFC3339),
@@ -288,6 +289,7 @@ func runRagCompare(cfg *appconfig.Config, provider providers.ChatProvider, host 
 		return err
 	}
 	correct = matchesExpected(response, test.ExpectedAnswer, test.MarginOfError)
+	fmt.Printf("Full response (RAG on): %s\n", response)
 	ttftMs, tokensPerSecond, inputTokens, outputTokens, totalDurationMs = accuracyMetrics(meta)
 	result = AccuracyResult{
 		Timestamp:          time.Now().Format(time.RFC3339),
@@ -418,11 +420,25 @@ func accuracyMetrics(meta providers.StreamMetadata) (int, float64, int, int, int
 }
 
 func matchesExpected(response string, expected, marginOfError int) bool {
-	value, ok := parseSingleInteger(response)
-	if !ok {
+	trimmed := strings.TrimSpace(stripThinkBlocks(response))
+	if trimmed == "" {
 		return false
 	}
-	return withinTolerance(value, expected, marginOfError)
+	tail := trimmed
+	if len(trimmed) > 25 {
+		tail = trimmed[len(trimmed)-25:]
+	}
+	matches := regexp.MustCompile(`-?\d+`).FindAllString(tail, -1)
+	for _, match := range matches {
+		value, err := strconv.Atoi(match)
+		if err != nil {
+			continue
+		}
+		if withinTolerance(value, expected, marginOfError) {
+			return true
+		}
+	}
+	return false
 }
 
 func withinTolerance(actual, expected, tolerance int) bool {
@@ -456,32 +472,6 @@ func stripThinkBlocks(response string) string {
 		trimmed = strings.TrimSpace(trimmed[:start] + trimmed[end:])
 	}
 	return trimmed
-}
-
-func parseSingleInteger(response string) (int, bool) {
-	trimmed := strings.TrimSpace(stripThinkBlocks(response))
-	if trimmed == "" {
-		return 0, false
-	}
-	if len(trimmed) >= 2 && strings.HasPrefix(trimmed, "\"") && strings.HasSuffix(trimmed, "\"") {
-		trimmed = strings.TrimSpace(strings.Trim(trimmed, "\""))
-	}
-	if trimmed == "" {
-		return 0, false
-	}
-	for i, r := range trimmed {
-		if i == 0 && r == '-' {
-			continue
-		}
-		if !unicode.IsDigit(r) {
-			return 0, false
-		}
-	}
-	value, err := strconv.Atoi(trimmed)
-	if err != nil {
-		return 0, false
-	}
-	return value, true
 }
 
 func isDeadlineExceeded(err error) bool {

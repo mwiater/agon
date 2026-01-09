@@ -61,27 +61,101 @@ type Config struct {
 
 // Host represents a single host that can serve language models.
 type Host struct {
-	Name         string     `json:"name"`
-	URL          string     `json:"url"`
-	Type         string     `json:"type"`
-	Models       []string   `json:"models"`
-	SystemPrompt string     `json:"systemprompt"`
-	Parameters   Parameters `json:"parameters"`
+	Name              string      `json:"name"`
+	URL               string      `json:"url"`
+	Type              string      `json:"type"`
+	Models            []string    `json:"models"`
+	SystemPrompt      string      `json:"systemprompt"`
+	ParameterTemplate string      `json:"parameterTemplate,omitempty"`
+	Parameters        LlamaParams `json:"parameters"`
 }
 
-// Parameters defines the set of parameters that can be used to control a language model's behavior.
-type Parameters struct {
-	TopK             *int     `json:"top_k,omitempty"`
-	TopP             *float64 `json:"top_p,omitempty"`
-	MinP             *float64 `json:"min_p,omitempty"`
-	TFSZ             *float64 `json:"tfs_z,omitempty"`
-	TypicalP         *float64 `json:"typical_p,omitempty"`
+// LlamaParams defines all request-scoped parameters supported by llama.cpp.
+// It is suitable for /completion, /v1/completions, and /v1/chat/completions.
+type LlamaParams struct {
+	// --- Sampling / decoding ---
+	Temperature *float64 `json:"temperature,omitempty"`
+	TopK        *int     `json:"top_k,omitempty"`
+	TopP        *float64 `json:"top_p,omitempty"`
+	MinP        *float64 `json:"min_p,omitempty"`
+	TypicalP    *float64 `json:"typical_p,omitempty"`
+
+	// Dynamic temperature
+	DynaTempRange    *float64 `json:"dynatemp_range,omitempty"`
+	DynaTempExponent *float64 `json:"dynatemp_exponent,omitempty"`
+
+	// Mirostat
+	Mirostat    *int     `json:"mirostat,omitempty"`
+	MirostatTau *float64 `json:"mirostat_tau,omitempty"`
+	MirostatEta *float64 `json:"mirostat_eta,omitempty"`
+
+	// XTC sampler
+	XTCProbability *float64 `json:"xtc_probability,omitempty"`
+	XTCThreshold   *float64 `json:"xtc_threshold,omitempty"`
+
+	// Explicit sampler ordering
+	Samplers *[]string `json:"samplers,omitempty"`
+
+	// --- Repetition / penalties ---
 	RepeatLastN      *int     `json:"repeat_last_n,omitempty"`
-	Temperature      *float64 `json:"temperature,omitempty"`
 	RepeatPenalty    *float64 `json:"repeat_penalty,omitempty"`
 	PresencePenalty  *float64 `json:"presence_penalty,omitempty"`
 	FrequencyPenalty *float64 `json:"frequency_penalty,omitempty"`
-	LogProbs         *bool    `json:"logProbs,omitempty"`
+
+	// DRY sampler (anti-loop)
+	DryMultiplier       *float64  `json:"dry_multiplier,omitempty"`
+	DryBase             *float64  `json:"dry_base,omitempty"`
+	DryAllowedLength    *int      `json:"dry_allowed_length,omitempty"`
+	DryPenaltyLastN     *int      `json:"dry_penalty_last_n,omitempty"`
+	DrySequenceBreakers *[]string `json:"dry_sequence_breakers,omitempty"`
+
+	// --- Generation limits / stopping ---
+	NPredict      *int      `json:"n_predict,omitempty"`
+	Stop          *[]string `json:"stop,omitempty"`
+	IgnoreEOS     *bool     `json:"ignore_eos,omitempty"`
+	TMaxPredictMS *int      `json:"t_max_predict_ms,omitempty"`
+
+	// --- Randomness / determinism ---
+	Seed *int64 `json:"seed,omitempty"`
+
+	// --- Logits / probabilities ---
+	LogitBias         map[string]float64 `json:"logit_bias,omitempty"`
+	NProbs            *int               `json:"n_probs,omitempty"`
+	PostSamplingProbs *bool              `json:"post_sampling_probs,omitempty"`
+	ReturnTokens      *bool              `json:"return_tokens,omitempty"`
+	MinKeep           *int               `json:"min_keep,omitempty"`
+
+	// --- Context / KV cache ---
+	NKeep       *int  `json:"n_keep,omitempty"`
+	CachePrompt *bool `json:"cache_prompt,omitempty"`
+	NCacheReuse *int  `json:"n_cache_reuse,omitempty"`
+
+	// --- Streaming / observability ---
+	Stream          *bool `json:"stream,omitempty"`
+	TimingsPerToken *bool `json:"timings_per_token,omitempty"`
+	ReturnProgress  *bool `json:"return_progress,omitempty"`
+
+	// --- Output shaping ---
+	ResponseFields *[]string `json:"response_fields,omitempty"`
+	NIndent        *int      `json:"n_indent,omitempty"`
+
+	// --- Slot / concurrency control ---
+	IDSlot *int `json:"id_slot,omitempty"`
+
+	// --- Grammar / structured output ---
+	Grammar    *string     `json:"grammar,omitempty"`
+	JSONSchema interface{} `json:"json_schema,omitempty"`
+
+	// --- Multi-completion ---
+	NCmpl *int `json:"n_cmpl,omitempty"`
+
+	// --- Per-request LoRA ---
+	Lora *[]LoraAdapter `json:"lora,omitempty"`
+}
+
+type LoraAdapter struct {
+	ID    string  `json:"id"`
+	Scale float64 `json:"scale"`
 }
 
 // RequestTimeout returns the timeout duration for HTTP requests, falling back to the default if not specified.
@@ -146,6 +220,9 @@ func Load(path string) (Config, error) {
 		if len(config.Hosts) == 0 {
 			return Config{}, errors.New("config must contain at least one host")
 		}
+		if err := applyParameterTemplates(&config); err != nil {
+			return Config{}, err
+		}
 		config.ConfigPath = path
 		return config, nil
 	}
@@ -154,6 +231,10 @@ func Load(path string) (Config, error) {
 		if path == DefaultConfigPath {
 			config, legacyErr := loadFromPath(legacyConfigPath)
 			if legacyErr == nil {
+				if err := applyParameterTemplates(&config); err != nil {
+					return Config{}, err
+				}
+				config.ConfigPath = legacyConfigPath
 				return config, nil
 			}
 			if errors.Is(legacyErr, os.ErrNotExist) {

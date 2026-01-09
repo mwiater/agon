@@ -93,7 +93,7 @@ These become the host/models to select from when running a chat in `multimidelMo
 *   **Multimodel Chat Mode**: Compare up to four models side-by-side in a single chat interface to evaluate their responses to the same prompt.
 *   **Pipeline Mode**: Chain up to four models together in a sequence, where the output of one stage becomes the input for the next.
 *   **Benchmark Mode**: Run a suite of benchmarks against a model to evaluate its performance.
-*   **Accuracy Mode**: Run a prompt suite against each model and log per-prompt correctness.
+*   **Accuracy Batch**: Run a prompt suite against each model and log per-prompt correctness via `agon run accuracy`.
 *   **MCPMode**: Enables advanced functionality like tool usage by proxying requests through a local `agon-mcp` server.
 *   **Comprehensive Model Management**: A suite of commands to `list` and `unload` models across all configured hosts, with `pull`, `delete`, and `sync` available for llama.cpp hosts running in router mode.
 *   **Detailed Configuration**: Fine-tune model parameters, system prompts, and application behavior through a simple JSON configuration.
@@ -138,7 +138,6 @@ This should print the version of `agon` that you have installed.
 *   `multimodelMode`: (Boolean) If `true`, the application starts directly in Multimodel mode.
 *   `pipelineMode`: (Boolean) If `true`, the application starts directly in Pipeline mode.
 *   `benchmarkMode`: (Boolean) If `true`, the application starts directly in Benchmark mode.
-*   `accuracyMode`: (Boolean) If `true`, the application starts directly in Accuracy mode.
 *   `jsonMode`: (Boolean) If `true`, forces the model to respond in JSON format.
 *   `export`: (String) A file path to automatically export pipeline run data as a JSON file.
 *   `exportMarkdown`: (String) A file path to automatically export a Markdown summary of pipeline runs.
@@ -154,8 +153,9 @@ Each object in the `hosts` array defines a host instance:
 *   `type`: (String) The type of host. Supported values: `"llama.cpp"` (alias: `"llamacpp"`).
 *   `models`: (Array of Strings) A list of model identifiers to manage on this host.
 *   `systemPrompt`: (String) A custom system prompt to use for all interactions with this host.
+*   `parameterTemplate`: (String) Required parameter preset to apply before overrides. Supported: `generic`, `fact_checker`, `creative`.
 *   `parameters`: (Object) A key-value map of model parameters to control generation. Parameter support varies by llama.cpp build and model.
-    *   `top_k`, `top_p`, `min_p`, `tfs_z`, `typical_p`, `repeat_last_n`, `temperature`, `repeat_penalty`, `presence_penalty`, `frequency_penalty`.
+    *   Common keys: `temperature`, `top_k`, `top_p`, `min_p`, `typical_p`, `repeat_last_n`, `repeat_penalty`, `presence_penalty`, `frequency_penalty`, `n_predict`, `n_probs`.
 
 ### Host Compatibility Matrix
 
@@ -172,7 +172,6 @@ Each object in the `hosts` array defines a host instance:
 For example configurations, see the `config/` directory. Each file demonstrates a different mode or feature:
 
 *   `config.example.BenchmarkMode.json`: An example of how to set up Benchmark mode.
-*   `config.example.AccuracyMode.json`: An example of how to set up Accuracy mode.
 *   `config.example.JSONMode.json`: An example of how to set up JSON mode.
 *   `config.example.MCPMode.json`: An example of how to set up MCP mode.
 *   `config.example.ModelParameters.json`: An example of how to set up model parameters.
@@ -237,12 +236,6 @@ Benchmark mode uses the following definitions:
   "benchmarkCount": 10,
 ```
 
-### Accuracy Mode
-
-Accuracy mode runs a fixed prompt suite against each host/model pair and records per-prompt correctness. Like Benchmark mode, your configuration file **must only have one model per host.** The system prompt and tests are loaded from `internal/accuracy/accuracy_prompts.json`, including `difficulty` and `marginOfError` for each test.
-
-Results are appended to `agonData/modelAccuracy/<model>.json` (one entry per prompt per run). Each entry includes the prompt, the model response, the expected answer, and a boolean indicating correctness. This makes it easy to run the suite multiple times and track consistency over time. See the `config/config.example.AccuracyMode.json` example.
-
 ## Metrics
 
 If `metrics: true` in a config file you run, all response metrics are aggregated and saved in: `agonData/modelMetrics/model_performance_metrics.json`. This way, over time, as you use the tool, model metrics are caprtured under different sceanrios, hopefully giving some long-term insights on models over time. I have `metrics: true` in all of my configs in order to collect this data over time for a different perspective on model metrics.
@@ -283,15 +276,6 @@ Starts the main interactive chat UI. The UI mode is determined by the configurat
 *   **`agon list models`**: Lists all models specified in the config for each host and indicates if they are available on the host machine.
 *   **`agon list modelparameters`**: Displays the model parameters for each host as defined in the configuration (router mode required).
 *   **`agon list commands`**: Lists all available commands.
-
-### `agon accuracy`
-
-*   **`agon accuracy`**: Runs the accuracy suite defined in `internal/accuracy/accuracy_prompts.json` against each host/model pair and appends results to `agonData/modelAccuracy/`. Requires `accuracyMode: true` and one model per host.
-
-**Example**
-```bash
-agon accuracy --config config/config.example.AccuracyMode.json
-```
 
 ### `agon pull`
 
@@ -414,11 +398,15 @@ agon rag preview "what is agon?" --config config/config.example.RAGAccuracy.json
 
 ### `agon run`
 
-*   **`agon run accuracy`**: Runs the accuracy batch workflow.
+*   **`agon run accuracy`**: Runs the accuracy batch workflow. Uses the prompt suite in `internal/accuracy/accuracy_prompts.json` and appends results to `agonData/modelAccuracy/`. Requires metadata in `agonData/modelMetadata/` (use `agon fetch modelmetadata`) and defaults to the `generic` parameter template unless overridden.
 
 **Example**
 ```bash
 agon run accuracy
+```
+
+```bash
+agon run accuracy --parameterTemplate fact_checker
 ```
 
 ## Examples
@@ -440,7 +428,8 @@ agon run accuracy
             "smollm2:1.7b",
             "granite3.1moe:1b"
           ],
-          "systemprompt": "You are a helpful and concise assistant."
+          "systemprompt": "You are a helpful and concise assistant.",
+          "parameterTemplate": "generic"
         },
         {
           "name": "LlamaCpp02",
@@ -452,7 +441,8 @@ agon run accuracy
             "smollm2:1.7b",
             "granite3.1moe:1b"
           ],
-          "systemprompt": "You are a helpful and concise assistant."
+          "systemprompt": "You are a helpful and concise assistant.",
+          "parameterTemplate": "generic"
         }
       ]
     }

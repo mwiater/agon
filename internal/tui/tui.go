@@ -30,7 +30,7 @@ type Config = appconfig.Config
 type Host = appconfig.Host
 
 // Parameters defines the configurable generation parameters for a language model on a host.
-type Parameters = appconfig.Parameters
+type Parameters = appconfig.LlamaParams
 
 // LLMResponseMeta holds timing and tokenization metrics for a model response.
 // This metadata mirrors providers.StreamMetadata for UI presentation.
@@ -498,13 +498,6 @@ func (m *model) chatView() string {
 		modelMinP = "MinP: n/a"
 	}
 
-	var modelTFSZ string
-	if m.selectedHost.Parameters.TFSZ != nil {
-		modelTFSZ = fmt.Sprintf("TFSZ: %v", *m.selectedHost.Parameters.TFSZ)
-	} else {
-		modelTFSZ = "TFSZ: n/a"
-	}
-
 	var modelTypicalP string
 	if m.selectedHost.Parameters.TypicalP != nil {
 		modelTypicalP = fmt.Sprintf("TypicalP: %v", *m.selectedHost.Parameters.TypicalP)
@@ -553,7 +546,6 @@ func (m *model) chatView() string {
 		modelTopK,
 		modelTopP,
 		modelMinP,
-		modelTFSZ,
 		modelTypicalP,
 		modelRepeatLastN,
 		modelTemperature,
@@ -589,23 +581,19 @@ func (m *model) chatView() string {
 	)
 
 	configSettingsLine2 := lipgloss.JoinHorizontal(lipgloss.Top,
-		paramStyle.MarginLeft(len(labelString)+1).Render(modelTFSZ),
-		paramStyle.Render(modelTypicalP),
+		paramStyle.MarginLeft(len(labelString)+1).Render(modelTypicalP),
 		paramStyle.Render(modelRepeatLastN),
+		paramStyle.Render(modelTemperature),
 	)
 
 	configSettingsLine3 := lipgloss.JoinHorizontal(lipgloss.Top,
-		paramStyle.MarginLeft(len(labelString)+1).Render(modelTemperature),
-		paramStyle.Render(modelRepeatPenalty),
+		paramStyle.MarginLeft(len(labelString)+1).Render(modelRepeatPenalty),
 		paramStyle.Render(modelPresencePenalty),
-	)
-
-	configSettingsLine4 := lipgloss.JoinHorizontal(lipgloss.Top,
-		paramStyle.MarginLeft(len(labelString)+1).Render(modelFrequencyPenalty),
+		paramStyle.Render(modelFrequencyPenalty),
 	)
 
 	help := lipgloss.NewStyle().Render(" (tab to change, esc to quit)")
-	builder.WriteString(status + help + configSettingsLine1 + configSettingsLine2 + configSettingsLine3 + configSettingsLine4 + "\n\n")
+	builder.WriteString(status + help + configSettingsLine1 + configSettingsLine2 + configSettingsLine3 + "\n\n")
 
 	var historyBuilder strings.Builder
 	userStyle := lipgloss.NewStyle().Bold(true)

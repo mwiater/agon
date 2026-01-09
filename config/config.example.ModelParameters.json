@@ -14,17 +14,18 @@
         "internlm2_5-1_8b-chat-Q4_K_M"
       ],
       "systemprompt": "Take user input as subject; return valid JSON: {\"subject\":\"{subject}\"} only.",
+      "parameterTemplate": "generic",
       "parameters": {
         "top_k": 40,
         "top_p": 0.9,
         "min_p": 0.05,
-        "tfs_z": 1,
         "typical_p": 0.95,
         "repeat_last_n": 64,
         "temperature": 0.7,
         "repeat_penalty": 1.1,
         "presence_penalty": 0.6,
-        "frequency_penalty": 0.3
+        "frequency_penalty": 0.3,
+        "n_predict": 256
       }
     },
     {
@@ -41,17 +42,18 @@
         "internlm2_5-1_8b-chat-Q4_K_M"
       ],
       "systemprompt": "Return one measurable property/value as JSON: {\"subject\":\"{subject}\",\"{property}\":\"{value}\"}.",
+      "parameterTemplate": "generic",
       "parameters": {
         "top_k": 40,
         "top_p": 0.9,
         "min_p": 0.05,
-        "tfs_z": 1,
         "typical_p": 0.95,
         "repeat_last_n": 64,
         "temperature": 0.7,
         "repeat_penalty": 1.1,
         "presence_penalty": 0.6,
-        "frequency_penalty": 0.3
+        "frequency_penalty": 0.3,
+        "n_predict": 256
       }
     },
     {
@@ -68,17 +70,18 @@
         "internlm2_5-1_8b-chat-Q4_K_M"
       ],
       "systemprompt": "Ensure clean keys/values, no extras; return valid JSON: {\"subject\":\"{subject}\",\"{property}\":\"{value}\"}.",
+      "parameterTemplate": "generic",
       "parameters": {
         "top_k": 40,
         "top_p": 0.9,
         "min_p": 0.05,
-        "tfs_z": 1,
         "typical_p": 0.95,
         "repeat_last_n": 64,
         "temperature": 0.7,
         "repeat_penalty": 1.1,
         "presence_penalty": 0.6,
-        "frequency_penalty": 0.3
+        "frequency_penalty": 0.3,
+        "n_predict": 256
       }
     },
     {
@@ -95,17 +98,18 @@
         "internlm2_5-1_8b-chat-Q4_K_M"
       ],
       "systemprompt": "Validate fact; return full JSON with added key 'validated': true or false, nothing else.",
+      "parameterTemplate": "generic",
       "parameters": {
         "top_k": 40,
         "top_p": 0.9,
         "min_p": 0.05,
-        "tfs_z": 1,
         "typical_p": 0.95,
         "repeat_last_n": 64,
         "temperature": 0.7,
         "repeat_penalty": 1.1,
         "presence_penalty": 0.6,
-        "frequency_penalty": 0.3
+        "frequency_penalty": 0.3,
+        "n_predict": 256
       }
     }
   ],

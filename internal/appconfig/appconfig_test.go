@@ -20,7 +20,8 @@ func TestLoad(t *testing.T) {
                 "name": "Test Host",
                 "url": "http://localhost:8080",
                 "type": "llama.cpp",
-                "models": ["model1", "model2"]
+                "models": ["model1", "model2"],
+                "parameterTemplate": "generic"
             }
         ]
     }`

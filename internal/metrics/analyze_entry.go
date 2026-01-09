@@ -27,6 +27,7 @@ func AnalyzeMetrics(opts AnalyzeOptions, out io.Writer) error {
 		opts.AccuracyResultsDir,
 		opts.BenchmarksDir,
 		opts.MetadataDir,
+		opts.InputPath,
 	)
 	if err != nil {
 		return err

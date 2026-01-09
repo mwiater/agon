@@ -32,7 +32,7 @@ type endpointGroup struct {
 }
 
 // RunAccuracyBatch is the entry point for the "run accuracy" workflow.
-func RunAccuracyBatch() error {
+func RunAccuracyBatch(parameterTemplate string) error {
 	suite, err := loadPromptSuite(promptSuitePath)
 	if err != nil {
 		return err
@@ -104,6 +104,10 @@ func RunAccuracyBatch() error {
 	}
 
 	timeoutSeconds := int(appconfig.Config{}.RequestTimeout().Seconds())
+	templateName := strings.TrimSpace(parameterTemplate)
+	if templateName == "" {
+		templateName = string(appconfig.ProfileGenericChat)
+	}
 
 	var wg sync.WaitGroup
 	for _, group := range ordered {
@@ -113,7 +117,7 @@ func RunAccuracyBatch() error {
 		wg.Add(1)
 		go func(endpoint string, models []modelEndpointPair) {
 			defer wg.Done()
-			if err := runEndpointQueue(endpoint, models, suite, timeoutSeconds); err != nil {
+			if err := runEndpointQueue(endpoint, models, suite, timeoutSeconds, templateName); err != nil {
 				log.Printf("accuracy batch error for endpoint %s: %v", endpoint, err)
 			}
 		}(endpoint, models)
@@ -124,18 +128,20 @@ func RunAccuracyBatch() error {
 	return nil
 }
 
-func runEndpointQueue(endpoint string, models []modelEndpointPair, suite PromptSuite, timeoutSeconds int) error {
+func runEndpointQueue(endpoint string, models []modelEndpointPair, suite PromptSuite, timeoutSeconds int, parameterTemplate string) error {
 	if len(models) == 0 {
 		return nil
 	}
 
+	params := appconfig.ParamsForProfile(parameterTemplate)
+	params.NProbs = intPtr(1)
+
 	cfg := &appconfig.Config{
 		Hosts: []appconfig.Host{{
-			Name: endpoint,
-			URL:  endpoint,
-			Parameters: appconfig.Parameters{
-				LogProbs: boolPtr(true),
-			},
+			Name:              endpoint,
+			URL:               endpoint,
+			ParameterTemplate: parameterTemplate,
+			Parameters:        params,
 		}},
 	}
 	provider, err := providerfactory.NewChatProvider(cfg)
@@ -203,6 +209,7 @@ func runAccuracyForModel(provider providers.ChatProvider, host appconfig.Host, m
 		}
 
 		correct := matchesExpected(response, t.ExpectedAnswer, t.MarginOfError)
+		fmt.Printf("Full response: %s\n", response)
 		fmt.Printf("[%d/%d] %s / %s - Result: correct=%t response=%q expected=%d\n", iteration, totalPrompts, host.Name, model.Name, correct, response, t.ExpectedAnswer)
 
 		ttftMs, tokensPerSecond, inputTokens, outputTokens, totalDurationMs := accuracyMetrics(meta)
@@ -253,6 +260,6 @@ func appendResultWithGPU(gpu, modelName string, result AccuracyResult) error {
 	return nil
 }
 
-func boolPtr(v bool) *bool {
+func intPtr(v int) *int {
 	return &v
 }

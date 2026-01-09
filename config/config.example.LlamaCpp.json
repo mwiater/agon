@@ -14,6 +14,7 @@
         "internlm2_5-1_8b-chat-Q4_K_M"
       ],
       "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point.",
+      "parameterTemplate": "generic",
       "parameters": {}
     },
     {
@@ -30,6 +31,7 @@
         "internlm2_5-1_8b-chat-Q4_K_M"
       ],
       "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point.",
+      "parameterTemplate": "generic",
       "parameters": {}
     }
   ],

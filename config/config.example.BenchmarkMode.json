@@ -14,6 +14,7 @@
         "internlm2_5-1_8b-chat-Q4_K_M"
       ],
       "systemprompt": "You are a helpful and assistant",
+      "parameterTemplate": "generic",
       "parameters": {}
     },
     {
@@ -30,6 +31,7 @@
         "internlm2_5-1_8b-chat-Q4_K_M"
       ],
       "systemprompt": "You are a helpful and assistant",
+      "parameterTemplate": "generic",
       "parameters": {}
     },
     {
@@ -46,6 +48,7 @@
         "internlm2_5-1_8b-chat-Q4_K_M"
       ],
       "systemprompt": "You are a helpful and assistant",
+      "parameterTemplate": "generic",
       "parameters": {}
     },
     {
@@ -62,6 +65,7 @@
         "internlm2_5-1_8b-chat-Q4_K_M"
       ],
       "systemprompt": "You are a helpful and assistant",
+      "parameterTemplate": "generic",
       "parameters": {}
     }
   ],

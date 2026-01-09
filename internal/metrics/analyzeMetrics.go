@@ -4,6 +4,7 @@ package metrics
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -153,6 +154,7 @@ type ModelMetricsBundle struct {
 	Accuracy   []AccuracyRecord       `json:"accuracy,omitempty"`
 	Benchmarks []BenchmarkRun         `json:"benchmarks,omitempty"`
 	Metadata   *ModelMetadataDocument `json:"metadata,omitempty"`
+	ModelMetrics *ModelMetrics        `json:"-"`
 	Aggregates DerivedAggregates      `json:"aggregates"`
 }
 
@@ -336,7 +338,7 @@ type ComparisonAggregate struct {
 }
 
 // LoadCombinedMetrics reads accuracy, benchmark, and metadata directories into a combined set.
-func LoadCombinedMetrics(accuracyDir, benchmarksDir, metadataDir string) (CombinedMetrics, error) {
+func LoadCombinedMetrics(accuracyDir, benchmarksDir, metadataDir, modelMetricsPath string) (CombinedMetrics, error) {
 	models := make(map[string]*ModelMetricsBundle)
 
 	if accuracyDir != "" {
@@ -354,9 +356,15 @@ func LoadCombinedMetrics(accuracyDir, benchmarksDir, metadataDir string) (Combin
 			return CombinedMetrics{}, err
 		}
 	}
+	if modelMetricsPath != "" {
+		if err := applyModelMetricsFile(modelMetricsPath, models); err != nil {
+			return CombinedMetrics{}, err
+		}
+	}
 
 	bundles := make([]ModelMetricsBundle, 0, len(models))
 	for _, bundle := range models {
+		applyModelMetricsFallbacks(bundle)
 		computeAggregates(bundle)
 		bundles = append(bundles, *bundle)
 	}
@@ -371,6 +379,72 @@ func LoadCombinedMetrics(accuracyDir, benchmarksDir, metadataDir string) (Combin
 	combined := CombinedMetrics{Models: bundles}
 	applyComparisons(combined.Models)
 	return combined, nil
+}
+
+func applyModelMetricsFile(path string, models map[string]*ModelMetricsBundle) error {
+	metrics, err := loadModelMetricsFile(path)
+	if err != nil {
+		return err
+	}
+	if len(metrics) == 0 {
+		return nil
+	}
+
+	index := make(map[string]map[*ModelMetricsBundle]struct{})
+	for _, bundle := range models {
+		if bundle.Metadata == nil {
+			continue
+		}
+		names := []string{bundle.Model, bundle.Metadata.Name, bundle.Metadata.Metadata.ModelAlias}
+		for _, name := range names {
+			key := normalizeModelName(name)
+			if key == "" {
+				continue
+			}
+			set := index[key]
+			if set == nil {
+				set = make(map[*ModelMetricsBundle]struct{})
+				index[key] = set
+			}
+			set[bundle] = struct{}{}
+		}
+	}
+
+	for i := range metrics {
+		metric := &metrics[i]
+		key := normalizeModelName(metric.ModelName)
+		if key == "" {
+			continue
+		}
+		set := index[key]
+		if len(set) != 1 {
+			continue
+		}
+		for bundle := range set {
+			bundle.ModelMetrics = metric
+		}
+	}
+
+	return nil
+}
+
+func loadModelMetricsFile(path string) ([]ModelMetrics, error) {
+	trimmed := strings.TrimSpace(path)
+	if trimmed == "" {
+		return nil, nil
+	}
+	data, err := os.ReadFile(trimmed)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read model metrics file %s: %w", trimmed, err)
+	}
+	var metrics []ModelMetrics
+	if err := json.Unmarshal(data, &metrics); err != nil {
+		return nil, fmt.Errorf("parse model metrics file %s: %w", trimmed, err)
+	}
+	return metrics, nil
 }
 
 func loadAccuracyDir(dir string, models map[string]*ModelMetricsBundle) error {
@@ -576,6 +650,34 @@ func computeAggregates(bundle *ModelMetricsBundle) {
 	computeCorrelationAggregates(bundle)
 	computeBenchmarkAggregates(bundle)
 	computeMetadataSummary(bundle)
+}
+
+func applyModelMetricsFallbacks(bundle *ModelMetricsBundle) {
+	if bundle == nil || bundle.ModelMetrics == nil {
+		return
+	}
+	if len(bundle.Accuracy) == 0 {
+		return
+	}
+	stats := bundle.ModelMetrics.OverallStats
+	for i := range bundle.Accuracy {
+		record := &bundle.Accuracy[i]
+		if record.TokensPerSecond == 0 && stats.TokensPerSecond.Mean > 0 {
+			record.TokensPerSecond = stats.TokensPerSecond.Mean
+		}
+		if record.TimeToFirstToken == 0 && stats.TTFTMillis.Mean > 0 {
+			record.TimeToFirstToken = int64(math.Round(stats.TTFTMillis.Mean))
+		}
+		if record.TotalDurationMs == 0 && stats.TotalDurationMillis.Mean > 0 {
+			record.TotalDurationMs = int64(math.Round(stats.TotalDurationMillis.Mean))
+		}
+		if record.InputTokens == 0 && stats.InputTokens.Mean > 0 {
+			record.InputTokens = int(math.Round(stats.InputTokens.Mean))
+		}
+		if record.OutputTokens == 0 && stats.OutputTokens.Mean > 0 {
+			record.OutputTokens = int(math.Round(stats.OutputTokens.Mean))
+		}
+	}
 }
 
 func computeAccuracyAggregates(bundle *ModelMetricsBundle) {

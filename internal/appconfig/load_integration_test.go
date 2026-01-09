@@ -16,8 +16,8 @@ func TestLoadDefaultPathWithLlamaTypes(t *testing.T) {
 
 	payload := `{
   "hosts": [
-    { "name": "A", "url": "http://localhost:8080", "type": "llama.cpp", "models": ["m1"] },
-    { "name": "B", "url": "http://localhost:8081", "type": "llamacpp", "models": ["m2"] }
+    { "name": "A", "url": "http://localhost:8080", "type": "llama.cpp", "models": ["m1"], "parameterTemplate": "generic" },
+    { "name": "B", "url": "http://localhost:8081", "type": "llamacpp", "models": ["m2"], "parameterTemplate": "generic" }
   ]
 }`
 	path := filepath.Join(configDir, "config.json")
@@ -50,7 +50,7 @@ func TestLoadLegacyFallback(t *testing.T) {
 	tempDir := t.TempDir()
 	payload := `{
   "hosts": [
-    { "name": "A", "url": "http://localhost:8080", "type": "llama.cpp", "models": ["m1"] }
+    { "name": "A", "url": "http://localhost:8080", "type": "llama.cpp", "models": ["m1"], "parameterTemplate": "generic" }
   ]
 }`
 	if err := os.WriteFile(filepath.Join(tempDir, "config.json"), []byte(payload), 0o644); err != nil {

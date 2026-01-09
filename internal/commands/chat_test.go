@@ -29,7 +29,8 @@ func TestChatCmd(t *testing.T) {
                 "name": "Test Host",
                 "url": "http://localhost:8080",
                 "type": "llama.cpp",
-                "models": ["model1"]
+                "models": ["model1"],
+                "parameterTemplate": "generic"
             }
         ]
     }`

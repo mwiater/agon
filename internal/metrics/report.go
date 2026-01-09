@@ -481,6 +481,38 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
         return name + ' @ ' + gpu;
       }
 
+      function getBenchmark(model) {
+        return model.aggregates && model.aggregates.benchmark ? model.aggregates.benchmark : null;
+      }
+
+      function getBenchmarkPromptTPS(model) {
+        var bench = getBenchmark(model);
+        if (!bench || typeof bench.prompt_tokens_per_second !== 'number' || isNaN(bench.prompt_tokens_per_second)) {
+          return null;
+        }
+        return bench.prompt_tokens_per_second;
+      }
+
+      function getBenchmarkGenTPS(model) {
+        var bench = getBenchmark(model);
+        if (!bench || typeof bench.generation_tokens_per_second !== 'number' || isNaN(bench.generation_tokens_per_second)) {
+          return null;
+        }
+        return bench.generation_tokens_per_second;
+      }
+
+      function getBenchmarkThroughput(model) {
+        var gen = getBenchmarkGenTPS(model);
+        if (gen && gen > 0) {
+          return gen;
+        }
+        var prompt = getBenchmarkPromptTPS(model);
+        if (prompt && prompt > 0) {
+          return prompt;
+        }
+        return null;
+      }
+
       function createNumericCell(value, decimals) {
         var display = formatNumber(value, decimals);
         var $td = $('<td></td>').text(display);
@@ -661,7 +693,10 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
           var pareto = [];
 
           entries.forEach(function(model) {
-            var throughput = model.aggregates && model.aggregates.throughput ? model.aggregates.throughput.avg_tokens_per_second : 0;
+            var throughput = getBenchmarkThroughput(model);
+            if (throughput === null) {
+              throughput = model.aggregates && model.aggregates.throughput ? model.aggregates.throughput.avg_tokens_per_second : 0;
+            }
             var latency = model.aggregates && model.aggregates.latency ? model.aggregates.latency.avg_total_ms : 0;
             var efficiency = model.aggregates && model.aggregates.efficiency ? model.aggregates.efficiency.accuracy_per_second : 0;
             var accuracy = model.aggregates && model.aggregates.accuracy ? model.aggregates.accuracy.accuracy : 0;
@@ -722,6 +757,9 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
           var deadlineRate = model.aggregates && model.aggregates.reliability ? model.aggregates.reliability.deadline_exceeded_rate : null;
           var avgTtft = model.aggregates && model.aggregates.latency ? model.aggregates.latency.avg_ttft_ms : null;
           var avgTps = model.aggregates && model.aggregates.throughput ? model.aggregates.throughput.avg_tokens_per_second : null;
+          if (!avgTps || avgTps === 0) {
+            avgTps = getBenchmarkThroughput(model);
+          }
           var effTps = model.aggregates && model.aggregates.throughput ? model.aggregates.throughput.avg_effective_tps : null;
           var avgTotal = model.aggregates && model.aggregates.latency ? model.aggregates.latency.avg_total_ms : null;
           var avgOutput = model.aggregates && model.aggregates.token_usage ? model.aggregates.token_usage.avg_output_tokens : null;
@@ -761,7 +799,10 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
         var points = [];
         models.forEach(function(model) {
           var accuracy = model.aggregates && model.aggregates.accuracy ? model.aggregates.accuracy.accuracy : null;
-          var throughput = model.aggregates && model.aggregates.throughput ? model.aggregates.throughput.avg_tokens_per_second : null;
+          var throughput = getBenchmarkThroughput(model);
+          if (throughput === null) {
+            throughput = model.aggregates && model.aggregates.throughput ? model.aggregates.throughput.avg_tokens_per_second : null;
+          }
           if (accuracy === null || throughput === null) {
             return;
           }
@@ -1408,6 +1449,7 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
           var accuracy = model.aggregates && model.aggregates.accuracy ? model.aggregates.accuracy : {};
           var latency = model.aggregates && model.aggregates.latency ? model.aggregates.latency : {};
           var throughput = model.aggregates && model.aggregates.throughput ? model.aggregates.throughput : {};
+          var benchmark = model.aggregates && model.aggregates.benchmark ? model.aggregates.benchmark : {};
           var reliability = model.aggregates && model.aggregates.reliability ? model.aggregates.reliability : {};
           var efficiency = model.aggregates && model.aggregates.efficiency ? model.aggregates.efficiency : {};
           var distributions = model.aggregates && model.aggregates.distributions ? model.aggregates.distributions : {};
@@ -1440,6 +1482,12 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
           bodyParts.push('<li><strong>TPS P90:</strong> ' + formatNumber(throughput.p90_tokens_per_second, 2) + '</li>');
           bodyParts.push('<li><strong>Accuracy per second:</strong> ' + formatNumber(efficiency.accuracy_per_second, 3) + '</li>');
           bodyParts.push('<li><strong>Tokens/sec per param:</strong> ' + formatNumber(efficiency.tokens_per_second_per_param, 6) + '</li>');
+          bodyParts.push('</ul>');
+          bodyParts.push('<h6>Benchmarks</h6><ul class="list-unstyled mb-3">');
+          bodyParts.push('<li><strong>Prompt TPS:</strong> ' + formatNumber(benchmark.prompt_tokens_per_second, 2) + '</li>');
+          bodyParts.push('<li><strong>Generation TPS:</strong> ' + formatNumber(benchmark.generation_tokens_per_second, 2) + '</li>');
+          bodyParts.push('<li><strong>Avg benchmark (ms):</strong> ' + formatNumber((benchmark.avg_benchmark_ns || 0) / 1000000, 2) + '</li>');
+          bodyParts.push('<li><strong>Run count:</strong> ' + formatNumber(benchmark.run_count, 0) + '</li>');
           bodyParts.push('</ul>');
           bodyParts.push('<h6>Correlations</h6><ul class="list-unstyled mb-3">');
           bodyParts.push('<li><strong>Acc vs TPS:</strong> ' + formatNumber(correlations.accuracy_vs_throughput, 3) + '</li>');

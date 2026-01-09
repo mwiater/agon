@@ -84,8 +84,8 @@ func TestIsAlreadyLoadedError(t *testing.T) {
 func TestApplyParameters(t *testing.T) {
 	topK := 42
 	temp := 0.7
-	logProbs := true
-	params := appconfig.Parameters{TopK: &topK, Temperature: &temp, LogProbs: &logProbs}
+	nProbs := 5
+	params := appconfig.LlamaParams{TopK: &topK, Temperature: &temp, NProbs: &nProbs}
 	payload := map[string]any{}
 	applyParameters(payload, params)
 	if payload["top_k"] != 42 {
@@ -94,8 +94,8 @@ func TestApplyParameters(t *testing.T) {
 	if payload["temperature"] != 0.7 {
 		t.Fatalf("expected temperature to be set")
 	}
-	if payload["logprobs"] != true {
-		t.Fatalf("expected logprobs to be set")
+	if payload["n_probs"] != 5 {
+		t.Fatalf("expected n_probs to be set")
 	}
 }
 

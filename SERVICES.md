@@ -18,6 +18,24 @@ Adjust paths, user/group, and server flags to match your environment.
      - Download the Windows release archive (typically a `.zip`).
      - If you later decide to build from source, use the Windows build instructions
        in the repo, but the prebuilt release is easiest for service setup.
+   - The same response settings (timings/usage) are available in the prebuilt
+     binaries; you do not need a custom build to enable them.
+
+   Optional: build from source (if you need a custom build)
+
+   - Linux (CMake):
+     - `git clone https://github.com/ggml-org/llama.cpp.git`
+     - `cd llama.cpp`
+     - `cmake -B build -S . -DCMAKE_BUILD_TYPE=Release`
+     - `cmake --build build --config Release -j`
+     - The server binary is typically in `build/bin/llama-server`.
+   - Windows (CMake + Visual Studio Build Tools):
+     - `git clone https://github.com/ggml-org/llama.cpp.git`
+     - `cd llama.cpp`
+     - `cmake -B build -S . -DCMAKE_BUILD_TYPE=Release`
+     - `cmake --build build --config Release`
+     - The server binary is typically in `build\bin\Release\llama-server.exe`.
+     - If you do not see it, search under `build\` for `llama-server.exe`.
 
 2) Unpack and install in your home directory
 
@@ -87,6 +105,10 @@ WantedBy=multi-user.target
    Notes:
    - The `ExecStart` line must be a single line in the service file.
      The line breaks above are for readability only. Combine them into one line.
+   - To ensure Agon receives timing + usage in `/v1/chat/completions` responses:
+     - Do NOT enable response field filtering, or
+     - If you do, include both `timings` and `usage` fields in the response.
+       (In llama.cpp this is controlled by the response fields feature.)
    - `User` and `Group` should be a non-root account that has read access
      to your model files and execute access to the binary.
    - To find your current user and group:
