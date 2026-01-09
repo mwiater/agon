@@ -131,6 +131,7 @@ func RunAccuracy(cfg *appconfig.Config) error {
 							DeadlineExceeded:   true,
 							DeadlineTimeoutSec: timeoutSeconds,
 						}
+						applyTimingMetrics(&result, meta)
 
 						if err := appendResult(r.model, result); err != nil {
 							log.Printf("error writing result for model %s: %v", r.model, err)
@@ -142,7 +143,6 @@ func RunAccuracy(cfg *appconfig.Config) error {
 				}
 
 				correct := matchesExpected(response, t.ExpectedAnswer, t.MarginOfError)
-				fmt.Printf("Full response: %s\n", response)
 				fmt.Printf("[%d/%d] %s / %s - Result: correct=%t response=%q expected=%d\n", iteration, total, r.host.Name, r.model, correct, response, t.ExpectedAnswer)
 
 				ttftMs, tokensPerSecond, inputTokens, outputTokens, totalDurationMs := accuracyMetrics(meta)
@@ -166,6 +166,7 @@ func RunAccuracy(cfg *appconfig.Config) error {
 					DeadlineExceeded:   false,
 					DeadlineTimeoutSec: timeoutSeconds,
 				}
+				applyTimingMetrics(&result, meta)
 
 				if err := appendResult(r.model, result); err != nil {
 					log.Printf("error writing result for model %s: %v", r.model, err)
@@ -205,6 +206,7 @@ func runRagCompare(cfg *appconfig.Config, provider providers.ChatProvider, host 
 				DeadlineTimeoutSec: timeoutSeconds,
 				RagMode:            "off",
 			}
+			applyTimingMetrics(&result, meta)
 			if err := appendResult(modelName, result); err != nil {
 				log.Printf("error writing result for model %s: %v", modelName, err)
 			}
@@ -236,6 +238,7 @@ func runRagCompare(cfg *appconfig.Config, provider providers.ChatProvider, host 
 		DeadlineTimeoutSec: timeoutSeconds,
 		RagMode:            "off",
 	}
+	applyTimingMetrics(&result, meta)
 	if err := appendResult(modelName, result); err != nil {
 		log.Printf("error writing result for model %s: %v", modelName, err)
 	}
@@ -281,6 +284,7 @@ func runRagCompare(cfg *appconfig.Config, provider providers.ChatProvider, host 
 				TopK:               len(retrieval.Chunks),
 				SourceCoverage:     retrieval.SourceCoverage,
 			}
+			applyTimingMetrics(&result, meta)
 			if err := appendResult(modelName, result); err != nil {
 				log.Printf("error writing result for model %s: %v", modelName, err)
 			}
@@ -317,6 +321,7 @@ func runRagCompare(cfg *appconfig.Config, provider providers.ChatProvider, host 
 		SourceCoverage:     retrieval.SourceCoverage,
 		CitationsUsed:      false,
 	}
+	applyTimingMetrics(&result, meta)
 	if err := appendResult(modelName, result); err != nil {
 		log.Printf("error writing result for model %s: %v", modelName, err)
 	}
@@ -412,11 +417,42 @@ func appendResult(modelName string, result AccuracyResult) error {
 func accuracyMetrics(meta providers.StreamMetadata) (int, float64, int, int, int) {
 	ttftMs := int((meta.LoadDuration + meta.PromptEvalDuration) / int64(time.Millisecond))
 	totalDurationMs := int(meta.TotalDuration / int64(time.Millisecond))
-	tokensPerSecond := 0.0
-	if meta.EvalDuration > 0 {
-		tokensPerSecond = float64(meta.EvalCount) / (float64(meta.EvalDuration) / float64(time.Second))
+	inputTokens := meta.PromptTokens
+	if inputTokens == 0 {
+		inputTokens = meta.PromptEvalCount
 	}
-	return ttftMs, tokensPerSecond, meta.PromptEvalCount, meta.EvalCount, totalDurationMs
+	outputTokens := meta.CompletionTokens
+	if outputTokens == 0 {
+		outputTokens = meta.EvalCount
+	}
+	evalDuration := meta.EvalDuration
+	if evalDuration == 0 && meta.TotalDuration > 0 && meta.PromptEvalDuration > 0 {
+		remainder := meta.TotalDuration - meta.LoadDuration - meta.PromptEvalDuration
+		if remainder > 0 {
+			evalDuration = remainder
+		}
+	}
+	tokensPerSecond := 0.0
+	if evalDuration > 0 && outputTokens > 0 {
+		tokensPerSecond = float64(outputTokens) / (float64(evalDuration) / float64(time.Second))
+	}
+	return ttftMs, tokensPerSecond, inputTokens, outputTokens, totalDurationMs
+}
+
+func applyTimingMetrics(result *AccuracyResult, meta providers.StreamMetadata) {
+	if result == nil {
+		return
+	}
+	result.TotalTokens = meta.TotalTokens
+	result.CacheN = meta.CacheN
+	result.PromptN = meta.PromptEvalCount
+	result.PromptMs = meta.PromptMs
+	result.PromptPerTokenMs = meta.PromptPerTokenMs
+	result.PromptPerSecond = meta.PromptPerSecond
+	result.PredictedN = meta.EvalCount
+	result.PredictedMs = meta.PredictedMs
+	result.PredictedPerTokenMs = meta.PredictedPerTokenMs
+	result.PredictedPerSecond = meta.PredictedPerSecond
 }
 
 func matchesExpected(response string, expected, marginOfError int) bool {

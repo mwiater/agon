@@ -35,16 +35,26 @@ type ToolExecutor func(ctx context.Context, name string, args map[string]any) (s
 // StreamMetadata contains metadata about a completed chat stream,
 // including performance metrics like timing and token counts.
 type StreamMetadata struct {
-	Model              string
-	CreatedAt          time.Time
-	Done               bool
-	TotalDuration      int64
-	LoadDuration       int64
-	PromptEvalCount    int
-	PromptEvalDuration int64
-	EvalCount          int
-	EvalDuration       int64
-	LogProbs           json.RawMessage
+	Model               string
+	CreatedAt           time.Time
+	Done                bool
+	TotalDuration       int64
+	LoadDuration        int64
+	PromptEvalCount     int
+	PromptTokens        int
+	PromptEvalDuration  int64
+	EvalCount           int
+	CompletionTokens    int
+	EvalDuration        int64
+	TotalTokens         int
+	CacheN              int
+	PromptMs            float64
+	PromptPerTokenMs    float64
+	PromptPerSecond     float64
+	PredictedMs         float64
+	PredictedPerTokenMs float64
+	PredictedPerSecond  float64
+	LogProbs            json.RawMessage
 }
 
 // StreamRequest encapsulates all the information needed to initiate a chat stream.

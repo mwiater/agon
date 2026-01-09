@@ -198,6 +198,7 @@ func runAccuracyForModel(provider providers.ChatProvider, host appconfig.Host, m
 					DeadlineExceeded:   true,
 					DeadlineTimeoutSec: timeoutSeconds,
 				}
+				applyTimingMetrics(&result, meta)
 
 				if err := appendResultWithGPU(model.GPU, model.Name, result); err != nil {
 					log.Printf("error writing result for model %s: %v", model.Name, err)
@@ -209,7 +210,6 @@ func runAccuracyForModel(provider providers.ChatProvider, host appconfig.Host, m
 		}
 
 		correct := matchesExpected(response, t.ExpectedAnswer, t.MarginOfError)
-		fmt.Printf("Full response: %s\n", response)
 		fmt.Printf("[%d/%d] %s / %s - Result: correct=%t response=%q expected=%d\n", iteration, totalPrompts, host.Name, model.Name, correct, response, t.ExpectedAnswer)
 
 		ttftMs, tokensPerSecond, inputTokens, outputTokens, totalDurationMs := accuracyMetrics(meta)
@@ -233,6 +233,7 @@ func runAccuracyForModel(provider providers.ChatProvider, host appconfig.Host, m
 			DeadlineExceeded:   false,
 			DeadlineTimeoutSec: timeoutSeconds,
 		}
+		applyTimingMetrics(&result, meta)
 
 		if err := appendResultWithGPU(model.GPU, model.Name, result); err != nil {
 			log.Printf("error writing result for model %s: %v", model.Name, err)

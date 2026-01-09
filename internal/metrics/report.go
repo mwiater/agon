@@ -24,10 +24,21 @@ type ReportModelMetricsBundle struct {
 }
 
 type ReportAccuracyRecord struct {
-	InputTokens      int     `json:"input_tokens"`
-	TokensPerSecond  float64 `json:"tokens_per_second"`
-	TimeToFirstToken int64   `json:"time_to_first_token"`
-	TotalDurationMs  int64   `json:"total_duration_ms"`
+	InputTokens         int     `json:"input_tokens"`
+	OutputTokens        int     `json:"output_tokens"`
+	TotalTokens         int     `json:"total_tokens,omitempty"`
+	TokensPerSecond     float64 `json:"tokens_per_second"`
+	TimeToFirstToken    int64   `json:"time_to_first_token"`
+	TotalDurationMs     int64   `json:"total_duration_ms"`
+	CacheN              int     `json:"cache_n,omitempty"`
+	PromptN             int     `json:"prompt_n,omitempty"`
+	PromptMs            float64 `json:"prompt_ms,omitempty"`
+	PromptPerTokenMs    float64 `json:"prompt_per_token_ms,omitempty"`
+	PromptPerSecond     float64 `json:"prompt_per_second,omitempty"`
+	PredictedN          int     `json:"predicted_n,omitempty"`
+	PredictedMs         float64 `json:"predicted_ms,omitempty"`
+	PredictedPerTokenMs float64 `json:"predicted_per_token_ms,omitempty"`
+	PredictedPerSecond  float64 `json:"predicted_per_second,omitempty"`
 }
 
 // GenerateCombinedReport renders a standalone HTML dashboard powered by CombinedMetrics.
@@ -56,10 +67,21 @@ func condenseMetrics(combined CombinedMetrics) ReportMetrics {
 		accuracy := make([]ReportAccuracyRecord, 0, len(bundle.Accuracy))
 		for _, record := range bundle.Accuracy {
 			accuracy = append(accuracy, ReportAccuracyRecord{
-				InputTokens:      record.InputTokens,
-				TokensPerSecond:  record.TokensPerSecond,
-				TimeToFirstToken: record.TimeToFirstToken,
-				TotalDurationMs:  record.TotalDurationMs,
+				InputTokens:         record.InputTokens,
+				OutputTokens:        record.OutputTokens,
+				TotalTokens:         record.TotalTokens,
+				TokensPerSecond:     record.TokensPerSecond,
+				TimeToFirstToken:    record.TimeToFirstToken,
+				TotalDurationMs:     record.TotalDurationMs,
+				CacheN:              record.CacheN,
+				PromptN:             record.PromptN,
+				PromptMs:            record.PromptMs,
+				PromptPerTokenMs:    record.PromptPerTokenMs,
+				PromptPerSecond:     record.PromptPerSecond,
+				PredictedN:          record.PredictedN,
+				PredictedMs:         record.PredictedMs,
+				PredictedPerTokenMs: record.PredictedPerTokenMs,
+				PredictedPerSecond:  record.PredictedPerSecond,
 			})
 		}
 		models = append(models, ReportModelMetricsBundle{
@@ -473,6 +495,25 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
           return '-';
         }
         return (Number(value) * 100).toFixed(decimals) + '%';
+      }
+
+      function averageField(records, field) {
+        if (!records || !records.length) {
+          return null;
+        }
+        var sum = 0;
+        var count = 0;
+        records.forEach(function(record) {
+          var value = Number(record[field]);
+          if (!isNaN(value) && value !== 0) {
+            sum += value;
+            count += 1;
+          }
+        });
+        if (!count) {
+          return null;
+        }
+        return sum / count;
       }
 
       function modelLabel(bundle) {
@@ -1455,6 +1496,17 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
           var distributions = model.aggregates && model.aggregates.distributions ? model.aggregates.distributions : {};
           var correlations = model.aggregates && model.aggregates.correlations ? model.aggregates.correlations : {};
           var metadata = model.aggregates && model.aggregates.metadata ? model.aggregates.metadata : {};
+          var records = model.accuracy || [];
+          var avgPromptMs = averageField(records, 'prompt_ms');
+          var avgPredictedMs = averageField(records, 'predicted_ms');
+          var avgPromptPerTokenMs = averageField(records, 'prompt_per_token_ms');
+          var avgPredictedPerTokenMs = averageField(records, 'predicted_per_token_ms');
+          var avgPromptPerSecond = averageField(records, 'prompt_per_second');
+          var avgPredictedPerSecond = averageField(records, 'predicted_per_second');
+          var avgTotalTokens = averageField(records, 'total_tokens');
+          var avgCacheN = averageField(records, 'cache_n');
+          var avgPromptN = averageField(records, 'prompt_n');
+          var avgPredictedN = averageField(records, 'predicted_n');
 
           var bodyParts = [];
           bodyParts.push('<div class="row">');
@@ -1488,6 +1540,18 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
           bodyParts.push('<li><strong>Generation TPS:</strong> ' + formatNumber(benchmark.generation_tokens_per_second, 2) + '</li>');
           bodyParts.push('<li><strong>Avg benchmark (ms):</strong> ' + formatNumber((benchmark.avg_benchmark_ns || 0) / 1000000, 2) + '</li>');
           bodyParts.push('<li><strong>Run count:</strong> ' + formatNumber(benchmark.run_count, 0) + '</li>');
+          bodyParts.push('</ul>');
+          bodyParts.push('<h6>Usage &amp; Timings (avg)</h6><ul class="list-unstyled mb-3">');
+          bodyParts.push('<li><strong>Total tokens:</strong> ' + formatNumber(avgTotalTokens, 1) + '</li>');
+          bodyParts.push('<li><strong>Cache n:</strong> ' + formatNumber(avgCacheN, 1) + '</li>');
+          bodyParts.push('<li><strong>Prompt n:</strong> ' + formatNumber(avgPromptN, 1) + '</li>');
+          bodyParts.push('<li><strong>Predicted n:</strong> ' + formatNumber(avgPredictedN, 1) + '</li>');
+          bodyParts.push('<li><strong>Prompt ms:</strong> ' + formatNumber(avgPromptMs, 2) + '</li>');
+          bodyParts.push('<li><strong>Predicted ms:</strong> ' + formatNumber(avgPredictedMs, 2) + '</li>');
+          bodyParts.push('<li><strong>Prompt ms/token:</strong> ' + formatNumber(avgPromptPerTokenMs, 3) + '</li>');
+          bodyParts.push('<li><strong>Predicted ms/token:</strong> ' + formatNumber(avgPredictedPerTokenMs, 3) + '</li>');
+          bodyParts.push('<li><strong>Prompt tokens/sec:</strong> ' + formatNumber(avgPromptPerSecond, 2) + '</li>');
+          bodyParts.push('<li><strong>Predicted tokens/sec:</strong> ' + formatNumber(avgPredictedPerSecond, 2) + '</li>');
           bodyParts.push('</ul>');
           bodyParts.push('<h6>Correlations</h6><ul class="list-unstyled mb-3">');
           bodyParts.push('<li><strong>Acc vs TPS:</strong> ' + formatNumber(correlations.accuracy_vs_throughput, 3) + '</li>');

@@ -142,6 +142,8 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 		"stream":   !req.DisableStreaming,
 	}
 	applyParameters(payload, req.Parameters)
+	ensureResponseFields(payload)
+	ensureTimingsPerToken(payload)
 	if req.JSONMode {
 		payload["response_format"] = map[string]any{"type": "json_object"}
 	}
@@ -269,16 +271,26 @@ func (p *Provider) handleNonStreaming(ctx context.Context, resp *http.Response, 
 		}
 		totalMs := parsed.Timings.PromptMs + parsed.Timings.PredictedMs
 		meta := providers.StreamMetadata{
-			Model:              modelName,
-			CreatedAt:          time.Now(),
-			Done:               true,
-			TotalDuration:      msToNs(totalMs),
-			LoadDuration:       0,
-			PromptEvalCount:    parsed.Timings.PromptN,
-			PromptEvalDuration: msToNs(parsed.Timings.PromptMs),
-			EvalCount:          parsed.Timings.PredictedN,
-			EvalDuration:       msToNs(parsed.Timings.PredictedMs),
-			LogProbs:           parsed.Choices[0].LogProbs,
+			Model:               modelName,
+			CreatedAt:           time.Now(),
+			Done:                true,
+			TotalDuration:       msToNs(totalMs),
+			LoadDuration:        0,
+			PromptEvalCount:     parsed.Timings.PromptN,
+			PromptTokens:        parsed.Usage.PromptTokens,
+			PromptEvalDuration:  msToNs(parsed.Timings.PromptMs),
+			EvalCount:           parsed.Timings.PredictedN,
+			CompletionTokens:    parsed.Usage.CompletionTokens,
+			EvalDuration:        msToNs(parsed.Timings.PredictedMs),
+			TotalTokens:         parsed.Usage.TotalTokens,
+			CacheN:              parsed.Timings.CacheN,
+			PromptMs:            parsed.Timings.PromptMs,
+			PromptPerTokenMs:    parsed.Timings.PromptPerTokenMs,
+			PromptPerSecond:     parsed.Timings.PromptPerSecond,
+			PredictedMs:         parsed.Timings.PredictedMs,
+			PredictedPerTokenMs: parsed.Timings.PredictedPerTokenMs,
+			PredictedPerSecond:  parsed.Timings.PredictedPerSecond,
+			LogProbs:            parsed.Choices[0].LogProbs,
 		}
 		if err := callbacks.OnComplete(meta); err != nil {
 			return err
@@ -395,6 +407,11 @@ type chatResponse struct {
 		PromptPerSecond     float64 `json:"prompt_per_second"`
 		PromptPerTokenMs    float64 `json:"prompt_per_token_ms"`
 	} `json:"timings"`
+	Usage struct {
+		PromptTokens     int `json:"prompt_tokens"`
+		CompletionTokens int `json:"completion_tokens"`
+		TotalTokens      int `json:"total_tokens"`
+	} `json:"usage"`
 	Choices []struct {
 		Message struct {
 			Role      string     `json:"role"`
@@ -726,6 +743,54 @@ func applyParameters(payload map[string]any, params appconfig.LlamaParams) {
 	if params.Lora != nil {
 		payload["lora"] = *params.Lora
 	}
+}
+
+func ensureResponseFields(payload map[string]any) {
+	required := map[string]bool{
+		"choices": true,
+		"usage":   true,
+		"timings": true,
+	}
+	if existing, ok := payload["response_fields"]; ok {
+		switch fields := existing.(type) {
+		case []string:
+			seen := make(map[string]bool, len(fields))
+			for _, f := range fields {
+				seen[f] = true
+			}
+			for f := range required {
+				if !seen[f] {
+					fields = append(fields, f)
+				}
+			}
+			payload["response_fields"] = fields
+			return
+		case []any:
+			seen := make(map[string]bool, len(fields))
+			out := make([]string, 0, len(fields)+len(required))
+			for _, f := range fields {
+				if s, ok := f.(string); ok {
+					out = append(out, s)
+					seen[s] = true
+				}
+			}
+			for f := range required {
+				if !seen[f] {
+					out = append(out, f)
+				}
+			}
+			payload["response_fields"] = out
+			return
+		}
+	}
+	payload["response_fields"] = []string{"choices", "usage", "timings"}
+}
+
+func ensureTimingsPerToken(payload map[string]any) {
+	if _, ok := payload["timings_per_token"]; ok {
+		return
+	}
+	payload["timings_per_token"] = true
 }
 
 type toolCall struct {

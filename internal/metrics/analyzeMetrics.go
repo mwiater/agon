@@ -16,24 +16,34 @@ import (
 
 // AccuracyRecord mirrors a single JSONL entry from agonData/modelAccuracy.
 type AccuracyRecord struct {
-	Timestamp        time.Time       `json:"timestamp"`
-	Host             string          `json:"host"`
-	Model            string          `json:"model"`
-	PromptID         int             `json:"promptId"`
-	Prompt           string          `json:"prompt"`
-	ExpectedAnswer   json.RawMessage `json:"expectedAnswer"`
-	Response         string          `json:"response"`
-	LogProbs         *LogProbs       `json:"logprobs,omitempty"`
-	Correct          bool            `json:"correct"`
-	MarginOfError    float64         `json:"marginOfError"`
-	Difficulty       int             `json:"difficulty"`
-	TimeToFirstToken int64           `json:"time_to_first_token"`
-	TokensPerSecond  float64         `json:"tokens_per_second"`
-	InputTokens      int             `json:"input_tokens"`
-	OutputTokens     int             `json:"output_tokens"`
-	TotalDurationMs  int64           `json:"total_duration_ms"`
-	DeadlineExceeded bool            `json:"deadlineExceeded"`
-	DeadlineTimeout  int64           `json:"deadlineTimeout"`
+	Timestamp           time.Time       `json:"timestamp"`
+	Host                string          `json:"host"`
+	Model               string          `json:"model"`
+	PromptID            int             `json:"promptId"`
+	Prompt              string          `json:"prompt"`
+	ExpectedAnswer      json.RawMessage `json:"expectedAnswer"`
+	Response            string          `json:"response"`
+	LogProbs            *LogProbs       `json:"logprobs,omitempty"`
+	Correct             bool            `json:"correct"`
+	MarginOfError       float64         `json:"marginOfError"`
+	Difficulty          int             `json:"difficulty"`
+	TimeToFirstToken    int64           `json:"time_to_first_token"`
+	TokensPerSecond     float64         `json:"tokens_per_second"`
+	InputTokens         int             `json:"input_tokens"`
+	OutputTokens        int             `json:"output_tokens"`
+	TotalDurationMs     int64           `json:"total_duration_ms"`
+	TotalTokens         int             `json:"total_tokens,omitempty"`
+	CacheN              int             `json:"cache_n,omitempty"`
+	PromptN             int             `json:"prompt_n,omitempty"`
+	PromptMs            float64         `json:"prompt_ms,omitempty"`
+	PromptPerTokenMs    float64         `json:"prompt_per_token_ms,omitempty"`
+	PromptPerSecond     float64         `json:"prompt_per_second,omitempty"`
+	PredictedN          int             `json:"predicted_n,omitempty"`
+	PredictedMs         float64         `json:"predicted_ms,omitempty"`
+	PredictedPerTokenMs float64         `json:"predicted_per_token_ms,omitempty"`
+	PredictedPerSecond  float64         `json:"predicted_per_second,omitempty"`
+	DeadlineExceeded    bool            `json:"deadlineExceeded"`
+	DeadlineTimeout     int64           `json:"deadlineTimeout"`
 }
 
 // LogProbs captures token-level likelihood details from accuracy records.
@@ -149,13 +159,13 @@ type CombinedMetrics struct {
 
 // ModelMetricsBundle groups accuracy, benchmark, and metadata inputs for a model+GPU.
 type ModelMetricsBundle struct {
-	GPU        string                 `json:"gpu"`
-	Model      string                 `json:"model"`
-	Accuracy   []AccuracyRecord       `json:"accuracy,omitempty"`
-	Benchmarks []BenchmarkRun         `json:"benchmarks,omitempty"`
-	Metadata   *ModelMetadataDocument `json:"metadata,omitempty"`
-	ModelMetrics *ModelMetrics        `json:"-"`
-	Aggregates DerivedAggregates      `json:"aggregates"`
+	GPU          string                 `json:"gpu"`
+	Model        string                 `json:"model"`
+	Accuracy     []AccuracyRecord       `json:"accuracy,omitempty"`
+	Benchmarks   []BenchmarkRun         `json:"benchmarks,omitempty"`
+	Metadata     *ModelMetadataDocument `json:"metadata,omitempty"`
+	ModelMetrics *ModelMetrics          `json:"-"`
+	Aggregates   DerivedAggregates      `json:"aggregates"`
 }
 
 // DerivedAggregates summarizes accuracy, latency, throughput, and comparison insights.
@@ -356,15 +366,9 @@ func LoadCombinedMetrics(accuracyDir, benchmarksDir, metadataDir, modelMetricsPa
 			return CombinedMetrics{}, err
 		}
 	}
-	if modelMetricsPath != "" {
-		if err := applyModelMetricsFile(modelMetricsPath, models); err != nil {
-			return CombinedMetrics{}, err
-		}
-	}
 
 	bundles := make([]ModelMetricsBundle, 0, len(models))
 	for _, bundle := range models {
-		applyModelMetricsFallbacks(bundle)
 		computeAggregates(bundle)
 		bundles = append(bundles, *bundle)
 	}
