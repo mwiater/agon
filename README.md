@@ -102,34 +102,40 @@ These become the host/models to select from when running a chat in `multimidelMo
 
 ## Installation
 
-### Pre-built Binaries
+### Building
 
-The recommended way to install `agon` is to download the latest pre-built binaries from the [GitHub releases page](https://github.com/mwiater/agon/releases).
+Install GoReleaser: https://goreleaser.com/install/
 
-### Building from Source
-
-The recommended way to install `agon` is with `go install`:
+From the root of the project, run the following command to build the `agon` and `agon-mcp` binaries:
 
 ```bash
-go install github.com/mwiater/agon/cmd/agon@latest
+goreleaser release --snapshot --clean --skip=publish
 ```
 
-The resulting binary will be placed in your Go bin directory (e.g., `$GOPATH/bin`). You will need to create a configuration file. See the `config/` directory for examples.
+*   `--snapshot`: Creates a local build without requiring a Git tag.
+*   `--clean`: Ensures the `dist/` directory is cleared of old artifacts.
+*   `--skip=publish`: Prevents any attempt to publish the release to GitHub.
 
-For MCP mode, the `agon-mcp` binary must also be installed and available in the system's `PATH`.
+The binaries will be placed in the `dist/` directory, organized by architecture, e.g.:
 
-### Verifying the Installation
+```
+dist/agon_linux_amd64_v1/agon
+dist/agon_windows_amd64_v1/agon.exe
+dist/agon-mcp_linux_amd64_v1/agon-mcp
+dist/agon-mcp_windows_amd64_v1/agon-mcp.exe
+```
 
-To verify the installation, run the `agon` command with the `--version` flag:
+#### Verifying the Installation
+
+To verify the build, run the `agon` command with the `--version` flag:
 
 ```bash
-agon --version
+./dist/agon_linux_amd64_v1/agon --version
 ```
 
 This should print the version of `agon` that you have installed.
 
 ## Configuration
-
 `agon` is configured via a JSON file. By default, it looks for `config/config.json`, but you can specify a different path with the `--config` or `-c` flag.
 
 ### Global Settings
