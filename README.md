@@ -20,6 +20,8 @@ Overall, `agon` was created to efficiently evaluate different scenarios with sma
 ## Requirements
 You'll need to set up at least one llama.cpp server that exposes the OpenAI-compatible API. Router mode is recommended if you want model list/load/unload support.
 
+**NOTE: If you are running git bash on windows, you may need to execute: `echo "ConPTY=on" >> ~/.minttyrc` if the CLI interactivity is not loading or not responsive.**
+
 ## Table of Contents
 
 *   [Example Setup](#example-setup)
@@ -92,8 +94,7 @@ These become the host/models to select from when running a chat in `multimidelMo
 *   **Interactive Chat**: A focused, terminal-based UI for conversational AI, with support for single-model, multi-model, and pipeline modes.
 *   **Multimodel Chat Mode**: Compare up to four models side-by-side in a single chat interface to evaluate their responses to the same prompt.
 *   **Pipeline Mode**: Chain up to four models together in a sequence, where the output of one stage becomes the input for the next.
-*   **Benchmark Mode**: Run a suite of benchmarks against a model to evaluate its performance.
-*   **Accuracy Batch**: Run a prompt suite against each model and log per-prompt correctness via `agon run accuracy`.
+*   **Accuracy Batch**: Run a prompt suite against each model and log per-prompt correctness via `agon benchmark accuracy`.
 *   **MCPMode**: Enables advanced functionality like tool usage by proxying requests through a local `agon-mcp` server.
 *   **Comprehensive Model Management**: A suite of commands to `list` and `unload` models across all configured hosts, with `pull`, `delete`, and `sync` available for llama.cpp hosts running in router mode.
 *   **Detailed Configuration**: Fine-tune model parameters, system prompts, and application behavior through a simple JSON configuration.
@@ -101,28 +102,35 @@ These become the host/models to select from when running a chat in `multimidelMo
 
 ## Installation
 
-### Pre-built Binaries
+### Building
 
-The recommended way to install `agon` is to download the latest pre-built binaries from the [GitHub releases page](https://github.com/mwiater/agon/releases).
+Install GoReleaser: https://goreleaser.com/install/
 
-### Building from Source
-
-The recommended way to install `agon` is with `go install`:
+From the root of the project, run the following command to build the `agon` and `agon-mcp` binaries:
 
 ```bash
-go install github.com/mwiater/agon/cmd/agon@latest
+goreleaser release --snapshot --clean --skip=publish
 ```
 
-The resulting binary will be placed in your Go bin directory (e.g., `$GOPATH/bin`). You will need to create a configuration file. See the `configs/` directory for examples.
+*   `--snapshot`: Creates a local build without requiring a Git tag.
+*   `--clean`: Ensures the `dist/` directory is cleared of old artifacts.
+*   `--skip=publish`: Prevents any attempt to publish the release to GitHub.
 
-For MCP mode, the `agon-mcp` binary must also be installed and available in the system's `PATH`.
+The binaries will be placed in the `dist/` directory, organized by architecture, e.g.:
 
-### Verifying the Installation
+```
+dist/agon_linux_amd64_v1/agon
+dist/agon_windows_amd64_v1/agon.exe
+dist/agon-mcp_linux_amd64_v1/agon-mcp
+dist/agon-mcp_windows_amd64_v1/agon-mcp.exe
+```
 
-To verify the installation, run the `agon` command with the `--version` flag:
+#### Verifying the Installation
+
+To verify the build, run the `agon` command with the `--version` flag:
 
 ```bash
-agon --version
+./dist/agon_linux_amd64_v1/agon --version
 ```
 
 This should print the version of `agon` that you have installed.
@@ -137,7 +145,6 @@ This should print the version of `agon` that you have installed.
 *   `debug`: (Boolean) When `true`, enables debug logging to `agon.log` and displays performance metrics in the UI.
 *   `multimodelMode`: (Boolean) If `true`, the application starts directly in Multimodel mode.
 *   `pipelineMode`: (Boolean) If `true`, the application starts directly in Pipeline mode.
-*   `benchmarkMode`: (Boolean) If `true`, the application starts directly in Benchmark mode.
 *   `jsonMode`: (Boolean) If `true`, forces the model to respond in JSON format.
 *   `export`: (String) A file path to automatically export pipeline run data as a JSON file.
 *   `exportMarkdown`: (String) A file path to automatically export a Markdown summary of pipeline runs.
@@ -171,7 +178,6 @@ Each object in the `hosts` array defines a host instance:
 
 For example configurations, see the `configs/` directory. Each file demonstrates a different mode or feature:
 
-*   `config.example.BenchmarkMode.json`: An example of how to set up Benchmark mode.
 *   `config.example.JSONMode.json`: An example of how to set up JSON mode.
 *   `config.example.MCPMode.json`: An example of how to set up MCP mode.
 *   `config.example.ModelParameters.json`: An example of how to set up model parameters.
@@ -221,28 +227,27 @@ MCP mode is an advanced feature that enables language models to use external too
 
 > In MCP mode, test how different models work with tool calls. See: [configs/config.example.MCPMode.json](configs/config.example.MCPMode.json)
 
-### Benchmark Mode
-
-Benchmark mode is a feature that allows you to run a common user prompt against models in parallel for n iteration. For this to run, your configuration file **must only have one model per host.** There is no UI with this mode, it is just meant to repeat the same requests against models several times in order to get a more complete average response time. If you have one model assigned to each host, it will run the benchmark requests against those models automatically. See the `configs/config.example.BenchmarkMode.json` example.
-
-If you want a standalone benchmark server, use `servers/benchmark` (llama.cpp only). Configure `servers/benchmark/agon-benchmark.yml` with a `models_path` pointing to your GGUF directory, then run the server and POST to `/benchmark` with the model filename (relative to `models_path`) or an absolute path.
-
-Benchmark results are written to `agonData/modelBenchmarks/`.
-
-Benchmark mode uses the following definitions:
-
-```
-  "benchmarkMode": true,
-  "benchmarkCount": 10,
-```
-
 ## Metrics
 
 If `metrics: true` in a config file you run, all response metrics are aggregated and saved in: `agonData/modelMetrics/model_performance_metrics.json`. This way, over time, as you use the tool, model metrics are caprtured under different sceanrios, hopefully giving some long-term insights on models over time. I have `metrics: true` in all of my configs in order to collect this data over time for a different perspective on model metrics.
 
-You can run: `agon analyze metrics` which will output a standalone html file (`agonData/reports/metrics-report.<parameterTemplate>_profile.html`) containing model metric details, comparison leaderboard, and recommendations. The `<parameterTemplate>` value comes from the accuracy JSONL data generated during `agon run accuracy`:
+You can run: `agon analyze metrics` which will output a standalone html file (`agonData/reports/metrics-report.<parameterTemplate>_profile.html`) containing model metric details, comparison leaderboard, and recommendations. The `<parameterTemplate>` value comes from the accuracy JSONL data generated during `agon benchmark accuracy`:
 
 ![Multichat Mode](.screens/agon_benchmark_report.png)
+
+### Analyze Metrics
+
+`agon analyze metrics` relies on previously collected data. Run these steps first:
+
+1. `agon fetch modelmetadata --endpoints http://localhost:8080,http://localhost:8081 --gpu radeon-rx-570` to populate `agonData/modelMetadata/`.
+2. `agon benchmark models --config configs/config.json` to generate benchmark JSON in `agonData/modelBenchmarks/`.
+3. `agon benchmark accuracy` to generate accuracy JSONL in `agonData/modelAccuracy/`.
+
+Once those are available, run:
+
+```bash
+agon analyze metrics
+```
 
 ## CLI Commands
 
@@ -254,7 +259,6 @@ Starts the main interactive chat UI. The UI mode is determined by the configurat
     *   `--config, -c`: Path to a custom config file.
     *   `--multimodelMode`: Override config to start in Multimodel mode.
     *   `--pipelineMode`: Override config to start in Pipeline mode.
-    *   `--benchmarkMode`: Override config to start in Benchmark mode.
     *   `--debug`, `--jsonMode`, `--mcpMode`, etc.
 
 *   **Examples**:
@@ -274,7 +278,6 @@ Starts the main interactive chat UI. The UI mode is determined by the configurat
 ### `agon list`
 
 *   **`agon list models`**: Lists all models specified in the config for each host and indicates if they are available on the host machine.
-*   **`agon list modelparameters`**: Displays the model parameters for each host as defined in the configuration (router mode required).
 *   **`agon list commands`**: Lists all available commands.
 
 ### `agon pull`
@@ -329,13 +332,6 @@ agon unload models --config configs/config.example.LlamaCpp.json
 agon show config --config configs/config.example.LlamaCpp.json
 ```
 
-*   **`agon show modelInfo`**: Shows model details from the configuration file.
-
-**Example**
-```bash
-agon show modelInfo --config configs/config.example.LlamaCpp.json
-```
-
 ### `agon analyze`
 
 *   **`agon analyze metrics`**: Generates metric analysis and an HTML report from benchmark outputs (includes the parameter template name from accuracy results in the report filename).
@@ -349,14 +345,23 @@ agon analyze metrics --benchmarks-dir agonData/modelBenchmarks --metadata-dir ag
 
 *   **`agon benchmark models`**: Runs benchmarks for models defined in the config file.
 *   **`agon benchmark model`**: Runs a single benchmark against a benchmark server endpoint.
+*   **`agon benchmark accuracy`**: Runs the accuracy batch workflow. Uses the prompt suite in `internal/accuracy/accuracy_prompts.json`, reads `agonData/modelMetadata/` (use `agon fetch modelmetadata`), and appends results to `agonData/modelAccuracy/`. Defaults to the `accuracy` parameter template unless overridden.
 
 **Examples**
 ```bash
-agon benchmark models --config configs/config.example.BenchmarkMode.json
+agon benchmark models --config configs/config.json
 ```
 
 ```bash
 agon benchmark model --model llama-3-2-1b-instruct-q8_0.gguf --gpu radeon-rx-570 --benchmark-endpoint http://localhost:9999/benchmark
+```
+
+```bash
+agon benchmark accuracy
+```
+
+```bash
+agon benchmark accuracy --parameterTemplate fact_checker
 ```
 
 ### `agon fetch`
@@ -371,16 +376,12 @@ agon fetch modelmetadata --endpoints http://localhost:8080,http://localhost:8081
 ### `agon list`
 
 *   **`agon list commands`**: Lists all available commands.
-*   **`agon list modelParameters`**: Lists model parameters for each node.
 
 **Examples**
 ```bash
 agon list commands
 ```
 
-```bash
-agon list modelParameters --config configs/config.example.ModelParameters.json
-```
 
 ### `agon rag`
 
@@ -394,19 +395,6 @@ agon rag index --config configs/config.example.RAGAccuracy.json
 
 ```bash
 agon rag preview "what is agon?" --config configs/config.example.RAGAccuracy.json
-```
-
-### `agon run`
-
-*   **`agon run accuracy`**: Runs the accuracy batch workflow. Uses the prompt suite in `internal/accuracy/accuracy_prompts.json` and appends results to `agonData/modelAccuracy/`. Requires metadata in `agonData/modelMetadata/` (use `agon fetch modelmetadata`) and defaults to the `generic` parameter template unless overridden.
-
-**Example**
-```bash
-agon run accuracy
-```
-
-```bash
-agon run accuracy --parameterTemplate fact_checker
 ```
 
 ## Examples
@@ -701,4 +689,3 @@ go tool cover -func=.coverage/coverage.out
 ## License
 
 This project is distributed under the [MIT License](LICENSE).
-

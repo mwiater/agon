@@ -30,17 +30,13 @@ var (
 
 // BenchmarkModels runs benchmarks for models defined in the configuration.
 func BenchmarkModels(cfg *appconfig.Config) error {
-	if !cfg.BenchmarkMode {
-		return fmt.Errorf("benchmark mode is not enabled in the configuration")
-	}
-
 	if len(cfg.Hosts) < 2 {
-		return fmt.Errorf("benchmark mode requires at least two hosts in the configuration")
+		return fmt.Errorf("benchmark runs require at least two hosts in the configuration")
 	}
 
 	for _, host := range cfg.Hosts {
 		if len(host.Models) != 1 {
-			return fmt.Errorf("each host in benchmark mode must have exactly one model")
+			return fmt.Errorf("each host in a benchmark run must have exactly one model")
 		}
 	}
 

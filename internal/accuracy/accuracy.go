@@ -31,17 +31,14 @@ func RunAccuracy(cfg *appconfig.Config) error {
 	if cfg == nil {
 		return fmt.Errorf("config is nil")
 	}
-	if !cfg.AccuracyMode {
-		return fmt.Errorf("accuracy mode is not enabled in the configuration")
-	}
 	if len(cfg.Hosts) == 0 {
-		return fmt.Errorf("accuracy mode requires at least one host in the configuration")
+		return fmt.Errorf("accuracy runs require at least one host in the configuration")
 	}
 	timeoutSeconds := int(cfg.RequestTimeout().Seconds())
 
 	for _, host := range cfg.Hosts {
 		if len(host.Models) != 1 {
-			return fmt.Errorf("each host in accuracy mode must have exactly one model")
+			return fmt.Errorf("each host in an accuracy run must have exactly one model")
 		}
 	}
 

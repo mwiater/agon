@@ -13,17 +13,12 @@ import (
 )
 
 func TestBenchmarkModelsValidationErrors(t *testing.T) {
-	if err := BenchmarkModels(&appconfig.Config{BenchmarkMode: false}); err == nil {
-		t.Fatalf("expected error when benchmark mode disabled")
-	}
-
-	cfg := &appconfig.Config{BenchmarkMode: true, Hosts: []appconfig.Host{{Name: "one", Models: []string{"m1"}}}}
+	cfg := &appconfig.Config{Hosts: []appconfig.Host{{Name: "one", Models: []string{"m1"}}}}
 	if err := BenchmarkModels(cfg); err == nil {
 		t.Fatalf("expected error when fewer than two hosts")
 	}
 
 	cfg = &appconfig.Config{
-		BenchmarkMode: true,
 		Hosts: []appconfig.Host{
 			{Name: "one", Models: []string{"m1", "m2"}},
 			{Name: "two", Models: []string{"m3"}},

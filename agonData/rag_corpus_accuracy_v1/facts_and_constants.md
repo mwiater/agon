@@ -1,6 +1,6 @@
 # Facts and constants
 
-This file lists short reference facts used by accuracyMode prompts. These are not Q/A pairs.
+This file lists short reference facts used by accuracy prompts. These are not Q/A pairs.
 
 Atomic numbers
 - Helium: 2

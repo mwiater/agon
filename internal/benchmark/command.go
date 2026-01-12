@@ -14,6 +14,5 @@ func RunBenchmarkModels(cfg *appconfig.Config) error {
 		log.Println("config is nil")
 		return nil
 	}
-	log.Printf("benchmark mode: %v", cfg.BenchmarkMode)
 	return BenchmarkModels(cfg)
 }

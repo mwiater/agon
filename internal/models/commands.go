@@ -75,11 +75,6 @@ func DeleteModels(config *appconfig.Config) {
 		return
 	}
 
-	if config.BenchmarkMode {
-		fmt.Println("Benchmark mode is enabled; skipping model deletion.")
-		return
-	}
-
 	hosts := createHosts(*config)
 	var wg sync.WaitGroup
 	for _, host := range hosts {
@@ -162,11 +157,6 @@ var (
 
 // SyncModels deletes any models not in config and then pulls missing models.
 func SyncModels(config *appconfig.Config) {
-	if config.BenchmarkMode {
-		fmt.Println("Benchmark mode is enabled; skipping model sync.")
-		return
-	}
-
 	deleteModelsFunc(config)
 	pullModelsFunc(config)
 }
