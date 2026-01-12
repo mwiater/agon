@@ -11,7 +11,7 @@ import (
 var listModelsCmd = &cobra.Command{
 	Use:   "models",
 	Short: "List all models on each node",
-	Long:  `The 'models' subcommand lists all models on each node specified in the configuration file (default: config/config.json).`,
+	Long:  `The 'models' subcommand lists all models on each node specified in the configuration file (default: configs/config.json).`,
 	Run: func(cmd *cobra.Command, args []string) {
 		models.ListModels(GetConfig())
 	},
@@ -20,3 +20,4 @@ var listModelsCmd = &cobra.Command{
 func init() {
 	listCmd.AddCommand(listModelsCmd)
 }
+

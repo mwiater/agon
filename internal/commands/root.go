@@ -23,7 +23,7 @@ var (
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "agon",
-	Short: "agon — terminal-first companion for multi-host llama.cpp workflows",
+	Short: "agon â€” terminal-first companion for multi-host llama.cpp workflows",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureConfigLoaded(); err != nil {
 			return err
@@ -76,7 +76,7 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "config/config.json", "config file (e.g., config/config.json)")
+	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "configs/config.json", "config file (e.g., configs/config.json)")
 
 	rootCmd.PersistentFlags().Bool("debug", false, "enable debug logging")
 	rootCmd.PersistentFlags().Bool("multimodelMode", false, "enable multi-model mode")
@@ -142,3 +142,4 @@ func SetVersionInfo(version, commit, date string) {
 	appCommit = commit
 	appDate = date
 }
+

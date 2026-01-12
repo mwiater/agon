@@ -11,7 +11,7 @@ import (
 var pullModelsCmd = &cobra.Command{
 	Use:   "models",
 	Short: "Pull all models from the configuration file",
-	Long:  `The 'models' subcommand pulls all models from the configuration file (default: config/config.json).`,
+	Long:  `The 'models' subcommand pulls all models from the configuration file (default: configs/config.json).`,
 	Run: func(cmd *cobra.Command, args []string) {
 		models.PullModels(GetConfig())
 	},
@@ -20,3 +20,4 @@ var pullModelsCmd = &cobra.Command{
 func init() {
 	pullCmd.AddCommand(pullModelsCmd)
 }
+

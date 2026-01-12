@@ -14,7 +14,7 @@ import (
 
 const (
 	// DefaultConfigPath is the default path to the application's configuration file.
-	DefaultConfigPath = "config/config.json"
+	DefaultConfigPath = "configs/config.json"
 	// legacyConfigPath is the path to the configuration file used in previous versions.
 	legacyConfigPath = "config.json"
 	// defaultRequestTimeout is the default timeout for HTTP requests.
@@ -266,3 +266,5 @@ func loadFromPath(path string) (Config, error) {
 
 	return config, nil
 }
+
+

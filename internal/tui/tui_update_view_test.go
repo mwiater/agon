@@ -76,6 +76,34 @@ func TestSingleModel_StateTransitions_And_View(t *testing.T) {
 	}
 }
 
+func TestSingleModel_ModelListView(t *testing.T) {
+	cfg := &Config{Hosts: []Host{{Name: "HostA", URL: "http://x", Models: []string{"m1", "m2"}}}}
+	provider := newTestProvider()
+	m := initialModel(context.Background(), cfg, provider)
+
+	_, _ = m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+
+	m.selectedHost = cfg.Hosts[0]
+	items := []list.Item{
+		item{title: "m1", desc: "Select this model"},
+		item{title: "m2", desc: "Select this model"},
+	}
+	m2, _ := m.Update(modelsReadyMsg{models: items, loadedModels: nil})
+	m = m2.(*model)
+
+	if m.state != viewModelSelector {
+		t.Fatalf("expected model selector; got %v", m.state)
+	}
+
+	out := m.View()
+	if !strings.Contains(out, "Select a Model from HostA") {
+		t.Fatalf("expected model list title; got: %s", out)
+	}
+	if !strings.Contains(out, "m1") || !strings.Contains(out, "m2") {
+		t.Fatalf("expected model names in view; got: %s", out)
+	}
+}
+
 // TestMultimodel_Assignment_And_Chat_Flow validates the multimodel assignment and chat flow.
 // It simulates host and model selection, verifies that assignments are correctly made,
 // and checks the chat interaction within the multimodel interface.

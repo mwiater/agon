@@ -1,4 +1,4 @@
-.
+﻿.
 |-- .gitignore
 |-- .goreleaser.yml
 |-- agon.log
@@ -160,3 +160,5 @@
 |           |-- current_weather.go
 |           |-- current_weather_test.go
 |           `-- tools.go
+
+

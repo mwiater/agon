@@ -1,4 +1,4 @@
-// internal/appconfig/load_integration_test.go
+﻿// internal/appconfig/load_integration_test.go
 package appconfig
 
 import (
@@ -9,9 +9,9 @@ import (
 
 func TestLoadDefaultPathWithLlamaTypes(t *testing.T) {
 	tempDir := t.TempDir()
-	configDir := filepath.Join(tempDir, "config")
+	configDir := filepath.Join(tempDir, "configs")
 	if err := os.MkdirAll(configDir, 0o755); err != nil {
-		t.Fatalf("mkdir config: %v", err)
+		t.Fatalf("mkdir configs: %v", err)
 	}
 
 	payload := `{
@@ -77,9 +77,9 @@ func TestLoadLegacyFallback(t *testing.T) {
 
 func TestLoadNoHostsError(t *testing.T) {
 	tempDir := t.TempDir()
-	configDir := filepath.Join(tempDir, "config")
+	configDir := filepath.Join(tempDir, "configs")
 	if err := os.MkdirAll(configDir, 0o755); err != nil {
-		t.Fatalf("mkdir config: %v", err)
+		t.Fatalf("mkdir configs: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(`{"hosts":[]}`), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
@@ -114,3 +114,4 @@ func TestLoadMissingFileError(t *testing.T) {
 		t.Fatal("expected error for missing config")
 	}
 }
+

@@ -1,4 +1,4 @@
-# agon
+﻿# agon
 
 ![agon](.screens/agon_llamacpp.png)
 
@@ -113,7 +113,7 @@ The recommended way to install `agon` is with `go install`:
 go install github.com/mwiater/agon/cmd/agon@latest
 ```
 
-The resulting binary will be placed in your Go bin directory (e.g., `$GOPATH/bin`). You will need to create a configuration file. See the `config/` directory for examples.
+The resulting binary will be placed in your Go bin directory (e.g., `$GOPATH/bin`). You will need to create a configuration file. See the `configs/` directory for examples.
 
 For MCP mode, the `agon-mcp` binary must also be installed and available in the system's `PATH`.
 
@@ -129,7 +129,7 @@ This should print the version of `agon` that you have installed.
 
 ## Configuration
 
-`agon` is configured via a JSON file. By default, it looks for `config/config.json`, but you can specify a different path with the `--config` or `-c` flag.
+`agon` is configured via a JSON file. By default, it looks for `configs/config.json`, but you can specify a different path with the `--config` or `-c` flag.
 
 ### Global Settings
 
@@ -169,7 +169,7 @@ Each object in the `hosts` array defines a host instance:
 
 ### Example Configurations
 
-For example configurations, see the `config/` directory. Each file demonstrates a different mode or feature:
+For example configurations, see the `configs/` directory. Each file demonstrates a different mode or feature:
 
 *   `config.example.BenchmarkMode.json`: An example of how to set up Benchmark mode.
 *   `config.example.JSONMode.json`: An example of how to set up JSON mode.
@@ -187,7 +187,7 @@ This is the standard, default mode for `agon`, providing a classic, one-on-one c
 
 ![Singlemodel Mode](.screens/agon_singlemodelMode_01.png)
 
-> In Single-model mode, model parameters will also be shown since there is more UI real estate. Theses values will be set from the "parameters" settings in the config files. See: [config/config.example.ModelParameters.json](config/config.example.ModelParameters.json)
+> In Single-model mode, model parameters will also be shown since there is more UI real estate. Theses values will be set from the "parameters" settings in the config files. See: [configs/config.example.ModelParameters.json](configs/config.example.ModelParameters.json)
 
 ### Multimodel Mode
 
@@ -203,7 +203,7 @@ Pipeline mode is designed for complex, multi-step workflows by chaining up to fo
 
 ![Pipeline Mode](.screens/agon_pipelineMode_01.png)
 
-> In Pipeline mode, chain requests together so that the output of one model is the input of the next. See: [config/config.example.PipelineMode.json](config/config.example.PipelineMode.json)
+> In Pipeline mode, chain requests together so that the output of one model is the input of the next. See: [configs/config.example.PipelineMode.json](configs/config.example.PipelineMode.json)
 
 ### JSON Mode
 
@@ -211,7 +211,7 @@ JSON mode is a constraint that can be applied to any of the other operating mode
 
 ![JSON Mode](.screens/agon_jsonMode_01.png)
 
-> In JSON mode, force model output to be in JSON format. This is exactly why I developed agon. As you can see above, some models perform better at this task than others. See: [config/config.example.JSONMode.json](config/config.example.JSONMode.json)
+> In JSON mode, force model output to be in JSON format. This is exactly why I developed agon. As you can see above, some models perform better at this task than others. See: [configs/config.example.JSONMode.json](configs/config.example.JSONMode.json)
 
 ### MCP Mode
 
@@ -219,11 +219,11 @@ MCP mode is an advanced feature that enables language models to use external too
 
 ![MCP Mode](.screens/agon_mcpMode_01.png)
 
-> In MCP mode, test how different models work with tool calls. See: [config/config.example.MCPMode.json](config/config.example.MCPMode.json)
+> In MCP mode, test how different models work with tool calls. See: [configs/config.example.MCPMode.json](configs/config.example.MCPMode.json)
 
 ### Benchmark Mode
 
-Benchmark mode is a feature that allows you to run a common user prompt against models in parallel for n iteration. For this to run, your configuration file **must only have one model per host.** There is no UI with this mode, it is just meant to repeat the same requests against models several times in order to get a more complete average response time. If you have one model assigned to each host, it will run the benchmark requests against those models automatically. See the `config/config.example.BenchmarkMode.json` example.
+Benchmark mode is a feature that allows you to run a common user prompt against models in parallel for n iteration. For this to run, your configuration file **must only have one model per host.** There is no UI with this mode, it is just meant to repeat the same requests against models several times in order to get a more complete average response time. If you have one model assigned to each host, it will run the benchmark requests against those models automatically. See the `configs/config.example.BenchmarkMode.json` example.
 
 If you want a standalone benchmark server, use `servers/benchmark` (llama.cpp only). Configure `servers/benchmark/agon-benchmark.yml` with a `models_path` pointing to your GGUF directory, then run the server and POST to `/benchmark` with the model filename (relative to `models_path`) or an absolute path.
 
@@ -283,7 +283,7 @@ Starts the main interactive chat UI. The UI mode is determined by the configurat
 
 **Example**
 ```bash
-agon pull models --config config/config.example.LlamaCpp.json
+agon pull models --config configs/config.example.LlamaCpp.json
 ```
 
 ### `agon delete`
@@ -292,7 +292,7 @@ agon pull models --config config/config.example.LlamaCpp.json
 
 **Example**
 ```bash
-agon delete models --config config/config.example.LlamaCpp.json
+agon delete models --config configs/config.example.LlamaCpp.json
 ```
 
 ### `agon sync`
@@ -301,14 +301,14 @@ agon delete models --config config/config.example.LlamaCpp.json
 
 **Example**
 ```bash
-agon sync models --config config/config.example.LlamaCpp.json
+agon sync models --config configs/config.example.LlamaCpp.json
 ```
 
 *   **`agon sync configs`**: Synchronizes per-host config files from the main config.
 
 **Example**
 ```bash
-agon sync configs --config config/config.json
+agon sync configs --config configs/config.json
 ```
 
 ### `agon unload`
@@ -317,7 +317,7 @@ agon sync configs --config config/config.json
 
 **Example**
 ```bash
-agon unload models --config config/config.example.LlamaCpp.json
+agon unload models --config configs/config.example.LlamaCpp.json
 ```
 
 ### `agon show`
@@ -326,14 +326,14 @@ agon unload models --config config/config.example.LlamaCpp.json
 
 **Example**
 ```bash
-agon show config --config config/config.example.LlamaCpp.json
+agon show config --config configs/config.example.LlamaCpp.json
 ```
 
 *   **`agon show modelInfo`**: Shows model details from the configuration file.
 
 **Example**
 ```bash
-agon show modelInfo --config config/config.example.LlamaCpp.json
+agon show modelInfo --config configs/config.example.LlamaCpp.json
 ```
 
 ### `agon analyze`
@@ -352,7 +352,7 @@ agon analyze metrics --benchmarks-dir agonData/modelBenchmarks --metadata-dir ag
 
 **Examples**
 ```bash
-agon benchmark models --config config/config.example.BenchmarkMode.json
+agon benchmark models --config configs/config.example.BenchmarkMode.json
 ```
 
 ```bash
@@ -379,7 +379,7 @@ agon list commands
 ```
 
 ```bash
-agon list modelParameters --config config/config.example.ModelParameters.json
+agon list modelParameters --config configs/config.example.ModelParameters.json
 ```
 
 ### `agon rag`
@@ -389,11 +389,11 @@ agon list modelParameters --config config/config.example.ModelParameters.json
 
 **Examples**
 ```bash
-agon rag index --config config/config.example.RAGAccuracy.json
+agon rag index --config configs/config.example.RAGAccuracy.json
 ```
 
 ```bash
-agon rag preview "what is agon?" --config config/config.example.RAGAccuracy.json
+agon rag preview "what is agon?" --config configs/config.example.RAGAccuracy.json
 ```
 
 ### `agon run`
@@ -413,7 +413,7 @@ agon run accuracy --parameterTemplate fact_checker
 
 ### Simple Chat Session
 
-1.  **Create a configuration file** (`config/config.json`):
+1.  **Create a configuration file** (`configs/config.json`):
 
     ```json
     {
@@ -456,7 +456,7 @@ agon run accuracy --parameterTemplate fact_checker
 
 ### Multimodel Chat Session
 
-1.  **Create a configuration file** (`config/config.json`):
+1.  **Create a configuration file** (`configs/config.json`):
 
     ```json
     {
@@ -498,7 +498,7 @@ agon run accuracy --parameterTemplate fact_checker
 
 ### JSON Mode
 
-1.  **Create a configuration file** (`config/config.json`):
+1.  **Create a configuration file** (`configs/config.json`):
 
     ```json
     {
@@ -540,7 +540,7 @@ agon run accuracy --parameterTemplate fact_checker
 
 ### MCP Mode
 
-1.  **Create a configuration file** (`config/config.json`):
+1.  **Create a configuration file** (`configs/config.json`):
 
     ```json
     {
@@ -582,7 +582,7 @@ agon run accuracy --parameterTemplate fact_checker
 
 ### llama.cpp Router Mode
 
-1.  **Create a configuration file** (`config/config.json`):
+1.  **Create a configuration file** (`configs/config.json`):
 
     ```json
     {
@@ -701,3 +701,4 @@ go tool cover -func=.coverage/coverage.out
 ## License
 
 This project is distributed under the [MIT License](LICENSE).
+
