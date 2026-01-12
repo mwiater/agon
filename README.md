@@ -20,6 +20,8 @@ Overall, `agon` was created to efficiently evaluate different scenarios with sma
 ## Requirements
 You'll need to setup and have 1-4 Ollama endpoints available.
 
+**NOTE: If you are running git bash on windows, you may need to execute: `echo "ConPTY=on" >> ~/.minttyrc` if the CLI interactivity is not loading or not responsive.**
+
 ## Table of Contents
 
 *   [Example Setup](#example-setup)
