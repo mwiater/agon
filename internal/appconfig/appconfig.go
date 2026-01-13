@@ -52,9 +52,7 @@ type Config struct {
 	ExportPath            string   `json:"export,omitempty"`
 	ExportMarkdownPath    string   `json:"exportMarkdown,omitempty"`
 	LogFile               string   `json:"logFile,omitempty"`
-	BenchmarkMode         bool     `json:"benchmarkMode"`
 	BenchmarkCount        int      `json:"benchmarkCount"`
-	AccuracyMode          bool     `json:"accuracyMode"`
 	Metrics               bool     `json:"metrics"`
 	ConfigPath            string   `json:"-"`
 }

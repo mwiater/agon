@@ -76,7 +76,6 @@ func TestBenchmarkModelsWithProviderFakes(t *testing.T) {
 	}
 
 	cfg := &appconfig.Config{
-		BenchmarkMode:  true,
 		BenchmarkCount: 2,
 		Hosts: []appconfig.Host{
 			{Name: "h1", Models: []string{"m1"}},

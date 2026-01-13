@@ -81,7 +81,6 @@ func TestRunAccuracyWritesJSONL(t *testing.T) {
 	defer server.Close()
 
 	cfg := &appconfig.Config{
-		AccuracyMode:   true,
 		TimeoutSeconds: 5,
 		Hosts: []appconfig.Host{
 			{Name: "Host01", URL: server.URL, Type: "llama.cpp", Models: []string{"model1"}},
@@ -134,7 +133,6 @@ func TestRunAccuracyDeadlineExceeded(t *testing.T) {
 	defer server.Close()
 
 	cfg := &appconfig.Config{
-		AccuracyMode:   true,
 		TimeoutSeconds: 5,
 		Hosts: []appconfig.Host{
 			{Name: "Host01", URL: server.URL, Type: "llama.cpp", Models: []string{"model1"}},

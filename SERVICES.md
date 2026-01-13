@@ -244,7 +244,6 @@ Description=Agon Benchmark Service
 After=network-online.target
 
 [Service]
-WorkingDirectory=/home/<you>/agon-benchmark
 ExecStart=/home/<you>/agon-benchmark/agon-benchmark
 User={user}
 Group={group}
