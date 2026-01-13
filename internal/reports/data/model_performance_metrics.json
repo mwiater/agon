@@ -1,0 +1,1282 @@
+[
+  {
+    "model_name": "qwen3:0.6b",
+    "last_updated_utc": "2025-11-25T01:25:11.603331Z",
+    "overall_stats": {
+      "total_requests": 12,
+      "ttft_ms": {
+        "mean": 246267.75,
+        "min": 185370,
+        "max": 323350
+      },
+      "tokens_per_second": {
+        "mean": 3.4659959533323828,
+        "min": 2.7217854787872873,
+        "max": 4.097205949708717
+      },
+      "input_tokens": {
+        "mean": 296,
+        "min": 296,
+        "max": 296
+      },
+      "output_tokens": {
+        "mean": 105.5,
+        "min": 101,
+        "max": 110
+      },
+      "total_duration_ms": {
+        "mean": 94475,
+        "min": 80634,
+        "max": 112084
+      }
+    },
+    "performance_buckets": [
+      {
+        "dimension": "input_tokens",
+        "bucket": "257-1024",
+        "stats": {
+          "total_requests": 12,
+          "ttft_ms": {
+            "mean": 246267.75,
+            "min": 185370,
+            "max": 323350
+          },
+          "tokens_per_second": {
+            "mean": 3.4659959533323828,
+            "min": 2.7217854787872873,
+            "max": 4.097205949708717
+          },
+          "input_tokens": {
+            "mean": 296,
+            "min": 296,
+            "max": 296
+          },
+          "output_tokens": {
+            "mean": 105.5,
+            "min": 101,
+            "max": 110
+          },
+          "total_duration_ms": {
+            "mean": 94475,
+            "min": 80634,
+            "max": 112084
+          }
+        }
+      }
+    ]
+  },
+  {
+    "model_name": "deepseek-r1:1.5b",
+    "last_updated_utc": "2025-12-22T00:23:29.7653942Z",
+    "overall_stats": {
+      "total_requests": 2,
+      "ttft_ms": {
+        "mean": 89514,
+        "min": 89514,
+        "max": 89514
+      },
+      "tokens_per_second": {
+        "mean": 2.5360494250522128,
+        "min": 2.5360494250522128,
+        "max": 2.5360494250522128
+      },
+      "input_tokens": {
+        "mean": 45,
+        "min": 45,
+        "max": 45
+      },
+      "output_tokens": {
+        "mean": 193,
+        "min": 193,
+        "max": 193
+      },
+      "total_duration_ms": {
+        "mean": 89074,
+        "min": 89074,
+        "max": 89074
+      }
+    },
+    "performance_buckets": [
+      {
+        "dimension": "input_tokens",
+        "bucket": "0-256",
+        "stats": {
+          "total_requests": 2,
+          "ttft_ms": {
+            "mean": 89514,
+            "min": 89514,
+            "max": 89514
+          },
+          "tokens_per_second": {
+            "mean": 2.5360494250522128,
+            "min": 2.5360494250522128,
+            "max": 2.5360494250522128
+          },
+          "input_tokens": {
+            "mean": 45,
+            "min": 45,
+            "max": 45
+          },
+          "output_tokens": {
+            "mean": 193,
+            "min": 193,
+            "max": 193
+          },
+          "total_duration_ms": {
+            "mean": 89074,
+            "min": 89074,
+            "max": 89074
+          }
+        }
+      }
+    ]
+  },
+  {
+    "model_name": "llama3.2:1b",
+    "last_updated_utc": "2026-01-03T00:27:53.8027407Z",
+    "overall_stats": {
+      "total_requests": 220,
+      "ttft_ms": {
+        "mean": 6452.32,
+        "min": 3996,
+        "max": 23525
+      },
+      "tokens_per_second": {
+        "mean": 6.065211560502275,
+        "min": 4.330499197955822,
+        "max": 7.373874032478597
+      },
+      "input_tokens": {
+        "mean": 111.24000000000002,
+        "min": 99,
+        "max": 200
+      },
+      "output_tokens": {
+        "mean": 2.800000000000001,
+        "min": 2,
+        "max": 6
+      },
+      "total_duration_ms": {
+        "mean": 6242.519999999999,
+        "min": 3733,
+        "max": 23355
+      }
+    },
+    "performance_buckets": [
+      {
+        "dimension": "input_tokens",
+        "bucket": "257-1024",
+        "stats": {
+          "total_requests": 8,
+          "ttft_ms": {
+            "mean": 159130,
+            "min": 159130,
+            "max": 159130
+          },
+          "tokens_per_second": {
+            "mean": 3.599493399948347,
+            "min": 3.599493399948347,
+            "max": 3.599493399948347
+          },
+          "input_tokens": {
+            "mean": 322,
+            "min": 322,
+            "max": 322
+          },
+          "output_tokens": {
+            "mean": 19,
+            "min": 19,
+            "max": 19
+          },
+          "total_duration_ms": {
+            "mean": 77136,
+            "min": 77136,
+            "max": 77136
+          }
+        }
+      },
+      {
+        "dimension": "input_tokens",
+        "bucket": "0-256",
+        "stats": {
+          "total_requests": 212,
+          "ttft_ms": {
+            "mean": 6452.32,
+            "min": 3996,
+            "max": 23525
+          },
+          "tokens_per_second": {
+            "mean": 6.065211560502275,
+            "min": 4.330499197955822,
+            "max": 7.373874032478597
+          },
+          "input_tokens": {
+            "mean": 111.24000000000002,
+            "min": 99,
+            "max": 200
+          },
+          "output_tokens": {
+            "mean": 2.800000000000001,
+            "min": 2,
+            "max": 6
+          },
+          "total_duration_ms": {
+            "mean": 6242.519999999999,
+            "min": 3733,
+            "max": 23355
+          }
+        }
+      }
+    ]
+  },
+  {
+    "model_name": "phi4-mini:3.8b",
+    "last_updated_utc": "2025-12-22T00:22:32.1664966Z",
+    "overall_stats": {
+      "total_requests": 4,
+      "ttft_ms": {
+        "mean": 31915,
+        "min": 31915,
+        "max": 31915
+      },
+      "tokens_per_second": {
+        "mean": 2.134538597421711,
+        "min": 2.134538597421711,
+        "max": 2.134538597421711
+      },
+      "input_tokens": {
+        "mean": 44,
+        "min": 44,
+        "max": 44
+      },
+      "output_tokens": {
+        "mean": 2,
+        "min": 2,
+        "max": 2
+      },
+      "total_duration_ms": {
+        "mean": 31639,
+        "min": 31639,
+        "max": 31639
+      }
+    },
+    "performance_buckets": [
+      {
+        "dimension": "input_tokens",
+        "bucket": "0-256",
+        "stats": {
+          "total_requests": 4,
+          "ttft_ms": {
+            "mean": 31915,
+            "min": 31915,
+            "max": 31915
+          },
+          "tokens_per_second": {
+            "mean": 2.134538597421711,
+            "min": 2.134538597421711,
+            "max": 2.134538597421711
+          },
+          "input_tokens": {
+            "mean": 44,
+            "min": 44,
+            "max": 44
+          },
+          "output_tokens": {
+            "mean": 2,
+            "min": 2,
+            "max": 2
+          },
+          "total_duration_ms": {
+            "mean": 31639,
+            "min": 31639,
+            "max": 31639
+          }
+        }
+      }
+    ]
+  },
+  {
+    "model_name": "qwen2.5-1.5b-instruct-q4_k_m",
+    "last_updated_utc": "2026-01-08T01:31:03.486435472Z",
+    "overall_stats": {
+      "total_requests": 1,
+      "ttft_ms": {
+        "mean": 24079,
+        "min": 24079,
+        "max": 24079
+      },
+      "tokens_per_second": {
+        "mean": 0,
+        "min": 0,
+        "max": 0
+      },
+      "input_tokens": {
+        "mean": 0,
+        "min": 0,
+        "max": 0
+      },
+      "output_tokens": {
+        "mean": 0,
+        "min": 0,
+        "max": 0
+      },
+      "total_duration_ms": {
+        "mean": 0,
+        "min": 0,
+        "max": 0
+      }
+    },
+    "performance_buckets": [
+      {
+        "dimension": "input_tokens",
+        "bucket": "0-256",
+        "stats": {
+          "total_requests": 1,
+          "ttft_ms": {
+            "mean": 24079,
+            "min": 24079,
+            "max": 24079
+          },
+          "tokens_per_second": {
+            "mean": 0,
+            "min": 0,
+            "max": 0
+          },
+          "input_tokens": {
+            "mean": 0,
+            "min": 0,
+            "max": 0
+          },
+          "output_tokens": {
+            "mean": 0,
+            "min": 0,
+            "max": 0
+          },
+          "total_duration_ms": {
+            "mean": 0,
+            "min": 0,
+            "max": 0
+          }
+        }
+      }
+    ]
+  },
+  {
+    "model_name": "gemma3:1b",
+    "last_updated_utc": "2026-01-03T00:30:16.6882804Z",
+    "overall_stats": {
+      "total_requests": 233,
+      "ttft_ms": {
+        "mean": 12168.039999999999,
+        "min": 6588,
+        "max": 43914
+      },
+      "tokens_per_second": {
+        "mean": 3.403999719261079,
+        "min": 1.9638915995726356,
+        "max": 4.270346078838839
+      },
+      "input_tokens": {
+        "mean": 101.00000000000001,
+        "min": 88,
+        "max": 188
+      },
+      "output_tokens": {
+        "mean": 3.28,
+        "min": 2,
+        "max": 10
+      },
+      "total_duration_ms": {
+        "mean": 11973.48,
+        "min": 6357,
+        "max": 43756
+      }
+    },
+    "performance_buckets": [
+      {
+        "dimension": "input_tokens",
+        "bucket": "0-256",
+        "stats": {
+          "total_requests": 233,
+          "ttft_ms": {
+            "mean": 12168.039999999999,
+            "min": 6588,
+            "max": 43914
+          },
+          "tokens_per_second": {
+            "mean": 3.403999719261079,
+            "min": 1.9638915995726356,
+            "max": 4.270346078838839
+          },
+          "input_tokens": {
+            "mean": 101.00000000000001,
+            "min": 88,
+            "max": 188
+          },
+          "output_tokens": {
+            "mean": 3.28,
+            "min": 2,
+            "max": 10
+          },
+          "total_duration_ms": {
+            "mean": 11973.48,
+            "min": 6357,
+            "max": 43756
+          }
+        }
+      }
+    ]
+  },
+  {
+    "model_name": "smollm2:360m",
+    "last_updated_utc": "2025-12-22T00:22:22.094585Z",
+    "overall_stats": {
+      "total_requests": 35,
+      "ttft_ms": {
+        "mean": 21845,
+        "min": 21845,
+        "max": 21845
+      },
+      "tokens_per_second": {
+        "mean": 3.1851254336476615,
+        "min": 3.1851254336476615,
+        "max": 3.1851254336476615
+      },
+      "input_tokens": {
+        "mean": 56,
+        "min": 56,
+        "max": 56
+      },
+      "output_tokens": {
+        "mean": 3,
+        "min": 3,
+        "max": 3
+      },
+      "total_duration_ms": {
+        "mean": 21462,
+        "min": 21462,
+        "max": 21462
+      }
+    },
+    "performance_buckets": [
+      {
+        "dimension": "input_tokens",
+        "bucket": "0-256",
+        "stats": {
+          "total_requests": 35,
+          "ttft_ms": {
+            "mean": 21845,
+            "min": 21845,
+            "max": 21845
+          },
+          "tokens_per_second": {
+            "mean": 3.1851254336476615,
+            "min": 3.1851254336476615,
+            "max": 3.1851254336476615
+          },
+          "input_tokens": {
+            "mean": 56,
+            "min": 56,
+            "max": 56
+          },
+          "output_tokens": {
+            "mean": 3,
+            "min": 3,
+            "max": 3
+          },
+          "total_duration_ms": {
+            "mean": 21462,
+            "min": 21462,
+            "max": 21462
+          }
+        }
+      }
+    ]
+  },
+  {
+    "model_name": "smollm2:1.7b",
+    "last_updated_utc": "2025-12-22T01:00:10.440829Z",
+    "overall_stats": {
+      "total_requests": 115,
+      "ttft_ms": {
+        "mean": 6315.9,
+        "min": 4891,
+        "max": 8492
+      },
+      "tokens_per_second": {
+        "mean": 4.142320005166797,
+        "min": 3.4150909755647234,
+        "max": 5.448948512591261
+      },
+      "input_tokens": {
+        "mean": 55.6,
+        "min": 53,
+        "max": 62
+      },
+      "output_tokens": {
+        "mean": 3.4000000000000004,
+        "min": 2,
+        "max": 5
+      },
+      "total_duration_ms": {
+        "mean": 6015.5,
+        "min": 4728,
+        "max": 7722
+      }
+    },
+    "performance_buckets": [
+      {
+        "dimension": "input_tokens",
+        "bucket": "0-256",
+        "stats": {
+          "total_requests": 113,
+          "ttft_ms": {
+            "mean": 6315.9,
+            "min": 4891,
+            "max": 8492
+          },
+          "tokens_per_second": {
+            "mean": 4.142320005166797,
+            "min": 3.4150909755647234,
+            "max": 5.448948512591261
+          },
+          "input_tokens": {
+            "mean": 55.6,
+            "min": 53,
+            "max": 62
+          },
+          "output_tokens": {
+            "mean": 3.4000000000000004,
+            "min": 2,
+            "max": 5
+          },
+          "total_duration_ms": {
+            "mean": 6015.5,
+            "min": 4728,
+            "max": 7722
+          }
+        }
+      },
+      {
+        "dimension": "input_tokens",
+        "bucket": "257-1024",
+        "stats": {
+          "total_requests": 2,
+          "ttft_ms": {
+            "mean": 306853,
+            "min": 306853,
+            "max": 306853
+          },
+          "tokens_per_second": {
+            "mean": 2.4817274200172843,
+            "min": 2.4817274200172843,
+            "max": 2.4817274200172843
+          },
+          "input_tokens": {
+            "mean": 402,
+            "min": 402,
+            "max": 402
+          },
+          "output_tokens": {
+            "mean": 34,
+            "min": 34,
+            "max": 34
+          },
+          "total_duration_ms": {
+            "mean": 156023,
+            "min": 156023,
+            "max": 156023
+          }
+        }
+      }
+    ]
+  },
+  {
+    "model_name": "granite4:350m",
+    "last_updated_utc": "2026-01-03T00:27:57.1785345Z",
+    "overall_stats": {
+      "total_requests": 223,
+      "ttft_ms": {
+        "mean": 6587.6,
+        "min": 3864,
+        "max": 26056
+      },
+      "tokens_per_second": {
+        "mean": 5.892673865236414,
+        "min": 4.03902758060283,
+        "max": 6.145957883090446
+      },
+      "input_tokens": {
+        "mean": 99.24000000000002,
+        "min": 87,
+        "max": 188
+      },
+      "output_tokens": {
+        "mean": 2.1199999999999997,
+        "min": 2,
+        "max": 4
+      },
+      "total_duration_ms": {
+        "mean": 6401,
+        "min": 3717,
+        "max": 25882
+      }
+    },
+    "performance_buckets": [
+      {
+        "dimension": "input_tokens",
+        "bucket": "257-1024",
+        "stats": {
+          "total_requests": 31,
+          "ttft_ms": {
+            "mean": 173881.75,
+            "min": 168441,
+            "max": 181254
+          },
+          "tokens_per_second": {
+            "mean": 2.998000912386596,
+            "min": 2.9923472796643784,
+            "max": 3.0081193126005177
+          },
+          "input_tokens": {
+            "mean": 339,
+            "min": 339,
+            "max": 339
+          },
+          "output_tokens": {
+            "mean": 22,
+            "min": 22,
+            "max": 22
+          },
+          "total_duration_ms": {
+            "mean": 88078,
+            "min": 87312,
+            "max": 88343
+          }
+        }
+      },
+      {
+        "dimension": "input_tokens",
+        "bucket": "0-256",
+        "stats": {
+          "total_requests": 192,
+          "ttft_ms": {
+            "mean": 6587.6,
+            "min": 3864,
+            "max": 26056
+          },
+          "tokens_per_second": {
+            "mean": 5.892673865236414,
+            "min": 4.03902758060283,
+            "max": 6.145957883090446
+          },
+          "input_tokens": {
+            "mean": 99.24000000000002,
+            "min": 87,
+            "max": 188
+          },
+          "output_tokens": {
+            "mean": 2.1199999999999997,
+            "min": 2,
+            "max": 4
+          },
+          "total_duration_ms": {
+            "mean": 6401,
+            "min": 3717,
+            "max": 25882
+          }
+        }
+      }
+    ]
+  },
+  {
+    "model_name": "granite3.1-moe:1b",
+    "last_updated_utc": "2025-12-31T01:20:07.1622942Z",
+    "overall_stats": {
+      "total_requests": 135,
+      "ttft_ms": {
+        "mean": 8961,
+        "min": 8660,
+        "max": 9262
+      },
+      "tokens_per_second": {
+        "mean": 10.44995009692469,
+        "min": 10.27448299823864,
+        "max": 10.554023322449602
+      },
+      "input_tokens": {
+        "mean": 47,
+        "min": 47,
+        "max": 47
+      },
+      "output_tokens": {
+        "mean": 10,
+        "min": 10,
+        "max": 10
+      },
+      "total_duration_ms": {
+        "mean": 8336.5,
+        "min": 8034,
+        "max": 8655
+      }
+    },
+    "performance_buckets": [
+      {
+        "dimension": "input_tokens",
+        "bucket": "0-256",
+        "stats": {
+          "total_requests": 119,
+          "ttft_ms": {
+            "mean": 8961,
+            "min": 8660,
+            "max": 9262
+          },
+          "tokens_per_second": {
+            "mean": 10.44995009692469,
+            "min": 10.27448299823864,
+            "max": 10.554023322449602
+          },
+          "input_tokens": {
+            "mean": 47,
+            "min": 47,
+            "max": 47
+          },
+          "output_tokens": {
+            "mean": 10,
+            "min": 10,
+            "max": 10
+          },
+          "total_duration_ms": {
+            "mean": 8336.5,
+            "min": 8034,
+            "max": 8655
+          }
+        }
+      },
+      {
+        "dimension": "input_tokens",
+        "bucket": "257-1024",
+        "stats": {
+          "total_requests": 16,
+          "ttft_ms": {
+            "mean": 36035,
+            "min": 33493,
+            "max": 39508
+          },
+          "tokens_per_second": {
+            "mean": 7.808466445415089,
+            "min": 7.67902357545296,
+            "max": 7.939026247893465
+          },
+          "input_tokens": {
+            "mean": 325,
+            "min": 314,
+            "max": 338
+          },
+          "output_tokens": {
+            "mean": 51.5,
+            "min": 34,
+            "max": 73
+          },
+          "total_duration_ms": {
+            "mean": 35553,
+            "min": 33102,
+            "max": 38836
+          }
+        }
+      }
+    ]
+  },
+  {
+    "model_name": "llama3.2:3b",
+    "last_updated_utc": "2025-12-22T01:00:14.7582132Z",
+    "overall_stats": {
+      "total_requests": 81,
+      "ttft_ms": {
+        "mean": 11253.8,
+        "min": 9267,
+        "max": 17382
+      },
+      "tokens_per_second": {
+        "mean": 2.3047845699616882,
+        "min": 1.481902063948219,
+        "max": 2.580970336910499
+      },
+      "input_tokens": {
+        "mean": 67,
+        "min": 65,
+        "max": 71
+      },
+      "output_tokens": {
+        "mean": 3,
+        "min": 2,
+        "max": 8
+      },
+      "total_duration_ms": {
+        "mean": 11055.699999999999,
+        "min": 9141,
+        "max": 17241
+      }
+    },
+    "performance_buckets": [
+      {
+        "dimension": "input_tokens",
+        "bucket": "0-256",
+        "stats": {
+          "total_requests": 80,
+          "ttft_ms": {
+            "mean": 11253.8,
+            "min": 9267,
+            "max": 17382
+          },
+          "tokens_per_second": {
+            "mean": 2.3047845699616882,
+            "min": 1.481902063948219,
+            "max": 2.580970336910499
+          },
+          "input_tokens": {
+            "mean": 67,
+            "min": 65,
+            "max": 71
+          },
+          "output_tokens": {
+            "mean": 3,
+            "min": 2,
+            "max": 8
+          },
+          "total_duration_ms": {
+            "mean": 11055.699999999999,
+            "min": 9141,
+            "max": 17241
+          }
+        }
+      },
+      {
+        "dimension": "input_tokens",
+        "bucket": "257-1024",
+        "stats": {
+          "total_requests": 1,
+          "ttft_ms": {
+            "mean": 398897,
+            "min": 398897,
+            "max": 398897
+          },
+          "tokens_per_second": {
+            "mean": 1.2774551081299528,
+            "min": 1.2774551081299528,
+            "max": 1.2774551081299528
+          },
+          "input_tokens": {
+            "mean": 304,
+            "min": 304,
+            "max": 304
+          },
+          "output_tokens": {
+            "mean": 19,
+            "min": 19,
+            "max": 19
+          },
+          "total_duration_ms": {
+            "mean": 219176,
+            "min": 219176,
+            "max": 219176
+          }
+        }
+      }
+    ]
+  },
+  {
+    "model_name": "granite3.1-moe:3b",
+    "last_updated_utc": "2026-01-03T00:28:03.9739834Z",
+    "overall_stats": {
+      "total_requests": 205,
+      "ttft_ms": {
+        "mean": 6858.24,
+        "min": 3608,
+        "max": 26804
+      },
+      "tokens_per_second": {
+        "mean": 5.991257429498038,
+        "min": 4.3519036385481344,
+        "max": 8.107294793059111
+      },
+      "input_tokens": {
+        "mean": 108.92000000000003,
+        "min": 96,
+        "max": 203
+      },
+      "output_tokens": {
+        "mean": 4.28,
+        "min": 2,
+        "max": 16
+      },
+      "total_duration_ms": {
+        "mean": 6641.319999999999,
+        "min": 3312,
+        "max": 26554
+      }
+    },
+    "performance_buckets": [
+      {
+        "dimension": "input_tokens",
+        "bucket": "0-256",
+        "stats": {
+          "total_requests": 201,
+          "ttft_ms": {
+            "mean": 6858.24,
+            "min": 3608,
+            "max": 26804
+          },
+          "tokens_per_second": {
+            "mean": 5.991257429498038,
+            "min": 4.3519036385481344,
+            "max": 8.107294793059111
+          },
+          "input_tokens": {
+            "mean": 108.92000000000003,
+            "min": 96,
+            "max": 203
+          },
+          "output_tokens": {
+            "mean": 4.28,
+            "min": 2,
+            "max": 16
+          },
+          "total_duration_ms": {
+            "mean": 6641.319999999999,
+            "min": 3312,
+            "max": 26554
+          }
+        }
+      },
+      {
+        "dimension": "input_tokens",
+        "bucket": "257-1024",
+        "stats": {
+          "total_requests": 4,
+          "ttft_ms": {
+            "mean": 180884.5,
+            "min": 76157,
+            "max": 311000
+          },
+          "tokens_per_second": {
+            "mean": 3.117342312444294,
+            "min": 2.2141410913879542,
+            "max": 3.8348749144189562
+          },
+          "input_tokens": {
+            "mean": 562,
+            "min": 313,
+            "max": 951
+          },
+          "output_tokens": {
+            "mean": 170,
+            "min": 25,
+            "max": 307
+          },
+          "total_duration_ms": {
+            "mean": 180650.25,
+            "min": 76039,
+            "max": 310890
+          }
+        }
+      }
+    ]
+  },
+  {
+    "model_name": "granite4:1b",
+    "last_updated_utc": "2025-11-25T00:01:10.8274089Z",
+    "overall_stats": {
+      "total_requests": 65,
+      "ttft_ms": {
+        "mean": 87782.75,
+        "min": 73004,
+        "max": 94540
+      },
+      "tokens_per_second": {
+        "mean": 0.7326751283258106,
+        "min": 0.7239762304316396,
+        "max": 0.7575594523446569
+      },
+      "input_tokens": {
+        "mean": 48,
+        "min": 48,
+        "max": 48
+      },
+      "output_tokens": {
+        "mean": 23.25,
+        "min": 13,
+        "max": 28
+      },
+      "total_duration_ms": {
+        "mean": 87674.75,
+        "min": 72898,
+        "max": 94434
+      }
+    },
+    "performance_buckets": [
+      {
+        "dimension": "input_tokens",
+        "bucket": "0-256",
+        "stats": {
+          "total_requests": 64,
+          "ttft_ms": {
+            "mean": 87782.75,
+            "min": 73004,
+            "max": 94540
+          },
+          "tokens_per_second": {
+            "mean": 0.7326751283258106,
+            "min": 0.7239762304316396,
+            "max": 0.7575594523446569
+          },
+          "input_tokens": {
+            "mean": 48,
+            "min": 48,
+            "max": 48
+          },
+          "output_tokens": {
+            "mean": 23.25,
+            "min": 13,
+            "max": 28
+          },
+          "total_duration_ms": {
+            "mean": 87674.75,
+            "min": 72898,
+            "max": 94434
+          }
+        }
+      },
+      {
+        "dimension": "input_tokens",
+        "bucket": "257-1024",
+        "stats": {
+          "total_requests": 1,
+          "ttft_ms": {
+            "mean": 758574,
+            "min": 758574,
+            "max": 758574
+          },
+          "tokens_per_second": {
+            "mean": 0.6997120171365447,
+            "min": 0.6997120171365447,
+            "max": 0.6997120171365447
+          },
+          "input_tokens": {
+            "mean": 321,
+            "min": 321,
+            "max": 321
+          },
+          "output_tokens": {
+            "mean": 22,
+            "min": 22,
+            "max": 22
+          },
+          "total_duration_ms": {
+            "mean": 429846,
+            "min": 429846,
+            "max": 429846
+          }
+        }
+      }
+    ]
+  },
+  {
+    "model_name": "granite4:micro",
+    "last_updated_utc": "2025-12-22T01:00:15.7261479Z",
+    "overall_stats": {
+      "total_requests": 71,
+      "ttft_ms": {
+        "mean": 11677.699999999999,
+        "min": 10070,
+        "max": 14183
+      },
+      "tokens_per_second": {
+        "mean": 2.26912281786914,
+        "min": 1.6120926513205458,
+        "max": 2.4503037629936038
+      },
+      "input_tokens": {
+        "mean": 55,
+        "min": 53,
+        "max": 59
+      },
+      "output_tokens": {
+        "mean": 2.3000000000000003,
+        "min": 2,
+        "max": 4
+      },
+      "total_duration_ms": {
+        "mean": 11404.8,
+        "min": 9821,
+        "max": 13836
+      }
+    },
+    "performance_buckets": [
+      {
+        "dimension": "input_tokens",
+        "bucket": "0-256",
+        "stats": {
+          "total_requests": 71,
+          "ttft_ms": {
+            "mean": 11677.699999999999,
+            "min": 10070,
+            "max": 14183
+          },
+          "tokens_per_second": {
+            "mean": 2.26912281786914,
+            "min": 1.6120926513205458,
+            "max": 2.4503037629936038
+          },
+          "input_tokens": {
+            "mean": 55,
+            "min": 53,
+            "max": 59
+          },
+          "output_tokens": {
+            "mean": 2.3000000000000003,
+            "min": 2,
+            "max": 4
+          },
+          "total_duration_ms": {
+            "mean": 11404.8,
+            "min": 9821,
+            "max": 13836
+          }
+        }
+      }
+    ]
+  },
+  {
+    "model_name": "qwen3:1.7b",
+    "last_updated_utc": "2025-11-24T23:16:48.1951492Z",
+    "overall_stats": {
+      "total_requests": 4,
+      "ttft_ms": {
+        "mean": 470387,
+        "min": 470387,
+        "max": 470387
+      },
+      "tokens_per_second": {
+        "mean": 1.668803351595482,
+        "min": 1.668803351595482,
+        "max": 1.668803351595482
+      },
+      "input_tokens": {
+        "mean": 26,
+        "min": 26,
+        "max": 26
+      },
+      "output_tokens": {
+        "mean": 768,
+        "min": 768,
+        "max": 768
+      },
+      "total_duration_ms": {
+        "mean": 469924,
+        "min": 469924,
+        "max": 469924
+      }
+    },
+    "performance_buckets": [
+      {
+        "dimension": "input_tokens",
+        "bucket": "0-256",
+        "stats": {
+          "total_requests": 4,
+          "ttft_ms": {
+            "mean": 470387,
+            "min": 470387,
+            "max": 470387
+          },
+          "tokens_per_second": {
+            "mean": 1.668803351595482,
+            "min": 1.668803351595482,
+            "max": 1.668803351595482
+          },
+          "input_tokens": {
+            "mean": 26,
+            "min": 26,
+            "max": 26
+          },
+          "output_tokens": {
+            "mean": 768,
+            "min": 768,
+            "max": 768
+          },
+          "total_duration_ms": {
+            "mean": 469924,
+            "min": 469924,
+            "max": 469924
+          }
+        }
+      }
+    ]
+  },
+  {
+    "model_name": "internlm2_5-1_8b-chat-Q4_K_M",
+    "last_updated_utc": "2026-01-08T01:31:06.627564817Z",
+    "overall_stats": {
+      "total_requests": 1,
+      "ttft_ms": {
+        "mean": 27238,
+        "min": 27238,
+        "max": 27238
+      },
+      "tokens_per_second": {
+        "mean": 0,
+        "min": 0,
+        "max": 0
+      },
+      "input_tokens": {
+        "mean": 0,
+        "min": 0,
+        "max": 0
+      },
+      "output_tokens": {
+        "mean": 0,
+        "min": 0,
+        "max": 0
+      },
+      "total_duration_ms": {
+        "mean": 0,
+        "min": 0,
+        "max": 0
+      }
+    },
+    "performance_buckets": [
+      {
+        "dimension": "input_tokens",
+        "bucket": "0-256",
+        "stats": {
+          "total_requests": 1,
+          "ttft_ms": {
+            "mean": 27238,
+            "min": 27238,
+            "max": 27238
+          },
+          "tokens_per_second": {
+            "mean": 0,
+            "min": 0,
+            "max": 0
+          },
+          "input_tokens": {
+            "mean": 0,
+            "min": 0,
+            "max": 0
+          },
+          "output_tokens": {
+            "mean": 0,
+            "min": 0,
+            "max": 0
+          },
+          "total_duration_ms": {
+            "mean": 0,
+            "min": 0,
+            "max": 0
+          }
+        }
+      }
+    ]
+  }
+]

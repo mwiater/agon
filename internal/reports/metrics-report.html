@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>agon: LLM Benchmark Report</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+	    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Two+Tone" rel="stylesheet">
+  <style>
+    body { background-color: #f5f7fb; }
+    .card { border: none; }
+    .table thead th { cursor: pointer; }
+    .sort-icon { font-size: 0.8rem; margin-left: 0.25rem; }
+    .accordion-button .badge { margin-left: 0.5rem; }
+    .list-group-item { display: flex; align-items: center; justify-content: space-between; }
+    .notes-list li { margin-bottom: 0.25rem; }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-dark bg-dark">
+    <div class="container-fluid">
+      <span class="navbar-brand mb-0 h1">agon: LLM Benchmark Report</span>
+      <span class="text-light">Generated: <span id="generatedAt">—</span></span>
+    </div>
+  </nav>
+  <main class="container-fluid my-4">
+    <div class="row g-3">
+      <div class="col-sm-6 col-lg-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <p style="font-size: 1.5em;" class="text-muted mb-1"><span style="display: inline-block;font-size: 1.5em;vertical-align: top;" class="material-icons-two-tone">speed</span> Fastest Model</p>
+            <h5 class="card-title" id="fastestModel">—</h5>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <p style="font-size: 1.5em;" class="text-muted mb-1"><span style="display: inline-block;font-size: 1.5em;vertical-align: top;" class="material-icons-two-tone">speed</span> Best Latency</p>
+            <h5 class="card-title" id="bestLatencyModel">—</h5>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <p style="font-size: 1.5em;" class="text-muted mb-1"><span style="display: inline-block;font-size: 1.5em;vertical-align: top;" class="material-icons-two-tone">speed</span> Most Efficient</p>
+            <h5 class="card-title" id="mostEfficientModel">-</h5>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <p style="font-size: 1.5em;" class="text-muted mb-1"><span style="display: inline-block;font-size: 1.5em;vertical-align: top;" class="material-icons-two-tone">fact_check</span> Most Accurate</p>
+            <h5 class="card-title" id="mostAccurateModel">-</h5>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <p style="font-size: 1.5em;" class="text-muted mb-1"><span style="display: inline-block;font-size: 1.5em;vertical-align: top;" class="material-icons-two-tone">speed</span> Interactive-Ready Models</p>
+            <h5 class="card-title" id="interactiveCount">0</h5>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section class="mt-4">
+      <div class="card shadow-sm">
+        <div class="card-header bg-white">
+          <h5 class="mb-0">Model Comparison</h5>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-striped table-hover table-bordered table-sm" id="modelsTable">
+              <thead class="table-light">
+                <tr>
+                  <th class="sortable" data-type="text">Model <span class="material-icons-two-tone sort">import_export</span></th>
+                  <th class="sortable" data-type="number">Avg TPS <span class="material-icons-two-tone sort">import_export</span></th>
+                  <th class="sortable" data-type="number">Avg TTFT (s) <span class="material-icons-two-tone sort">import_export</span></th>
+                  <th class="sortable" data-type="number">Avg Total (s) <span class="material-icons-two-tone sort">import_export</span></th>
+                  <th class="sortable" data-type="number">Avg Output Tokens <span class="material-icons-two-tone sort">import_export</span></th>
+                  <th class="sortable" data-type="number">Accuracy (%) <span class="material-icons-two-tone sort">import_export</span></th>
+                  <th class="sortable" data-type="number">Throughput Score <span class="material-icons-two-tone sort">import_export</span></th>
+                  <th class="sortable" data-type="number">Latency Score <span class="material-icons-two-tone sort">import_export</span></th>
+                  <th class="sortable" data-type="number">Efficiency Score <span class="material-icons-two-tone sort">import_export</span></th>
+                  <th class="sortable" data-type="text">Speed Tier <span class="material-icons-two-tone sort">import_export</span></th>
+                  <th class="sortable" data-type="text">Suitability <span class="material-icons-two-tone sort">import_export</span></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mt-4">
+      <div class="card shadow-sm">
+        <div class="card-header bg-white">
+          <h5 class="mb-0">Per-Model Details</h5>
+        </div>
+        <div class="card-body">
+          <div class="accordion" id="modelAccordion"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mt-4">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="card shadow-sm h-100">
+            <div class="card-header bg-white">
+              <h5 class="mb-0">Anomalies</h5>
+            </div>
+            <div class="card-body">
+              <div class="list-group" id="anomaliesList"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card shadow-sm h-100">
+            <div class="card-header bg-white">
+              <h5 class="mb-0">Recommendations</h5>
+            </div>
+            <div class="card-body">
+              <ol class="list-group list-group-numbered" id="recommendationsList"></ol>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    var analysis = {"generatedAt":"2025-12-22T01:01:03.1132338Z","hostInfo":{"clusterName":"","notes":""},"overall":{"fastestModel":"granite3.1-moe:1b","bestLatencyModel":"llama3.2:1b","mostEfficientModel":"llama3.2:1b","mostAccurateModel":"granite4:micro","summaryNotes":["Fastest model by throughput is granite3.1-moe:1b with 8.24 tokens/sec.","Best latency model is llama3.2:1b with time to first token ≈ 3.74s.","Most efficient model is llama3.2:1b with an efficiency score of 90.4.","Most accurate model is granite4:micro with 75.0% accuracy."]},"models":[{"modelName":"deepseek-r1:1.5b","benchmarkCount":2,"avg":{"tokensPerSecond":2.5360494250522128,"timeToFirstTokenSeconds":89.514,"totalExecutionTimeSeconds":89.074,"inputTokens":45,"outputTokens":193},"min":{"tokensPerSecond":2.5360494250522128,"timeToFirstTokenSeconds":89.514,"totalExecutionTimeSeconds":89.074,"inputTokens":45,"outputTokens":193},"max":{"tokensPerSecond":2.5360494250522128,"timeToFirstTokenSeconds":89.514,"totalExecutionTimeSeconds":89.074,"inputTokens":45,"outputTokens":193},"variance":{"tokensPerSecondStdDev":0,"timeToFirstTokenStdDevSeconds":0,"outputTokensStdDev":0},"accuracy":{"total":0,"correct":0,"accuracy":0},"scores":{"throughputScore":30.777183796984886,"latencyScore":4.183367964787632,"efficiencyScore":20.139657464105984},"labels":{"relativeSpeedTier":"slow","latencyProfile":"high","stability":"stable","interactiveSuitability":"borderline"},"derivedRatios":{"latencyShareOfTotal":1,"relativeToFastest":0.30777183796984886},"notes":["Very high time to first token; most of the time is spent before streaming."]},{"modelName":"gemma3:1b","benchmarkCount":160,"avg":{"tokensPerSecond":3.193063585779162,"timeToFirstTokenSeconds":7.4165,"totalExecutionTimeSeconds":7.1555,"inputTokens":56,"outputTokens":4},"min":{"tokensPerSecond":2.630797262731636,"timeToFirstTokenSeconds":5.838,"totalExecutionTimeSeconds":5.595,"inputTokens":54,"outputTokens":2},"max":{"tokensPerSecond":4.289187485918061,"timeToFirstTokenSeconds":9.594,"totalExecutionTimeSeconds":9.307,"inputTokens":63,"outputTokens":5},"variance":{"tokensPerSecondStdDev":0,"timeToFirstTokenStdDevSeconds":0,"outputTokensStdDev":0},"accuracy":{"total":20,"correct":6,"accuracy":0.3},"scores":{"throughputScore":38.75062681515429,"latencyScore":50.49147171846558,"efficiencyScore":43.44696477647881},"labels":{"relativeSpeedTier":"slow","latencyProfile":"low","stability":"stable","interactiveSuitability":"good"},"derivedRatios":{"latencyShareOfTotal":1,"relativeToFastest":0.3875062681515429},"notes":[]},{"modelName":"granite3.1-moe:1b","benchmarkCount":131,"avg":{"tokensPerSecond":8.24003080262548,"timeToFirstTokenSeconds":89.81725,"totalExecutionTimeSeconds":31.002375,"inputTokens":276,"outputTokens":36},"min":{"tokensPerSecond":7.67902357545296,"timeToFirstTokenSeconds":33.493,"totalExecutionTimeSeconds":25.547,"inputTokens":227,"outputTokens":17},"max":{"tokensPerSecond":8.902808948555771,"timeToFirstTokenSeconds":219.679,"totalExecutionTimeSeconds":38.836,"inputTokens":338,"outputTokens":73},"variance":{"tokensPerSecondStdDev":0,"timeToFirstTokenStdDevSeconds":0,"outputTokensStdDev":0},"accuracy":{"total":0,"correct":0,"accuracy":0},"scores":{"throughputScore":100,"latencyScore":4.169243658651317,"efficiencyScore":61.66769746346053},"labels":{"relativeSpeedTier":"top","latencyProfile":"high","stability":"stable","interactiveSuitability":"borderline"},"derivedRatios":{"latencyShareOfTotal":1,"relativeToFastest":1},"notes":["Very high time to first token; most of the time is spent before streaming.","This is one of the fastest models by throughput."]},{"modelName":"granite3.1-moe:3b","benchmarkCount":130,"avg":{"tokensPerSecond":5.739505104596049,"timeToFirstTokenSeconds":4.5373,"totalExecutionTimeSeconds":4.2636,"inputTokens":65,"outputTokens":5},"min":{"tokensPerSecond":4.699810073667933,"timeToFirstTokenSeconds":3.308,"totalExecutionTimeSeconds":3.045,"inputTokens":61,"outputTokens":2},"max":{"tokensPerSecond":8.289555053283125,"timeToFirstTokenSeconds":7.042,"totalExecutionTimeSeconds":6.649,"inputTokens":70,"outputTokens":11},"variance":{"tokensPerSecondStdDev":0,"timeToFirstTokenStdDevSeconds":0,"outputTokensStdDev":0},"accuracy":{"total":40,"correct":25,"accuracy":0.625},"scores":{"throughputScore":69.6539277834653,"latencyScore":82.53146144182664,"efficiencyScore":74.80494124680983},"labels":{"relativeSpeedTier":"mid","latencyProfile":"low","stability":"stable","interactiveSuitability":"good"},"derivedRatios":{"latencyShareOfTotal":1,"relativeToFastest":0.6965392778346531},"notes":[]},{"modelName":"granite4:1b","benchmarkCount":65,"avg":{"tokensPerSecond":0.7326751283258106,"timeToFirstTokenSeconds":87.78275,"totalExecutionTimeSeconds":87.67475,"inputTokens":48,"outputTokens":23},"min":{"tokensPerSecond":0.7239762304316396,"timeToFirstTokenSeconds":73.004,"totalExecutionTimeSeconds":72.898,"inputTokens":48,"outputTokens":13},"max":{"tokensPerSecond":0.7575594523446569,"timeToFirstTokenSeconds":94.54,"totalExecutionTimeSeconds":94.434,"inputTokens":48,"outputTokens":28},"variance":{"tokensPerSecondStdDev":0,"timeToFirstTokenStdDevSeconds":0,"outputTokensStdDev":0},"accuracy":{"total":0,"correct":0,"accuracy":0},"scores":{"throughputScore":8.891655211924231,"latencyScore":4.265872281285333,"efficiencyScore":7.041342039668671},"labels":{"relativeSpeedTier":"slow","latencyProfile":"high","stability":"stable","interactiveSuitability":"borderline"},"derivedRatios":{"latencyShareOfTotal":1,"relativeToFastest":0.08891655211924232},"notes":["Very high time to first token; most of the time is spent before streaming."]},{"modelName":"granite4:350m","benchmarkCount":148,"avg":{"tokensPerSecond":5.3697857173094174,"timeToFirstTokenSeconds":4.7049,"totalExecutionTimeSeconds":4.4922,"inputTokens":55,"outputTokens":4},"min":{"tokensPerSecond":3.22643256189349,"timeToFirstTokenSeconds":3.458,"totalExecutionTimeSeconds":3.327,"inputTokens":53,"outputTokens":2},"max":{"tokensPerSecond":6.124584059591616,"timeToFirstTokenSeconds":11.517,"totalExecutionTimeSeconds":11.287,"inputTokens":59,"outputTokens":23},"variance":{"tokensPerSecondStdDev":0,"timeToFirstTokenStdDevSeconds":0,"outputTokensStdDev":0},"accuracy":{"total":20,"correct":6,"accuracy":0.3},"scores":{"throughputScore":65.16705878815974,"latencyScore":79.59148972347977,"efficiencyScore":70.93683116228775},"labels":{"relativeSpeedTier":"mid","latencyProfile":"low","stability":"stable","interactiveSuitability":"good"},"derivedRatios":{"latencyShareOfTotal":1,"relativeToFastest":0.6516705878815974},"notes":[]},{"modelName":"granite4:micro","benchmarkCount":71,"avg":{"tokensPerSecond":2.26912281786914,"timeToFirstTokenSeconds":11.677699999,"totalExecutionTimeSeconds":11.4048,"inputTokens":55,"outputTokens":2},"min":{"tokensPerSecond":1.6120926513205458,"timeToFirstTokenSeconds":10.07,"totalExecutionTimeSeconds":9.821,"inputTokens":53,"outputTokens":2},"max":{"tokensPerSecond":2.4503037629936038,"timeToFirstTokenSeconds":14.183,"totalExecutionTimeSeconds":13.836,"inputTokens":59,"outputTokens":4},"variance":{"tokensPerSecondStdDev":0,"timeToFirstTokenStdDevSeconds":0,"outputTokensStdDev":0},"accuracy":{"total":20,"correct":15,"accuracy":0.75},"scores":{"throughputScore":27.5377953338007,"latencyScore":32.06710225747083,"efficiencyScore":29.34951810326875},"labels":{"relativeSpeedTier":"slow","latencyProfile":"medium","stability":"stable","interactiveSuitability":"good"},"derivedRatios":{"latencyShareOfTotal":1,"relativeToFastest":0.275377953338007},"notes":[]},{"modelName":"llama3.2:1b","benchmarkCount":145,"avg":{"tokensPerSecond":6.91832784198799,"timeToFirstTokenSeconds":3.7447,"totalExecutionTimeSeconds":3.432799999,"inputTokens":67,"outputTokens":2},"min":{"tokensPerSecond":5.437241404119164,"timeToFirstTokenSeconds":3.26,"totalExecutionTimeSeconds":3.081,"inputTokens":65,"outputTokens":2},"max":{"tokensPerSecond":7.346337710152781,"timeToFirstTokenSeconds":4.316,"totalExecutionTimeSeconds":4.074,"inputTokens":71,"outputTokens":3},"variance":{"tokensPerSecondStdDev":0,"timeToFirstTokenStdDevSeconds":0,"outputTokensStdDev":0},"accuracy":{"total":20,"correct":4,"accuracy":0.2},"scores":{"throughputScore":83.95997548678626,"latencyScore":100,"efficiencyScore":90.37598529207176},"labels":{"relativeSpeedTier":"top","latencyProfile":"low","stability":"stable","interactiveSuitability":"good"},"derivedRatios":{"latencyShareOfTotal":1,"relativeToFastest":0.8395997548678626},"notes":["This is one of the fastest models by throughput."]},{"modelName":"llama3.2:3b","benchmarkCount":81,"avg":{"tokensPerSecond":2.3047845699616882,"timeToFirstTokenSeconds":11.2538,"totalExecutionTimeSeconds":11.055699999,"inputTokens":67,"outputTokens":3},"min":{"tokensPerSecond":1.481902063948219,"timeToFirstTokenSeconds":9.267,"totalExecutionTimeSeconds":9.141,"inputTokens":65,"outputTokens":2},"max":{"tokensPerSecond":2.580970336910499,"timeToFirstTokenSeconds":17.382,"totalExecutionTimeSeconds":17.241,"inputTokens":71,"outputTokens":8},"variance":{"tokensPerSecondStdDev":0,"timeToFirstTokenStdDevSeconds":0,"outputTokensStdDev":0},"accuracy":{"total":20,"correct":14,"accuracy":0.7},"scores":{"throughputScore":27.97058196951553,"latencyScore":33.274982672519506,"efficiencyScore":30.09234225071712},"labels":{"relativeSpeedTier":"slow","latencyProfile":"medium","stability":"stable","interactiveSuitability":"good"},"derivedRatios":{"latencyShareOfTotal":1,"relativeToFastest":0.2797058196951553},"notes":[]},{"modelName":"phi4-mini:3.8b","benchmarkCount":4,"avg":{"tokensPerSecond":2.134538597421711,"timeToFirstTokenSeconds":31.915,"totalExecutionTimeSeconds":31.639,"inputTokens":44,"outputTokens":2},"min":{"tokensPerSecond":2.134538597421711,"timeToFirstTokenSeconds":31.915,"totalExecutionTimeSeconds":31.639,"inputTokens":44,"outputTokens":2},"max":{"tokensPerSecond":2.134538597421711,"timeToFirstTokenSeconds":31.915,"totalExecutionTimeSeconds":31.639,"inputTokens":44,"outputTokens":2},"variance":{"tokensPerSecondStdDev":0,"timeToFirstTokenStdDevSeconds":0,"outputTokensStdDev":0},"accuracy":{"total":0,"correct":0,"accuracy":0},"scores":{"throughputScore":25.904497793158654,"latencyScore":11.733354222152593,"efficiencyScore":20.236040364756228},"labels":{"relativeSpeedTier":"slow","latencyProfile":"medium","stability":"stable","interactiveSuitability":"good"},"derivedRatios":{"latencyShareOfTotal":1,"relativeToFastest":0.25904497793158654},"notes":[]},{"modelName":"qwen3:0.6b","benchmarkCount":12,"avg":{"tokensPerSecond":3.4659959533323828,"timeToFirstTokenSeconds":246.26775,"totalExecutionTimeSeconds":94.475,"inputTokens":296,"outputTokens":106},"min":{"tokensPerSecond":2.7217854787872873,"timeToFirstTokenSeconds":185.37,"totalExecutionTimeSeconds":80.634,"inputTokens":296,"outputTokens":101},"max":{"tokensPerSecond":4.097205949708717,"timeToFirstTokenSeconds":323.35,"totalExecutionTimeSeconds":112.084,"inputTokens":296,"outputTokens":110},"variance":{"tokensPerSecondStdDev":0,"timeToFirstTokenStdDevSeconds":0,"outputTokensStdDev":0},"accuracy":{"total":0,"correct":0,"accuracy":0},"scores":{"throughputScore":42.062900447265676,"latencyScore":1.5205807500170037,"efficiencyScore":25.845972568366207},"labels":{"relativeSpeedTier":"mid","latencyProfile":"high","stability":"stable","interactiveSuitability":"unusable"},"derivedRatios":{"latencyShareOfTotal":1,"relativeToFastest":0.4206290044726568},"notes":["Very high time to first token; most of the time is spent before streaming."]},{"modelName":"qwen3:1.7b","benchmarkCount":4,"avg":{"tokensPerSecond":1.668803351595482,"timeToFirstTokenSeconds":470.387,"totalExecutionTimeSeconds":469.924,"inputTokens":26,"outputTokens":768},"min":{"tokensPerSecond":1.668803351595482,"timeToFirstTokenSeconds":470.387,"totalExecutionTimeSeconds":469.924,"inputTokens":26,"outputTokens":768},"max":{"tokensPerSecond":1.668803351595482,"timeToFirstTokenSeconds":470.387,"totalExecutionTimeSeconds":469.924,"inputTokens":26,"outputTokens":768},"variance":{"tokensPerSecondStdDev":0,"timeToFirstTokenStdDevSeconds":0,"outputTokensStdDev":0},"accuracy":{"total":0,"correct":0,"accuracy":0},"scores":{"throughputScore":20.25239215202642,"latencyScore":0.796089177634586,"efficiencyScore":12.469870962269686},"labels":{"relativeSpeedTier":"slow","latencyProfile":"high","stability":"stable","interactiveSuitability":"unusable"},"derivedRatios":{"latencyShareOfTotal":1,"relativeToFastest":0.2025239215202642},"notes":["Very high time to first token; most of the time is spent before streaming."]},{"modelName":"smollm2:1.7b","benchmarkCount":115,"avg":{"tokensPerSecond":4.142320005166797,"timeToFirstTokenSeconds":6.3159,"totalExecutionTimeSeconds":6.0155,"inputTokens":56,"outputTokens":3},"min":{"tokensPerSecond":3.4150909755647234,"timeToFirstTokenSeconds":4.891,"totalExecutionTimeSeconds":4.728,"inputTokens":53,"outputTokens":2},"max":{"tokensPerSecond":5.448948512591261,"timeToFirstTokenSeconds":8.492,"totalExecutionTimeSeconds":7.722,"inputTokens":62,"outputTokens":5},"variance":{"tokensPerSecondStdDev":0,"timeToFirstTokenStdDevSeconds":0,"outputTokensStdDev":0},"accuracy":{"total":20,"correct":5,"accuracy":0.25},"scores":{"throughputScore":50.27068592810298,"latencyScore":59.290045757532575,"efficiencyScore":53.878429859874814},"labels":{"relativeSpeedTier":"mid","latencyProfile":"low","stability":"stable","interactiveSuitability":"good"},"derivedRatios":{"latencyShareOfTotal":1,"relativeToFastest":0.5027068592810298},"notes":[]},{"modelName":"smollm2:360m","benchmarkCount":35,"avg":{"tokensPerSecond":3.1851254336476615,"timeToFirstTokenSeconds":21.845,"totalExecutionTimeSeconds":21.462,"inputTokens":56,"outputTokens":3},"min":{"tokensPerSecond":3.1851254336476615,"timeToFirstTokenSeconds":21.845,"totalExecutionTimeSeconds":21.462,"inputTokens":56,"outputTokens":3},"max":{"tokensPerSecond":3.1851254336476615,"timeToFirstTokenSeconds":21.845,"totalExecutionTimeSeconds":21.462,"inputTokens":56,"outputTokens":3},"variance":{"tokensPerSecondStdDev":0,"timeToFirstTokenStdDevSeconds":0,"outputTokensStdDev":0},"accuracy":{"total":0,"correct":0,"accuracy":0},"scores":{"throughputScore":38.654290377565104,"latencyScore":17.14213778896773,"efficiencyScore":30.049429342126153},"labels":{"relativeSpeedTier":"slow","latencyProfile":"medium","stability":"stable","interactiveSuitability":"good"},"derivedRatios":{"latencyShareOfTotal":1,"relativeToFastest":0.38654290377565104},"notes":[]}],"rankings":{"byThroughput":[{"modelName":"granite3.1-moe:1b","avgTokensPerSecond":8.24003080262548},{"modelName":"llama3.2:1b","avgTokensPerSecond":6.91832784198799},{"modelName":"granite3.1-moe:3b","avgTokensPerSecond":5.739505104596049},{"modelName":"granite4:350m","avgTokensPerSecond":5.3697857173094174},{"modelName":"smollm2:1.7b","avgTokensPerSecond":4.142320005166797},{"modelName":"qwen3:0.6b","avgTokensPerSecond":3.4659959533323828},{"modelName":"gemma3:1b","avgTokensPerSecond":3.193063585779162},{"modelName":"smollm2:360m","avgTokensPerSecond":3.1851254336476615},{"modelName":"deepseek-r1:1.5b","avgTokensPerSecond":2.5360494250522128},{"modelName":"llama3.2:3b","avgTokensPerSecond":2.3047845699616882},{"modelName":"granite4:micro","avgTokensPerSecond":2.26912281786914},{"modelName":"phi4-mini:3.8b","avgTokensPerSecond":2.134538597421711},{"modelName":"qwen3:1.7b","avgTokensPerSecond":1.668803351595482},{"modelName":"granite4:1b","avgTokensPerSecond":0.7326751283258106}],"byLatency":[{"modelName":"llama3.2:1b","avgTimeToFirstTokenSeconds":3.7447},{"modelName":"granite3.1-moe:3b","avgTimeToFirstTokenSeconds":4.5373},{"modelName":"granite4:350m","avgTimeToFirstTokenSeconds":4.7049},{"modelName":"smollm2:1.7b","avgTimeToFirstTokenSeconds":6.3159},{"modelName":"gemma3:1b","avgTimeToFirstTokenSeconds":7.4165},{"modelName":"llama3.2:3b","avgTimeToFirstTokenSeconds":11.2538},{"modelName":"granite4:micro","avgTimeToFirstTokenSeconds":11.677699999},{"modelName":"smollm2:360m","avgTimeToFirstTokenSeconds":21.845},{"modelName":"phi4-mini:3.8b","avgTimeToFirstTokenSeconds":31.915},{"modelName":"granite4:1b","avgTimeToFirstTokenSeconds":87.78275},{"modelName":"deepseek-r1:1.5b","avgTimeToFirstTokenSeconds":89.514},{"modelName":"granite3.1-moe:1b","avgTimeToFirstTokenSeconds":89.81725},{"modelName":"qwen3:0.6b","avgTimeToFirstTokenSeconds":246.26775},{"modelName":"qwen3:1.7b","avgTimeToFirstTokenSeconds":470.387}],"byEfficiencyScore":[{"modelName":"llama3.2:1b","efficiencyScore":90.37598529207176},{"modelName":"granite3.1-moe:3b","efficiencyScore":74.80494124680983},{"modelName":"granite4:350m","efficiencyScore":70.93683116228775},{"modelName":"granite3.1-moe:1b","efficiencyScore":61.66769746346053},{"modelName":"smollm2:1.7b","efficiencyScore":53.878429859874814},{"modelName":"gemma3:1b","efficiencyScore":43.44696477647881},{"modelName":"llama3.2:3b","efficiencyScore":30.09234225071712},{"modelName":"smollm2:360m","efficiencyScore":30.049429342126153},{"modelName":"granite4:micro","efficiencyScore":29.34951810326875},{"modelName":"qwen3:0.6b","efficiencyScore":25.845972568366207},{"modelName":"phi4-mini:3.8b","efficiencyScore":20.236040364756228},{"modelName":"deepseek-r1:1.5b","efficiencyScore":20.139657464105984},{"modelName":"qwen3:1.7b","efficiencyScore":12.469870962269686},{"modelName":"granite4:1b","efficiencyScore":7.041342039668671}],"byAccuracy":[{"modelName":"granite4:micro","accuracy":0.75},{"modelName":"llama3.2:3b","accuracy":0.7},{"modelName":"granite3.1-moe:3b","accuracy":0.625},{"modelName":"gemma3:1b","accuracy":0.3},{"modelName":"granite4:350m","accuracy":0.3},{"modelName":"smollm2:1.7b","accuracy":0.25},{"modelName":"llama3.2:1b","accuracy":0.2}]},"anomalies":[{"type":"slow_small_model","modelName":"gemma3:1b","severity":"warning","message":"gemma3:1b is significantly slower than other models despite similar or smaller outputs; fixed overhead may dominate on this hardware."},{"type":"slow_small_model","modelName":"granite4:1b","severity":"warning","message":"granite4:1b is significantly slower than other models despite similar or smaller outputs; fixed overhead may dominate on this hardware."},{"type":"slow_small_model","modelName":"granite4:micro","severity":"warning","message":"granite4:micro is significantly slower than other models despite similar or smaller outputs; fixed overhead may dominate on this hardware."},{"type":"slow_small_model","modelName":"llama3.2:3b","severity":"warning","message":"llama3.2:3b is significantly slower than other models despite similar or smaller outputs; fixed overhead may dominate on this hardware."},{"type":"slow_small_model","modelName":"phi4-mini:3.8b","severity":"warning","message":"phi4-mini:3.8b is significantly slower than other models despite similar or smaller outputs; fixed overhead may dominate on this hardware."},{"type":"very_high_latency","modelName":"qwen3:0.6b","severity":"critical","message":"qwen3:0.6b has extremely high time to first token, making it unsuitable for interactive workloads."},{"type":"very_high_latency","modelName":"qwen3:1.7b","severity":"critical","message":"qwen3:1.7b has extremely high time to first token, making it unsuitable for interactive workloads."},{"type":"slow_small_model","modelName":"smollm2:360m","severity":"warning","message":"smollm2:360m is significantly slower than other models despite similar or smaller outputs; fixed overhead may dominate on this hardware."}],"recommendations":["Use llama3.2:1b as the default interactive model on this hardware.","Avoid qwen3:0.6b for interactive usage; reserve it for batch-style or very small outputs.","Avoid qwen3:1.7b for interactive usage; reserve it for batch-style or very small outputs.","Consider keeping sessions warm and reducing context size to minimize TTFT across all models."]};
+  </script>
+  <script>
+    (function($) {
+      function formatNumber(value, decimals) {
+        if (value === null || value === undefined || isNaN(value)) {
+          return '—';
+        }
+        return Number(value).toFixed(decimals);
+      }
+
+      function createNumericCell(value, decimals) {
+        var display = formatNumber(value, decimals);
+        var $td = $('<td></td>').text(display);
+        if (!isNaN(value)) {
+          $td.attr('data-value', value);
+        }
+        return $td;
+      }
+
+      function updateSortIcons($header, direction) {
+				$header.closest('tr').find('.sort').each(function() {
+					$(this)[0].innerHTML = 'import_export'
+				});
+
+        if (direction === 'asc') {
+					$header.find('.sort')[0].innerHTML = 'keyboard_double_arrow_up'
+        } else if (direction === 'desc') {
+          $header.find('.sort')[0].innerHTML = 'keyboard_double_arrow_down'
+        }
+      }
+
+      function populateTable(models) {
+        var $tbody = $('#modelsTable tbody').empty();
+        models.forEach(function(model) {
+          var $row = $('<tr></tr>');
+          $row.append($('<td><span class="material-icons-two-tone">smart_toy</span> '+model.modelName+'</td>'))
+          $row.append(createNumericCell(model.avg.tokensPerSecond, 2));
+          $row.append(createNumericCell(model.avg.timeToFirstTokenSeconds, 2));
+          $row.append(createNumericCell(model.avg.totalExecutionTimeSeconds, 2));
+          $row.append(createNumericCell(model.avg.outputTokens, 1));
+          var accuracyPct = null;
+          if (model.accuracy && typeof model.accuracy.accuracy === 'number') {
+            accuracyPct = model.accuracy.accuracy * 100;
+          }
+          $row.append(createNumericCell(accuracyPct, 1));
+          $row.append(createNumericCell(model.scores.throughputScore, 1));
+          $row.append(createNumericCell(model.scores.latencyScore, 1));
+          $row.append(createNumericCell(model.scores.efficiencyScore, 1));
+          $row.append($('<td></td>').text(model.labels.relativeSpeedTier || '—'));
+          $row.append($('<td></td>').text(model.labels.interactiveSuitability || '—'));
+          $tbody.append($row);
+        });
+      }
+
+      function buildAccordion(models) {
+        var $accordion = $('#modelAccordion').empty();
+        models.forEach(function(model, index) {
+          var collapseID = 'model-details-' + index;
+          var headerID = 'heading-' + index;
+          var $item = $('<div class="accordion-item"></div>');
+          var badges = '';
+          if (model.labels.relativeSpeedTier) {
+            badges += '<span class="badge bg-primary text-uppercase">' + model.labels.relativeSpeedTier + '</span>';
+          }
+          if (model.labels.interactiveSuitability) {
+            var badgeClass = 'bg-success';
+            if (model.labels.interactiveSuitability === 'borderline') {
+              badgeClass = 'bg-warning text-dark';
+            } else if (model.labels.interactiveSuitability === 'unusable') {
+              badgeClass = 'bg-danger';
+            }
+            badges += '<span class="badge ' + badgeClass + ' text-uppercase">' + model.labels.interactiveSuitability + '</span>';
+          }
+          var header = ''
+            + '<h2 class="accordion-header" id="' + headerID + '">'
+            + '<button class="accordion-button ' + (index !== 0 ? 'collapsed' : '') + '" type="button" data-bs-toggle="collapse"'
+            + ' data-bs-target="#' + collapseID + '" aria-expanded="' + (index === 0 ? 'true' : 'false') + '"'
+            + ' aria-controls="' + collapseID + '">'
+            + model.modelName + ' ' + badges
+            + '</button>'
+            + '</h2>';
+          var notes = (model.notes || []).map(function(note) {
+            return '<li>' + note + '</li>';
+          }).join('');
+          if (!notes) {
+            notes = '<li>No significant notes for this model.</li>';
+          }
+          var accuracyPct = null;
+          var accuracyLine = '-';
+          if (model.accuracy && model.accuracy.total > 0) {
+            accuracyPct = model.accuracy.accuracy * 100;
+            accuracyLine = formatNumber(accuracyPct, 1) + '% (' + model.accuracy.correct + '/' + model.accuracy.total + ')';
+          }
+          var bodyParts = [];
+          bodyParts.push('<div id="' + collapseID + '" class="accordion-collapse collapse ' + (index === 0 ? 'show' : '') + '" aria-labelledby="' + headerID + '" data-bs-parent="#modelAccordion">');
+          bodyParts.push('<div class="accordion-body"><div class="row g-3">');
+          bodyParts.push('<div class="col-md-6">');
+          bodyParts.push('<h6>Average Stats</h6><ul class="list-unstyled mb-3">');
+          bodyParts.push('<li><strong>Tokens/sec:</strong> ' + formatNumber(model.avg.tokensPerSecond, 2) + '</li>');
+          bodyParts.push('<li><strong>TTFT (s):</strong> ' + formatNumber(model.avg.timeToFirstTokenSeconds, 2) + '</li>');
+          bodyParts.push('<li><strong>Total (s):</strong> ' + formatNumber(model.avg.totalExecutionTimeSeconds, 2) + '</li>');
+          bodyParts.push('<li><strong>Output tokens:</strong> ' + formatNumber(model.avg.outputTokens, 1) + '</li>');
+          bodyParts.push('<li><strong>Accuracy:</strong> ' + accuracyLine + '</li>');
+          bodyParts.push('</ul><h6>Variance</h6><ul class="list-unstyled mb-3">');
+          bodyParts.push('<li><strong>TPS σ:</strong> ' + formatNumber(model.variance.tokensPerSecondStdDev, 2) + '</li>');
+          bodyParts.push('<li><strong>TTFT σ (s):</strong> ' + formatNumber(model.variance.timeToFirstTokenStdDevSeconds, 2) + '</li>');
+          bodyParts.push('<li><strong>Output σ:</strong> ' + formatNumber(model.variance.outputTokensStdDev, 2) + '</li>');
+          bodyParts.push('</ul></div>');
+          bodyParts.push('<div class="col-md-6">');
+          bodyParts.push('<h6>Extremes</h6><ul class="list-unstyled mb-3">');
+          bodyParts.push('<li><strong>Min TPS:</strong> ' + formatNumber(model.min.tokensPerSecond, 2) + '</li>');
+          bodyParts.push('<li><strong>Max TPS:</strong> ' + formatNumber(model.max.tokensPerSecond, 2) + '</li>');
+          bodyParts.push('<li><strong>Min TTFT (s):</strong> ' + formatNumber(model.min.timeToFirstTokenSeconds, 2) + '</li>');
+          bodyParts.push('<li><strong>Max TTFT (s):</strong> ' + formatNumber(model.max.timeToFirstTokenSeconds, 2) + '</li>');
+          bodyParts.push('</ul><h6>Ratios &amp; Notes</h6><ul class="list-unstyled mb-3">');
+          bodyParts.push('<li><strong>Latency share:</strong> ' + formatNumber((model.derivedRatios.latencyShareOfTotal || 0) * 100, 1) + '%</li>');
+          bodyParts.push('<li><strong>Relative to fastest:</strong> ' + formatNumber((model.derivedRatios.relativeToFastest || 0) * 100, 1) + '%</li>');
+          bodyParts.push('</ul><ul class="notes-list">' + notes + '</ul>');
+          bodyParts.push('</div></div></div></div>');
+          var body = bodyParts.join('');
+          $item.append(header);
+          $item.append(body);
+          $accordion.append($item);
+        });
+      }
+
+      function populateAnomalies(anomalies) {
+        var $container = $('#anomaliesList').empty();
+        if (!anomalies || anomalies.length === 0) {
+          $container.append('<div class="list-group-item text-muted">No anomalies detected.</div>');
+          return;
+        }
+        anomalies.forEach(function(anomaly) {
+          var badgeClass = 'bg-secondary';
+          if (anomaly.severity === 'warning') {
+            badgeClass = 'bg-warning text-dark';
+          } else if (anomaly.severity === 'critical') {
+            badgeClass = 'bg-danger';
+          }
+          var item = ''
+            + '<div class="list-group-item">'
+            + '<div>'
+            + '<span class="badge ' + badgeClass + ' text-uppercase me-2">' + (anomaly.severity || 'info') + '</span>'
+            + '<strong>' + (anomaly.modelName || '—') + '</strong>'
+            + '</div>'
+            + '<p class="mb-0 small">' + (anomaly.message || '') + '</p>'
+            + '</div>';
+          $container.append(item);
+        });
+      }
+
+      function populateRecommendations(recommendations) {
+        var $list = $('#recommendationsList').empty();
+        if (!recommendations || recommendations.length === 0) {
+          $list.append('<li class="list-group-item">No recommendations generated.</li>');
+          return;
+        }
+        recommendations.forEach(function(rec) {
+          $list.append('<li class="list-group-item">' + rec + '</li>');
+        });
+      }
+
+      function attachSorting() {
+        $('#modelsTable thead th.sortable').each(function(index) {
+          var direction = 'none';
+          $(this).on('click', function() {
+            var type = $(this).data('type');
+            direction = direction === 'asc' ? 'desc' : 'asc';
+            sortTable(index, type, direction);
+            updateSortIcons($(this), direction);
+          });
+        });
+      }
+
+      function sortTable(columnIndex, type, direction) {
+        var $tbody = $('#modelsTable tbody');
+        var rows = $tbody.find('tr').get();
+        rows.sort(function(a, b) {
+          var A = $(a).children().eq(columnIndex).text();
+          var B = $(b).children().eq(columnIndex).text();
+          if (type === 'number') {
+            A = parseFloat($(a).children().eq(columnIndex).attr('data-value')) || 0;
+            B = parseFloat($(b).children().eq(columnIndex).attr('data-value')) || 0;
+          }
+          if (A < B) {
+            return direction === 'asc' ? -1 : 1;
+          }
+          if (A > B) {
+            return direction === 'asc' ? 1 : -1;
+          }
+          return 0;
+        });
+        $.each(rows, function(_, row) {
+          $tbody.append(row);
+        });
+      }
+
+      $(function() {
+        if (!analysis) {
+          return;
+        }
+        var generatedAt = analysis.generatedAt ? new Date(analysis.generatedAt) : null;
+        if (generatedAt) {
+          $('#generatedAt').text(generatedAt.toLocaleString());
+        }
+
+        var summary = analysis.overall || {};
+        $('#fastestModel').text(summary.fastestModel || '-');
+        $('#bestLatencyModel').text(summary.bestLatencyModel || '-');
+        $('#mostEfficientModel').text(summary.mostEfficientModel || '-');
+        $('#mostAccurateModel').text(summary.mostAccurateModel || '-');
+
+        var models = analysis.models || [];
+        var interactiveCount = models.filter(function(model) {
+          return model.labels && model.labels.interactiveSuitability === 'good';
+        }).length;
+        $('#interactiveCount').text(interactiveCount);
+
+        populateTable(models);
+        attachSorting();
+        buildAccordion(models);
+        populateAnomalies(analysis.anomalies || []);
+        populateRecommendations(analysis.recommendations || []);
+      });
+    })(jQuery);
+  </script>
+</body>
+</html>
