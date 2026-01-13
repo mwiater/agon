@@ -290,3 +290,65 @@ WantedBy=multi-user.target
    - The Startup directory must contain `servers\benchmark\agon-benchmark.yml`
      and the `llama.cpp-windows\llama-bench.exe` path.
    - Ensure the service account can read your `models_path` directory.
+
+---
+
+goreleaser release --snapshot --clean --skip=publish
+
+dist/agon-benchmark_linux_amd64_v1/agon-benchmark
+
+sudo nano /etc/systemd/system/agon-benchmark.service
+
+
+[Unit]
+Description=Agon Benchmark Service
+After=network-online.target
+
+[Service]
+ExecStart=/home/matt/projects/agon/dist/agon-benchmark_linux_amd64_v1/agon-benchmark
+User=matt
+Group=matt
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+sudo systemctl daemon-reload
+sudo systemctl enable agon-benchmark
+sudo systemctl stop agon-benchmark
+sudo systemctl start agon-benchmark
+sudo systemctl status agon-benchmark
+
+nano /home/matt/projects/agon/dist/agon-benchmark_linux_amd64_v1/benchmark.yml
+
+# benchmarks server config
+host: 0.0.0.0
+port: 9999
+type: "llama.cpp"
+api_base: https://o-udoo01.0nezer0.com
+models_path: /home/matt/projects/gollama/models
+timeout: 10800
+
+# benchmarks server config
+host: 0.0.0.0
+port: 9999
+type: "llama.cpp"
+api_base: https://o-udoo02.0nezer0.com
+models_path: /home/matt/projects/gollama/models
+timeout: 10800
+
+# benchmarks server config
+host: 0.0.0.0
+port: 9999
+type: "llama.cpp"
+api_base: https://o-udoo03.0nezer0.com
+models_path: /home/matt/projects/gollama/models
+timeout: 10800
+
+# benchmarks server config
+host: 0.0.0.0
+port: 9999
+type: "llama.cpp"
+api_base: https://o-udoo04.0nezer0.com
+models_path: /home/matt/projects/gollama/models
+timeout: 10800
