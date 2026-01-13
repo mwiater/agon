@@ -22,15 +22,21 @@ You'll need to set up at least one llama.cpp server that exposes the OpenAI-comp
 
 ## Table of Contents
 
+*   [Requirements](#requirements)
 *   [Example Setup](#example-setup)
 *   [Introduction & Features](#introduction--features)
 *   [Installation](#installation)
 *   [Configuration](#configuration)
 *   [Operating Modes](#operating-modes)
+*   [Pipeline Mode (doc)](PIPLINEMODE.md)
+*   [Benchmarking (doc)](BENCHMARKING.md)
+*   [Accuracy (doc)](ACCURACY.md)
+*   [Metrics](#metrics)
 *   [CLI Commands](#cli-commands)
 *   [Examples](#examples)
-*   [MCPMode](#mcpmode)
-*   [Building from Source](#building-from-source)
+*   [MCP Mode (doc)](MCPMODE.md)
+*   [Building](#building)
+*   [golangci-lint](#golangci-lint)
 *   [Testing](#testing)
 *   [License](#license)
 
@@ -42,7 +48,7 @@ I had an unused cluster of 4 Udoo x86 Ultra SBCs. I was curious about experiment
 * Fetch and evaluate the current weather and traffic via an MCP server for my home dashboard
 * Generate -> Format -> Expand -> Validate data in a pipeline of models
 
-I have several models availble on each of my 4 llama.cpp nodes: `agon list models`
+I have several models available on each of my 4 llama.cpp nodes: `agon list models`
 
 ```
 LlamaCpp01:
@@ -81,7 +87,7 @@ LlamaCpp02:
 
 ```
 
-These become the host/models to select from when running a chat in `multimidelMode`:
+These become the host/models to select from when running a chat in `multimodelMode`:
 
 ![Model Selection](.screens/agon_multimodelMode_model_selection.gif)
 
@@ -91,10 +97,10 @@ These become the host/models to select from when running a chat in `multimidelMo
 *   **Multi-Host Management**: Centralize connection details for any number of llama.cpp hosts in a single configuration file.
 *   **Interactive Chat**: A focused, terminal-based UI for conversational AI, with support for single-model, multi-model, and pipeline modes.
 *   **Multimodel Chat Mode**: Compare up to four models side-by-side in a single chat interface to evaluate their responses to the same prompt.
-*   **Pipeline Mode**: Chain up to four models together in a sequence, where the output of one stage becomes the input for the next.
 *   **Benchmark Mode**: Run a suite of benchmarks against a model to evaluate its performance.
 *   **Accuracy Batch**: Run a prompt suite against each model and log per-prompt correctness via `agon run accuracy`.
-*   **MCPMode**: Enables advanced functionality like tool usage by proxying requests through a local `agon-mcp` server.
+*   **Pipeline Mode**: See [PIPLINEMODE.md](PIPLINEMODE.md).
+*   **MCPMode**: See [MCPMODE.md](MCPMODE.md).
 *   **Comprehensive Model Management**: A suite of commands to `list` and `unload` models across all configured hosts, with `pull`, `delete`, and `sync` available for llama.cpp hosts running in router mode.
 *   **Detailed Configuration**: Fine-tune model parameters, system prompts, and application behavior through a simple JSON configuration.
 *   **Debug & Performance Instrumentation**: Surface detailed timing and token metrics in the UI and log files to understand model performance.
@@ -136,11 +142,8 @@ This should print the version of `agon` that you have installed.
 *   `timeout`: (Integer) Timeout in seconds for API requests (default: `600`).
 *   `debug`: (Boolean) When `true`, enables debug logging to `agon.log` and displays performance metrics in the UI.
 *   `multimodelMode`: (Boolean) If `true`, the application starts directly in Multimodel mode.
-*   `pipelineMode`: (Boolean) If `true`, the application starts directly in Pipeline mode.
 *   `benchmarkMode`: (Boolean) If `true`, the application starts directly in Benchmark mode.
 *   `jsonMode`: (Boolean) If `true`, forces the model to respond in JSON format.
-*   `export`: (String) A file path to automatically export pipeline run data as a JSON file.
-*   `exportMarkdown`: (String) A file path to automatically export a Markdown summary of pipeline runs.
 *   `logFile`: (String) A file path to write log files to.
 *   `mcpRetryCount`: (Integer) The number of times to retry a failed MCP request.
 
@@ -175,7 +178,7 @@ For example configurations, see the `configs/` directory. Each file demonstrates
 *   `config.example.JSONMode.json`: An example of how to set up JSON mode.
 *   `config.example.MCPMode.json`: An example of how to set up MCP mode.
 *   `config.example.ModelParameters.json`: An example of how to set up model parameters.
-*   `config.example.PipelineMode.json`: An example of how to set up Pipeline mode.
+*   `config.example.PipelineMode.json`: An example of how to set up Pipeline mode (see [PIPLINEMODE.md](PIPLINEMODE.md)).
 *   `config.example.LlamaCpp.json`: An example of how to set up llama.cpp router mode.
 *   `scripts/llamacpp_integration_check.go`: A quick integration check to inspect `/models` and probe accepted chat parameters on a llama.cpp endpoint.
 
@@ -183,15 +186,15 @@ For example configurations, see the `configs/` directory. Each file demonstrates
 
 ### Singlemodel Mode
 
-This is the standard, default mode for `agon`, providing a classic, one-on-one chat session with a single language model. It works by having you first select a host and then a model to interact with. The user interface is a clean, scrollable conversation history, focusing on a direct and uninterrupted dialogue. This mode differs from others by its simplicity and focus on a single line of conversation, whereas Multimodel and Pipeline modes orchestrate multiple models. It is most useful for direct, focused tasks, creative writing, or any scenario where you want a traditional chatbot experience without the complexity of multiple models. Single-Model mode can be combined with both `JSONMode` to enforce structured output and `MCPMode` to enable tool use.
+This is the standard, default mode for `agon`, providing a classic, one-on-one chat session with a single language model. It works by having you first select a host and then a model to interact with. The user interface is a clean, scrollable conversation history, focusing on a direct and uninterrupted dialogue. This mode differs from others by its simplicity and focus on a single line of conversation, whereas Multimodel mode orchestrates multiple models. It is most useful for direct, focused tasks, creative writing, or any scenario where you want a traditional chatbot experience without the complexity of multiple models. Single-Model mode can be combined with `JSONMode` to enforce structured output and `MCPMode` to enable tool use (see [MCPMODE.md](MCPMODE.md)).
 
 ![Singlemodel Mode](.screens/agon_singlemodelMode_01.png)
 
-> In Single-model mode, model parameters will also be shown since there is more UI real estate. Theses values will be set from the "parameters" settings in the config files. See: [configs/config.example.ModelParameters.json](configs/config.example.ModelParameters.json)
+> In Single-model mode, model parameters will also be shown since there is more UI real estate. These values will be set from the "parameters" settings in the config files. See: [configs/config.example.ModelParameters.json](configs/config.example.ModelParameters.json)
 
 ### Multimodel Mode
 
-Multimodel mode is a powerful feature for comparative analysis, allowing you to chat with up to four different language models simultaneously in a side-by-side interface. When you send a prompt, it is dispatched to all assigned models at the same time, and their responses are streamed back into their respective columns. This parallel processing is the key differentiator from Pipeline mode, which is sequential. This mode is incredibly useful for comparing the performance, tone, or factual accuracy of different models, A/B testing various system prompts with the same model, or observing how different parameters affect a model's output. Multimodel mode is mutually exclusive with Pipeline mode but can be run in conjunction with `JSONMode` and `MCPMode`.
+Multimodel mode is a powerful feature for comparative analysis, allowing you to chat with up to four different language models simultaneously in a side-by-side interface. When you send a prompt, it is dispatched to all assigned models at the same time, and their responses are streamed back into their respective columns. This mode is incredibly useful for comparing the performance, tone, or factual accuracy of different models, A/B testing various system prompts with the same model, or observing how different parameters affect a model's output. Multimodel mode can be run in conjunction with `JSONMode` and `MCPMode` (see [MCPMODE.md](MCPMODE.md)).
 
 ![Multimodel Mode](.screens/agon_multimodelMode_01.png)
 
@@ -199,15 +202,15 @@ Multimodel mode is a powerful feature for comparative analysis, allowing you to 
 
 ### Pipeline Mode
 
-Pipeline mode is designed for complex, multi-step workflows by chaining up to four models together in a sequence. In this mode, the output from one model (a "stage") is automatically passed as the input to the next, allowing you to build sophisticated processing chains. For example, you could use the first stage to brainstorm ideas, the second to structure them into an outline, the third to write content, and the fourth to proofread it. This sequential execution is the primary difference from Multimodel mode's parallel nature. It is most useful for tasks that can be broken down into discrete steps, such as data transformation, progressive summarization, or creative writing where each stage builds upon the last. Pipeline mode is mutually exclusive with Multimodel mode but can be combined with `JSONMode` and `MCPMode`.
+Pipeline mode is designed for multi-step workflows by chaining up to four models together in a sequence. The output of one stage becomes the input to the next, enabling progressive refinement such as brainstorm -> outline -> draft -> review. This sequential flow differs from Multimodel mode's parallel comparisons. Pipeline mode can be combined with `JSONMode` and `MCPMode`, and is mutually exclusive with Multimodel mode. For full configuration and export examples, see [PIPLINEMODE.md](PIPLINEMODE.md).
 
 ![Pipeline Mode](.screens/agon_pipelineMode_01.png)
 
-> In Pipeline mode, chain requests together so that the output of one model is the input of the next. See: [configs/config.example.PipelineMode.json](configs/config.example.PipelineMode.json)
+> For full pipeline setup and examples, see [PIPLINEMODE.md](PIPLINEMODE.md).
 
 ### JSON Mode
 
-JSON mode is a constraint that can be applied to any of the other operating modes to force the language model to return its response in a valid JSON format. It sends OpenAI-style `response_format: {"type":"json_object"}` and relies on the server to honor it. This differs from other modes as it doesn't change the user interface or workflow but rather dictates the structure of the model's output. This is extremely useful for any task that requires structured data, such as data extraction, classification, or when the output of `agon` is intended to be consumed by another program or script that expects a predictable JSON structure. It can be enabled alongside Single-Model, Multimodel, Pipeline, and MCP modes.
+JSON mode is a constraint that can be applied to any of the other operating modes to force the language model to return its response in a valid JSON format. It sends OpenAI-style `response_format: {"type":"json_object"}` and relies on the server to honor it. This differs from other modes as it doesn't change the user interface or workflow but rather dictates the structure of the model's output. This is extremely useful for any task that requires structured data, such as data extraction, classification, or when the output of `agon` is intended to be consumed by another program or script that expects a predictable JSON structure. It can be enabled alongside Single-Model, Multimodel, and MCP modes (see [MCPMODE.md](MCPMODE.md)).
 
 ![JSON Mode](.screens/agon_jsonMode_01.png)
 
@@ -215,32 +218,30 @@ JSON mode is a constraint that can be applied to any of the other operating mode
 
 ### MCP Mode
 
+
 MCP mode is an advanced feature that enables language models to use external tools by proxying requests through a local `agon-mcp` server process. When enabled, `agon` starts and manages this server in the background. If the language model determines that a user's request can be fulfilled by one of the available tools (like fetching the current weather), it can issue a `tool_calls` request. `agon` intercepts this, executes the tool via the MCP server, and feeds the result back to the model to formulate a final answer. This mode is not a distinct UI but rather a capability that enhances other modes by giving them access to real-time information or other external actions. It is useful for breaking the model out of its static knowledge base and allowing it to interact with the outside world. MCP mode can be used in combination with Single-Model, Multimodel, and Pipeline modes, as well as `JSONMode`. Tool-call forwarding requires llama.cpp OpenAI-compatible tool calls and is in progress.
 
 ![MCP Mode](.screens/agon_mcpMode_01.png)
 
 > In MCP mode, test how different models work with tool calls. See: [configs/config.example.MCPMode.json](configs/config.example.MCPMode.json)
 
-### Benchmark Mode
-
-Benchmark mode is a feature that allows you to run a common user prompt against models in parallel for n iteration. For this to run, your configuration file **must only have one model per host.** There is no UI with this mode, it is just meant to repeat the same requests against models several times in order to get a more complete average response time. If you have one model assigned to each host, it will run the benchmark requests against those models automatically. See the `configs/config.example.BenchmarkMode.json` example.
-
-If you want a standalone benchmark server, use `servers/benchmark` (llama.cpp only). Configure `servers/benchmark/agon-benchmark.yml` with a `models_path` pointing to your GGUF directory, then run the server and POST to `/benchmark` with the model filename (relative to `models_path`) or an absolute path.
-
-Benchmark results are written to `agonData/modelBenchmarks/`.
-
-Benchmark mode uses the following definitions:
-
-```
-  "benchmarkMode": true,
-  "benchmarkCount": 10,
-```
+See [MCPMODE.md](MCPMODE.md) for MCP mode configuration, setup, and examples.
 
 ## Metrics
 
-If `metrics: true` in a config file you run, all response metrics are aggregated and saved in: `agonData/modelMetrics/model_performance_metrics.json`. This way, over time, as you use the tool, model metrics are caprtured under different sceanrios, hopefully giving some long-term insights on models over time. I have `metrics: true` in all of my configs in order to collect this data over time for a different perspective on model metrics.
+### General Operating Metrics
 
-You can run: `agon analyze metrics` which will output a standalone html file (`agonData/reports/metrics-report.<parameterTemplate>_profile.html`) containing model metric details, comparison leaderboard, and recommendations. The `<parameterTemplate>` value comes from the accuracy JSONL data generated during `agon run accuracy`:
+If `metrics: true` in a config file you run, all response metrics are aggregated and saved in: `agonData/modelMetrics/model_performance_metrics.json`. This way, over time, as you use the tool, model metrics are captured under different scenarios, hopefully giving some long-term insights on models over time. I have `metrics: true` in all of my configs in order to collect this data over time for a different perspective on model metrics.
+
+### Benchmarking
+
+Benchmarking is a command-driven workflow that runs technical benchmarks directly against llama.cpp to compare response timing and stability. Use `agon benchmark` to run benchmarks and collect results in `agonData/modelBenchmarks/`. For setup and example commands, see [BENCHMARKING.md](BENCHMARKING.md).
+
+### Accuracy
+
+Accuracy is a command-driven batch process that runs a prompt suite against each model and logs per-prompt correctness. The prompts live in `internal/accuracy/accuracy_prompts.json`. Use `agon run accuracy` to generate results in `agonData/modelAccuracy/` after you have fetched model metadata. For prerequisites and examples, see [ACCURACY.md](ACCURACY.md).
+
+You can run: `agon analyze metrics` after completing benchmarks and accuracy batches. It outputs a standalone HTML file (`agonData/reports/metrics-report.<parameterTemplate>_profile.html`) containing model metric details, comparison leaderboard, and recommendations. The `<parameterTemplate>` value comes from the accuracy JSONL data generated during `agon run accuracy`:
 
 ![Multichat Mode](.screens/agon_benchmark_report.png)
 
@@ -253,9 +254,8 @@ Starts the main interactive chat UI. The UI mode is determined by the configurat
 *   **Flags**:
     *   `--config, -c`: Path to a custom config file.
     *   `--multimodelMode`: Override config to start in Multimodel mode.
-    *   `--pipelineMode`: Override config to start in Pipeline mode.
-    *   `--benchmarkMode`: Override config to start in Benchmark mode.
-    *   `--debug`, `--jsonMode`, `--mcpMode`, etc.
+*   `--benchmarkMode`: Override config to start in Benchmark mode.
+*   `--debug`, `--jsonMode`, `--mcpMode`, etc.
 
 *   **Examples**:
     *   Start a chat session with the default configuration:
@@ -540,99 +540,19 @@ agon run accuracy --parameterTemplate fact_checker
 
 ### MCP Mode
 
-1.  **Create a configuration file** (`configs/config.json`):
+MCP mode adds tool usage by proxying requests through a local `agon-mcp` server process. When enabled, `agon` starts and manages the server in the background, intercepts `tool_calls`, executes the requested tool, and feeds the results back to the model for a final response. This unlocks real-time information and external actions while keeping the same chat UI, and can be combined with Single-Model, Multimodel, Pipeline, or JSON modes. For setup, tool lists, and examples, see [MCPMODE.md](MCPMODE.md).
 
-    ```json
-    {
-      "hosts": [
-        {
-          "name": "LlamaCpp01",
-          "url": "http://192.168.0.101:8080",
-          "type": "llama.cpp",
-          "models": [
-            "qwen3:1.7b",
-            "llama3.2:1b",
-            "smollm2:1.7b",
-            "granite3.1moe:1b"
-          ],
-          "systemprompt": "You are a helpful and concise assistant."
-        },
-        {
-          "name": "LlamaCpp02",
-          "url": "http://192.168.0.102:8080",
-          "type": "llama.cpp",
-          "models": [
-            "qwen3:1.7b",
-            "llama3.2:1b",
-            "smollm2:1.7b",
-            "granite3.1moe:1b"
-          ],
-          "systemprompt": "You are a helpful and concise assistant."
-        }
-      ],
-      "mcpMode": true
-    }
-    ```
+![MCP Mode](.screens/agon_mcpMode_01.png)
 
-2.  **Start `agon`**:
-
-    ```bash
-    agon chat
-    ```
+> For MCP mode setup and examples, see [MCPMODE.md](MCPMODE.md).
 
 ### llama.cpp Router Mode
 
-1.  **Create a configuration file** (`configs/config.json`):
-
-    ```json
-    {
-      "hosts": [
-        {
-          "name": "LlamaCpp01",
-          "url": "http://localhost:8080",
-          "type": "llama.cpp",
-          "models": [
-            "my-local-model.gguf"
-          ],
-          "systemprompt": "You are a helpful and concise assistant."
-        }
-      ]
-    }
-    ```
-
-2.  **Start `agon`**:
-
-    ```bash
-    agon chat
-    ```
+See [SERVICES.md](SERVICES.md) for router mode setup and examples.
 
 ### Exporting Data
 
-When using `pipelineMode`, you can export the results of the pipeline to a JSON or Markdown file.
-
-*   `--export`: Path to a JSON file to export the results to.
-*   `--exportMarkdown`: Path to a Markdown file to export the results to.
-
-## MCPMode
-
-MCP mode is an advanced feature that enables language models to use external tools by proxying requests through a local `agon-mcp` server process. When enabled, `agon` starts and manages this server in the background. If the language model determines that a user's request can be fulfilled by one of the available tools (like fetching the current weather), it can issue a `tool_calls` request. `agon` intercepts this, executes the tool via the MCP server, and feeds the result back to the model to formulate a final answer.
-Tool-call forwarding requires llama.cpp OpenAI-compatible tool calls and is in progress.
-
-### Setup
-
-1.  Install the `agon-mcp` binary and make sure it is available in your system's `PATH`.
-2.  Enable MCP mode in your `config.json` file:
-
-    ```json
-    {
-      "mcpMode": true
-    }
-    ```
-
-### Current Available MCP Tools for Testing
-
-*   `current_time`: Returns the current time.
-*   `current_weather`: Returns the current weather for a given location.
+For pipeline mode configuration and exports, see [PIPLINEMODE.md](PIPLINEMODE.md).
 
 ## Building
 
