@@ -24,6 +24,11 @@ func NewProvider(wrapped providers.ChatProvider, aggregator *Aggregator) *Provid
 	return &Provider{wrapped: wrapped, aggregator: aggregator}
 }
 
+// Wrapped returns the underlying provider.
+func (p *Provider) Wrapped() providers.ChatProvider {
+	return p.wrapped
+}
+
 // Stream intercepts the call to the wrapped provider's Stream method to record performance metrics.
 func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, callbacks providers.StreamCallbacks) error {
 	logging.LogMetricsEvent("[METRICS] Stream called on metrics provider for model %s", req.Model)

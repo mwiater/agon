@@ -19,7 +19,6 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/mwiater/agon/internal/logging"
 	"github.com/mwiater/agon/internal/providerfactory"
 	"github.com/mwiater/agon/internal/providers"
 	"github.com/mwiater/agon/internal/providers/llamacpp"
@@ -1612,6 +1611,9 @@ func (m *pipelineModel) exportPipelineMarkdown(path string) error {
 func StartPipelineGUI(ctx context.Context, cfg *Config, cancel context.CancelFunc) error {
 	provider, err := providerfactory.NewChatProvider(cfg)
 	if err != nil {
+		if cfg.MCPMode {
+			return err
+		}
 		provider = llamacpp.New(cfg)
 	}
 
@@ -1631,11 +1633,9 @@ func StartPipelineGUI(ctx context.Context, cfg *Config, cancel context.CancelFun
 			provider, err = providerfactory.NewChatProvider(cfg)
 			if err != nil {
 				if cfg.MCPMode {
-					logging.LogEvent("MCP provider unavailable: %v — falling back to direct llama.cpp access", err)
-					provider = llamacpp.New(cfg)
-				} else {
 					return err
 				}
+				return err
 			}
 		}
 		multiErr := StartMultimodelGUI(m.ctx, cfg, provider, cancel)

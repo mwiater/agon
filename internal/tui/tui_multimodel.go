@@ -483,7 +483,8 @@ func (m *multimodelModel) assignmentView() string {
 
 	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("5"))
 	builder.WriteString(titleStyle.Render("Multimodel Mode - Assign Models to Hosts") + "\n")
-	builder.WriteString(renderMCPBadge(m.mcpStatus) + "\n\n")
+	statusBadges := lipgloss.JoinHorizontal(lipgloss.Top, renderJSONBadge(m.config.JSONMode), renderMCPBadge(m.mcpStatus))
+	builder.WriteString(statusBadges + "\n\n")
 
 	if m.inModelSelection {
 		return lipgloss.NewStyle().Margin(1, 2).Render(m.modelList.View())
@@ -539,7 +540,7 @@ func (m *multimodelModel) multimodelChatView() string {
 	var builder strings.Builder
 
 	headerStyle := lipgloss.NewStyle().Background(lipgloss.Color("62")).Foreground(lipgloss.Color("230")).Padding(0, 1)
-	header := lipgloss.JoinHorizontal(lipgloss.Top, headerStyle.Render("Multimodel Chat"), renderMCPBadge(m.mcpStatus))
+	header := lipgloss.JoinHorizontal(lipgloss.Top, headerStyle.Render("Multimodel Chat"), renderJSONBadge(m.config.JSONMode), renderMCPBadge(m.mcpStatus))
 	help := lipgloss.NewStyle().Faint(true).Render(" (tab to reassign, q to quit)")
 	builder.WriteString(header + help + "\n\n")
 
