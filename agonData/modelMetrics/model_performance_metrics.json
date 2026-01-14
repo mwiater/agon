@@ -1,5 +1,71 @@
 [
   {
+    "model_name": "qwen2.5-1.5b-instruct-q4_k_m",
+    "last_updated_utc": "2026-01-14T00:58:14.0565679Z",
+    "overall_stats": {
+      "total_requests": 1,
+      "ttft_ms": {
+        "mean": 21948,
+        "min": 21948,
+        "max": 21948
+      },
+      "tokens_per_second": {
+        "mean": 0,
+        "min": 0,
+        "max": 0
+      },
+      "input_tokens": {
+        "mean": 0,
+        "min": 0,
+        "max": 0
+      },
+      "output_tokens": {
+        "mean": 0,
+        "min": 0,
+        "max": 0
+      },
+      "total_duration_ms": {
+        "mean": 0,
+        "min": 0,
+        "max": 0
+      }
+    },
+    "performance_buckets": [
+      {
+        "dimension": "input_tokens",
+        "bucket": "0-256",
+        "stats": {
+          "total_requests": 1,
+          "ttft_ms": {
+            "mean": 21948,
+            "min": 21948,
+            "max": 21948
+          },
+          "tokens_per_second": {
+            "mean": 0,
+            "min": 0,
+            "max": 0
+          },
+          "input_tokens": {
+            "mean": 0,
+            "min": 0,
+            "max": 0
+          },
+          "output_tokens": {
+            "mean": 0,
+            "min": 0,
+            "max": 0
+          },
+          "total_duration_ms": {
+            "mean": 0,
+            "min": 0,
+            "max": 0
+          }
+        }
+      }
+    ]
+  },
+  {
     "model_name": "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M",
     "last_updated_utc": "2026-01-14T00:58:47.4552604Z",
     "overall_stats": {
@@ -133,33 +199,33 @@
   },
   {
     "model_name": "gemma-2-2b-it-Q4_K_M",
-    "last_updated_utc": "2026-01-14T01:21:03.8687235Z",
+    "last_updated_utc": "2026-01-14T01:30:44.4385253Z",
     "overall_stats": {
-      "total_requests": 7,
+      "total_requests": 8,
       "ttft_ms": {
-        "mean": 453409,
-        "min": 453409,
-        "max": 453409
+        "mean": 19889,
+        "min": 19889,
+        "max": 19889
       },
       "tokens_per_second": {
-        "mean": 1.2524638790180989,
-        "min": 1.2524638790180989,
-        "max": 1.2524638790180989
+        "mean": 0,
+        "min": 0,
+        "max": 0
       },
       "input_tokens": {
-        "mean": 472,
-        "min": 472,
-        "max": 472
+        "mean": 0,
+        "min": 0,
+        "max": 0
       },
       "output_tokens": {
-        "mean": 41,
-        "min": 41,
-        "max": 41
+        "mean": 0,
+        "min": 0,
+        "max": 0
       },
       "total_duration_ms": {
-        "mean": 267508,
-        "min": 267508,
-        "max": 267508
+        "mean": 0,
+        "min": 0,
+        "max": 0
       }
     },
     "performance_buckets": [
@@ -167,11 +233,11 @@
         "dimension": "input_tokens",
         "bucket": "0-256",
         "stats": {
-          "total_requests": 6,
+          "total_requests": 7,
           "ttft_ms": {
-            "mean": 33031,
-            "min": 33031,
-            "max": 33031
+            "mean": 19889,
+            "min": 19889,
+            "max": 19889
           },
           "tokens_per_second": {
             "mean": 0,
@@ -270,72 +336,6 @@
             "mean": 79174,
             "min": 79174,
             "max": 79174
-          },
-          "tokens_per_second": {
-            "mean": 0,
-            "min": 0,
-            "max": 0
-          },
-          "input_tokens": {
-            "mean": 0,
-            "min": 0,
-            "max": 0
-          },
-          "output_tokens": {
-            "mean": 0,
-            "min": 0,
-            "max": 0
-          },
-          "total_duration_ms": {
-            "mean": 0,
-            "min": 0,
-            "max": 0
-          }
-        }
-      }
-    ]
-  },
-  {
-    "model_name": "qwen2.5-1.5b-instruct-q4_k_m",
-    "last_updated_utc": "2026-01-14T00:58:14.0565679Z",
-    "overall_stats": {
-      "total_requests": 1,
-      "ttft_ms": {
-        "mean": 21948,
-        "min": 21948,
-        "max": 21948
-      },
-      "tokens_per_second": {
-        "mean": 0,
-        "min": 0,
-        "max": 0
-      },
-      "input_tokens": {
-        "mean": 0,
-        "min": 0,
-        "max": 0
-      },
-      "output_tokens": {
-        "mean": 0,
-        "min": 0,
-        "max": 0
-      },
-      "total_duration_ms": {
-        "mean": 0,
-        "min": 0,
-        "max": 0
-      }
-    },
-    "performance_buckets": [
-      {
-        "dimension": "input_tokens",
-        "bucket": "0-256",
-        "stats": {
-          "total_requests": 1,
-          "ttft_ms": {
-            "mean": 21948,
-            "min": 21948,
-            "max": 21948
           },
           "tokens_per_second": {
             "mean": 0,
