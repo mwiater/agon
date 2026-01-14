@@ -21,15 +21,3 @@ Open `configs/config.pipeline.json` and update host URLs, models, and any parame
 ```bash
 agon chat --config configs/config.pipeline.json
 ```
-
-## Example Export
-
-Pipeline mode can export the run results to JSON or Markdown:
-
-```bash
-agon chat --config configs/config.pipeline.json --export agonData/pipeline-run.json
-```
-
-```bash
-agon chat --config configs/config.pipeline.json --exportMarkdown agonData/pipeline-run.md
-```

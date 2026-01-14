@@ -18,8 +18,6 @@ These flags are available for all commands:
 -   `--mcpMode`: bool, proxy LLM traffic through the MCP server
 -   `--mcpBinary`: string, path to the MCP server binary (defaults per OS)
 -   `--mcpInitTimeout`: int, seconds to wait for MCP startup (0 = default)
--   `--export`: string, write pipeline runs to this JSON file
--   `--exportMarkdown`: string, write pipeline runs to this Markdown file
 -   `--logFile`: string, path to the log file
 
 ### Command-Specific Flags
@@ -30,9 +28,6 @@ These flags are available for all commands:
     -   `--model, -m`: string, model name to benchmark (required)
     -   `--gpu, -g`: string, GPU name for output filename (required)
     -   `--benchmark-endpoint, -b`: string, benchmark server endpoint URL (required)
--   **`agon benchmark models`**:
-    -   `--gpu`: string, GPU identifier used to filter metadata and filenames
-    -   `--benchmark-server`: string, Benchmark server endpoint URL
 -   **`agon fetch modelmetadata`**:
     -   `--endpoints`: []string, comma-separated list of base URLs to query (required)
     -   `--gpu`: string, GPU identifier used as a filename prefix (required)
@@ -64,8 +59,6 @@ The following configuration options are available in `config.json` but are not d
 -   `MCPInitTimeout`: (int) Timeout in seconds for MCP server initialization.
 -   `MCPRetryCount`: (int) The number of times to retry a failed MCP tool call.
 -   `TimeoutSeconds`: (int) Timeout in seconds for API requests.
--   `ExportPath`: (string) Path to write pipeline runs to a JSON file.
--   `ExportMarkdownPath`: (string) Path to write pipeline runs to a Markdown file.
 -   `LogFile`: (string) Path to the log file.
 -   `BenchmarkCount`: (int) The number of iterations for benchmarks.
 -   `Metrics`: (bool) Enable metrics collection.

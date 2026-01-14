@@ -35,7 +35,7 @@ var rootCmd = &cobra.Command{
 				_ = cmd.Flags().Set(name, strconv.FormatBool(val))
 			}
 		}
-		for _, name := range []string{"export", "exportMarkdown", "mcpBinary"} {
+		for _, name := range []string{"mcpBinary"} {
 			if !cmd.Flags().Changed(name) {
 				_ = cmd.Flags().Set(name, viper.GetString(name))
 			}
@@ -88,8 +88,6 @@ func init() {
 	rootCmd.PersistentFlags().Bool("mcpMode", false, "proxy LLM traffic through the MCP server")
 	rootCmd.PersistentFlags().String("mcpBinary", "", "path to the MCP server binary (defaults per OS)")
 	rootCmd.PersistentFlags().Int("mcpInitTimeout", 0, "seconds to wait for MCP startup (0 = default)")
-	rootCmd.PersistentFlags().String("export", "", "write pipeline runs to this JSON file")
-	rootCmd.PersistentFlags().String("exportMarkdown", "", "write pipeline runs to this Markdown file")
 	rootCmd.PersistentFlags().String("logFile", "", "path to the log file")
 
 	_ = viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
@@ -99,8 +97,6 @@ func init() {
 	_ = viper.BindPFlag("mcpMode", rootCmd.PersistentFlags().Lookup("mcpMode"))
 	_ = viper.BindPFlag("mcpBinary", rootCmd.PersistentFlags().Lookup("mcpBinary"))
 	_ = viper.BindPFlag("mcpInitTimeout", rootCmd.PersistentFlags().Lookup("mcpInitTimeout"))
-	_ = viper.BindPFlag("export", rootCmd.PersistentFlags().Lookup("export"))
-	_ = viper.BindPFlag("exportMarkdown", rootCmd.PersistentFlags().Lookup("exportMarkdown"))
 	_ = viper.BindPFlag("logFile", rootCmd.PersistentFlags().Lookup("logFile"))
 }
 
@@ -145,4 +141,3 @@ func SetVersionInfo(version, commit, date string) {
 	appCommit = commit
 	appDate = date
 }
-

@@ -49,8 +49,6 @@ type Config struct {
 	MCPInitTimeout        int      `json:"mcpInitTimeout,omitempty"`
 	MCPRetryCount         int      `json:"mcpRetryCount,omitempty"`
 	TimeoutSeconds        int      `json:"timeout,omitempty"`
-	ExportPath            string   `json:"export,omitempty"`
-	ExportMarkdownPath    string   `json:"exportMarkdown,omitempty"`
 	LogFile               string   `json:"logFile,omitempty"`
 	BenchmarkCount        int      `json:"benchmarkCount"`
 	Metrics               bool     `json:"metrics"`

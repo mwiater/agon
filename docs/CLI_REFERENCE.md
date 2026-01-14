@@ -96,15 +96,10 @@ agon analyze metrics --benchmarks-dir ../agonData/modelBenchmarks --metadata-dir
 
 ### `agon benchmark`
 
-*   **`agon benchmark models`**: Runs benchmarks for models defined in the config file.
 *   **`agon benchmark model`**: Runs a single benchmark against a benchmark server endpoint.
 *   **`agon benchmark accuracy`**: Runs the accuracy batch workflow. Uses the prompt suite in `internal/accuracy/accuracy_prompts.json`, reads `../agonData/modelMetadata/` (use `agon fetch modelmetadata`), and appends results to `../agonData/modelAccuracy/`. Defaults to the `accuracy` parameter template unless overridden.
 
 **Examples**
-```bash
-agon benchmark models --config ../configs/config.json
-```
-
 ```bash
 agon benchmark model --model llama-3-2-1b-instruct-q8_0.gguf --gpu radeon-rx-570 --benchmark-endpoint http://localhost:9999/benchmark
 ```

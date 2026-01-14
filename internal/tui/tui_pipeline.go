@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"hash/fnv"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -194,36 +193,6 @@ type pipelineCacheEntry struct {
 	timestamp time.Time
 }
 
-// pipelineExportRecord captures per-stage export data.
-type pipelineExportRecord struct {
-	Stage             int           `json:"stage"`
-	Host              string        `json:"host"`
-	Model             string        `json:"model"`
-	Parameters        Parameters    `json:"parameters"`
-	SystemPromptHash  string        `json:"systemPromptHash"`
-	Timings           exportTimings `json:"timings"`
-	Tokens            exportTokens  `json:"tokens"`
-	OutputHash        string        `json:"outputHash"`
-	HandoffPayload    string        `json:"handoff"`
-	CacheHit          bool          `json:"cacheHit"`
-	TruncationSummary string        `json:"truncationSummary,omitempty"`
-}
-
-// exportTimings captures timing metrics for an exported pipeline stage.
-type exportTimings struct {
-	TotalSeconds      float64 `json:"totalSeconds"`
-	LoadSeconds       float64 `json:"loadSeconds"`
-	PromptEvalSeconds float64 `json:"promptEvalSeconds"`
-	EvalSeconds       float64 `json:"evalSeconds"`
-	TimeToFirstToken  float64 `json:"timeToFirstToken"`
-}
-
-// exportTokens captures token counts for an exported pipeline stage.
-type exportTokens struct {
-	Prompt int `json:"prompt"`
-	Eval   int `json:"eval"`
-}
-
 // pipelineModel owns all state for the pipeline Bubble Tea program.
 type pipelineModel struct {
 	ctx            context.Context
@@ -261,12 +230,6 @@ type pipelineModel struct {
 	overlayStageIndex  int
 
 	memoCache map[string]pipelineCacheEntry
-
-	exportRecords      []pipelineExportRecord
-	exportPath         string
-	exportMarkdownPath string
-	runStarted         time.Time
-	runCompleted       time.Time
 
 	switchToMultimodel bool
 
@@ -332,8 +295,6 @@ func initialPipelineModel(ctx context.Context, cfg *Config, provider providers.C
 		selectedStage:      0,
 		overlayStageIndex:  -1,
 		memoCache:          make(map[string]pipelineCacheEntry),
-		exportPath:         cfg.ExportPath,
-		exportMarkdownPath: cfg.ExportMarkdownPath,
 		nextHostIndex:      0,
 		defaultModelByHost: make(map[string]string),
 	}
@@ -709,32 +670,6 @@ func (m *pipelineModel) updateActive(msg tea.Msg) tea.Cmd {
 		case "ctrl+p":
 			m.switchToMultimodel = true
 			return tea.Quit
-		case "ctrl+e":
-			if len(m.exportRecords) == 0 {
-				m.statusBanner = "Run the pipeline before exporting"
-				return nil
-			}
-			if m.runCompleted.IsZero() {
-				m.runCompleted = time.Now()
-			}
-			jsonPath := strings.TrimSpace(m.exportPath)
-			if jsonPath == "" {
-				jsonPath = "pipeline.json"
-			}
-			var notices []string
-			if err := m.exportPipelineJSON(jsonPath); err != nil {
-				notices = append(notices, fmt.Sprintf("JSON export failed: %v", err))
-			} else {
-				notices = append(notices, fmt.Sprintf("JSON → %s", jsonPath))
-			}
-			if markdownPath := strings.TrimSpace(m.exportMarkdownPath); markdownPath != "" {
-				if err := m.exportPipelineMarkdown(markdownPath); err != nil {
-					notices = append(notices, fmt.Sprintf("Markdown export failed: %v", err))
-				} else {
-					notices = append(notices, fmt.Sprintf("Markdown → %s", markdownPath))
-				}
-			}
-			m.statusBanner = strings.Join(notices, " | ")
 		}
 	}
 
@@ -823,13 +758,13 @@ func (m *pipelineModel) assignmentView() string {
 
 		stageLabel := fmt.Sprintf("Stage %d", i+1)
 		builder.WriteString(stageTitleStyle.Render(stageLabel))
-		builder.WriteString(" → ")
+		builder.WriteString(" ??? ")
 
 		if stage.hasAssignment {
-			badge := fmt.Sprintf("%s • %s", stage.host.Name, stage.selectedModel)
+			badge := fmt.Sprintf("%s ??? %s", stage.host.Name, stage.selectedModel)
 			builder.WriteString(stageModelStyle.Render(badge))
 		} else if stage.host.URL != "" {
-			builder.WriteString(stageBadgeStyle.Render(fmt.Sprintf("%s • (select model)", stage.host.Name)))
+			builder.WriteString(stageBadgeStyle.Render(fmt.Sprintf("%s ??? (select model)", stage.host.Name)))
 		} else {
 			builder.WriteString(stageBadgeStyle.Render("(unassigned)"))
 		}
@@ -843,7 +778,7 @@ func (m *pipelineModel) assignmentView() string {
 	}
 
 	builder.WriteString("\n")
-	help := "↑/↓ select stage  Enter/h pick host  m pick model  d clear  c continue  q quit"
+	help := "???/??? select stage  Enter/h pick host  m pick model  d clear  c continue  q quit"
 	if m.statusBanner != "" {
 		builder.WriteString(bannerStyle.Render(m.statusBanner) + "\n")
 	}
@@ -896,7 +831,7 @@ func (m *pipelineModel) pipelineView() string {
 		parts = append(parts, m.textArea.View())
 	}
 
-	help := "Enter send  Ctrl+←/→ focus  Ctrl+Enter expand  Ctrl+S cycle  Ctrl+O overlay  Ctrl+P multimodel  Ctrl+E export  Ctrl+Q quit"
+	help := "Enter send  Ctrl+???/??? focus  Ctrl+Enter expand  Ctrl+S cycle  Ctrl+O overlay  Ctrl+P multimodel  Ctrl+Q quit"
 	parts = append(parts, lipgloss.NewStyle().Faint(true).Render(help))
 
 	return lipgloss.NewStyle().Margin(1, 2).Render(strings.Join(parts, "\n\n"))
@@ -911,7 +846,7 @@ func (m *pipelineModel) expandedView() string {
 	stage := m.stages[m.expandedIndex]
 	var builder strings.Builder
 
-	header := fmt.Sprintf("Stage %d — %s • %s", stage.index+1, stage.host.Name, stage.selectedModel)
+	header := fmt.Sprintf("Stage %d ??? %s ??? %s", stage.index+1, stage.host.Name, stage.selectedModel)
 	builder.WriteString(stageTitleStyle.Render(header) + "\n")
 	statusBadges := lipgloss.JoinHorizontal(lipgloss.Top, renderJSONBadge(m.config.JSONMode), renderMCPBadge(m.mcpStatus))
 	builder.WriteString(statusBadges + "\n")
@@ -931,7 +866,7 @@ func (m *pipelineModel) expandedView() string {
 	}
 
 	builder.WriteString("\n\n")
-	builder.WriteString(lipgloss.NewStyle().Faint(true).Render("Esc close  Ctrl+←/→ stage  Ctrl+S cycle view"))
+	builder.WriteString(lipgloss.NewStyle().Faint(true).Render("Esc close  Ctrl+???/??? stage  Ctrl+S cycle view"))
 
 	return lipgloss.NewStyle().Margin(1, 2).Render(builder.String())
 }
@@ -943,11 +878,11 @@ func (m *pipelineModel) renderProgressLine() string {
 		if stage.hasAssignment {
 			stageNames[i] = stage.host.Name
 		} else {
-			stageNames[i] = "—"
+			stageNames[i] = "???"
 		}
 	}
 
-	pipelinePath := strings.Join(stageNames, " → ")
+	pipelinePath := strings.Join(stageNames, " ??? ")
 
 	currentStage, totalAssigned, stageLabel := m.currentStageProgress()
 	stageStatus := "Stage 0/0 Idle"
@@ -996,7 +931,7 @@ func (m *pipelineModel) renderStageColumn(stage pipelineStage, colWidth int, tar
 	headerLines = append(headerLines, stageTitleStyle.Render(title))
 
 	if stage.hasAssignment {
-		badge := fmt.Sprintf("%s • %s", stage.host.Name, stage.selectedModel)
+		badge := fmt.Sprintf("%s ??? %s", stage.host.Name, stage.selectedModel)
 		headerLines = append(headerLines, stageBadgeStyle.Render(badge))
 	} else {
 		headerLines = append(headerLines, stageBadgeStyle.Render("(unassigned)"))
@@ -1004,7 +939,7 @@ func (m *pipelineModel) renderStageColumn(stage pipelineStage, colWidth int, tar
 
 	statusChip := stageStatusStyles[stage.status].Render(stage.statusMessage)
 	if stage.cacheHit {
-		statusChip = stageCacheStyle.Render("⟳ ") + statusChip
+		statusChip = stageCacheStyle.Render("??? ") + statusChip
 	}
 
 	header := lipgloss.JoinVertical(lipgloss.Left, headerLines...)
@@ -1104,7 +1039,7 @@ func (m *pipelineModel) renderHandoffOverlay(stage pipelineStage) string {
 	if len(stage.handoff.redactions) > 0 {
 		builder.WriteString("Redactions:\n")
 		for _, r := range stage.handoff.redactions {
-			builder.WriteString("  • " + r + "\n")
+			builder.WriteString("  ??? " + r + "\n")
 		}
 	}
 	builder.WriteString("\nPreview:\n" + stage.handoff.preview)
@@ -1129,9 +1064,6 @@ func (m *pipelineModel) startPipelineRun(input string) tea.Cmd {
 	m.runInProgress = true
 	m.viewState = pipelineViewRunning
 	m.requestStartTime = time.Now()
-	m.runStarted = time.Now()
-	m.runCompleted = time.Time{}
-	m.exportRecords = nil
 	m.textArea.Reset()
 	m.textArea.Blur()
 	m.statusBanner = ""
@@ -1220,10 +1152,6 @@ func (m *pipelineModel) advanceToNextStage(current int, payload string) tea.Cmd 
 	if next == -1 {
 		m.runInProgress = false
 		m.viewState = pipelineViewReady
-		if m.runCompleted.IsZero() {
-			m.runCompleted = time.Now()
-		}
-		m.autoExport()
 		m.textArea.Focus()
 		return nil
 	}
@@ -1266,9 +1194,6 @@ func (m *pipelineModel) handleStageDone(msg pipelineStageDoneMsg) tea.Cmd {
 		stage.statusMessage = "JSON validation failed"
 		m.runInProgress = false
 		m.viewState = pipelineViewReady
-		if m.runCompleted.IsZero() {
-			m.runCompleted = time.Now()
-		}
 		m.textArea.Focus()
 		return nil
 	}
@@ -1280,8 +1205,6 @@ func (m *pipelineModel) handleStageDone(msg pipelineStageDoneMsg) tea.Cmd {
 
 	cacheKey := makeCacheKey(msg.Stage, stage.host.URL, stage.selectedModel, inbound)
 	m.memoCache[cacheKey] = pipelineCacheEntry{output: stage.finalOutput, meta: msg.Meta, handoff: stage.handoff, timestamp: time.Now()}
-
-	m.exportRecords = append(m.exportRecords, m.buildExportRecord(msg.Stage, stage))
 
 	return m.advanceToNextStage(msg.Stage, stage.handoff.payload)
 }
@@ -1297,9 +1220,6 @@ func (m *pipelineModel) handleStageError(msg pipelineStageErrorMsg) {
 	m.statusBanner = fmt.Sprintf("Stage %d error: %v", stage.index+1, msg.Err)
 	m.runInProgress = false
 	m.viewState = pipelineViewReady
-	if m.runCompleted.IsZero() {
-		m.runCompleted = time.Now()
-	}
 	m.textArea.Focus()
 }
 
@@ -1317,8 +1237,6 @@ func (m *pipelineModel) handleStageCacheHit(msg pipelineStageCacheHitMsg) tea.Cm
 	stage.cacheHit = true
 	stage.completedAt = time.Now()
 	stage.history = append(stage.history, chatMessage{Role: "assistant", Content: stage.finalOutput})
-
-	m.exportRecords = append(m.exportRecords, m.buildExportRecord(msg.Stage, stage))
 
 	return m.advanceToNextStage(msg.Stage, stage.handoff.payload)
 }
@@ -1475,7 +1393,7 @@ func (m *pipelineModel) formatCompletionStatus(meta LLMResponseMeta) string {
 	}
 	tps := m.tokensPerSecond(meta)
 	total := float64(meta.TotalDuration) / 1e9
-	return fmt.Sprintf("Done • %.1fs • %.1f t/s", total, tps)
+	return fmt.Sprintf("Done ??? %.1fs ??? %.1f t/s", total, tps)
 }
 
 // tokensPerSecond calculates the tokens per second from StreamMetadata.
@@ -1484,125 +1402,6 @@ func (m *pipelineModel) tokensPerSecond(meta LLMResponseMeta) float64 {
 		return 0
 	}
 	return float64(meta.EvalCount) / (float64(meta.EvalDuration) / 1e9)
-}
-
-// buildExportRecord creates a pipelineExportRecord for a given stage.
-func (m *pipelineModel) buildExportRecord(idx int, stage *pipelineStage) pipelineExportRecord {
-	hash := fnv.New64a()
-	hash.Write([]byte(stage.systemPrompt))
-	promptHash := fmt.Sprintf("%x", hash.Sum64())
-
-	outputHash := fnv.New64a()
-	hash.Write([]byte(stage.finalOutput))
-
-	timings := exportTimings{
-		TotalSeconds:      float64(stage.stats.TotalDuration) / 1e9,
-		LoadSeconds:       float64(stage.stats.LoadDuration) / 1e9,
-		PromptEvalSeconds: float64(stage.stats.PromptEvalDuration) / 1e9,
-		EvalSeconds:       float64(stage.stats.EvalDuration) / 1e9,
-	}
-	if !stage.firstToken.IsZero() && !stage.startedAt.IsZero() {
-		timings.TimeToFirstToken = stage.firstToken.Sub(stage.startedAt).Seconds()
-	}
-
-	return pipelineExportRecord{
-		Stage:             idx + 1,
-		Host:              stage.host.Name,
-		Model:             stage.selectedModel,
-		Parameters:        stage.parameters,
-		SystemPromptHash:  promptHash,
-		Timings:           timings,
-		Tokens:            exportTokens{Prompt: stage.stats.PromptEvalCount, Eval: stage.stats.EvalCount},
-		OutputHash:        fmt.Sprintf("%x", outputHash.Sum64()),
-		HandoffPayload:    stage.handoff.payload,
-		CacheHit:          stage.cacheHit,
-		TruncationSummary: stage.handoff.truncationSummary,
-	}
-}
-
-// autoExport automatically exports pipeline run data if export paths are configured.
-func (m *pipelineModel) autoExport() {
-	if len(m.exportRecords) == 0 {
-		return
-	}
-	var errs []string
-	if path := strings.TrimSpace(m.exportPath); path != "" {
-		if err := m.exportPipelineJSON(path); err != nil {
-			errs = append(errs, fmt.Sprintf("JSON export failed: %v", err))
-		}
-	}
-	if path := strings.TrimSpace(m.exportMarkdownPath); path != "" {
-		if err := m.exportPipelineMarkdown(path); err != nil {
-			errs = append(errs, fmt.Sprintf("Markdown export failed: %v", err))
-		}
-	}
-	if len(errs) > 0 {
-		m.statusBanner = strings.Join(errs, " | ")
-	}
-}
-
-// exportPipelineJSON writes the latest run data to a JSON file.
-func (m *pipelineModel) exportPipelineJSON(path string) error {
-	if len(m.exportRecords) == 0 {
-		return fmt.Errorf("no pipeline run to export")
-	}
-	export := struct {
-		RunStarted   time.Time              `json:"runStarted"`
-		RunCompleted time.Time              `json:"runCompleted"`
-		JSONMode     bool                   `json:"jsonMode"`
-		Stages       []pipelineExportRecord `json:"stages"`
-	}{
-		RunStarted: m.runStarted,
-		RunCompleted: func() time.Time {
-			if m.runCompleted.IsZero() {
-				return time.Now()
-			}
-			return m.runCompleted
-		}(),
-		JSONMode: m.config.JSONMode,
-		Stages:   m.exportRecords,
-	}
-
-	data, err := json.MarshalIndent(export, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return util.WriteFile(path, data)
-}
-
-// exportPipelineMarkdown writes the latest run data to a Markdown file.
-func (m *pipelineModel) exportPipelineMarkdown(path string) error {
-	if len(m.exportRecords) == 0 {
-		return fmt.Errorf("no pipeline run to export")
-	}
-	builder := &strings.Builder{}
-	runCompleted := m.runCompleted
-	if runCompleted.IsZero() {
-		runCompleted = time.Now()
-	}
-	builder.WriteString("# Pipeline Run\n\n")
-	builder.WriteString(fmt.Sprintf("- Run started: %s\n", m.runStarted.Format(time.RFC3339)))
-	builder.WriteString(fmt.Sprintf("- Run completed: %s\n", runCompleted.Format(time.RFC3339)))
-	builder.WriteString(fmt.Sprintf("- JSON mode: %t\n\n", m.config.JSONMode))
-	for _, rec := range m.exportRecords {
-		builder.WriteString(fmt.Sprintf("## Stage %d — %s (%s)\n\n", rec.Stage, rec.Host, rec.Model))
-		builder.WriteString(fmt.Sprintf("- Cache hit: %t\n", rec.CacheHit))
-		builder.WriteString(fmt.Sprintf("- Prompt tokens: %d\n", rec.Tokens.Prompt))
-		builder.WriteString(fmt.Sprintf("- Eval tokens: %d\n", rec.Tokens.Eval))
-		builder.WriteString(fmt.Sprintf("- Total seconds: %.2f\n", rec.Timings.TotalSeconds))
-		builder.WriteString(fmt.Sprintf("- Load seconds: %.2f\n", rec.Timings.LoadSeconds))
-		builder.WriteString(fmt.Sprintf("- Prompt eval seconds: %.2f\n", rec.Timings.PromptEvalSeconds))
-		builder.WriteString(fmt.Sprintf("- Eval seconds: %.2f\n", rec.Timings.EvalSeconds))
-		builder.WriteString(fmt.Sprintf("- Time to first token: %.2f\n", rec.Timings.TimeToFirstToken))
-		if rec.TruncationSummary != "" {
-			builder.WriteString(fmt.Sprintf("- Handoff: %s\n", rec.TruncationSummary))
-		}
-		builder.WriteString("\n```text\n")
-		builder.WriteString(rec.HandoffPayload)
-		builder.WriteString("\n```\n\n")
-	}
-	return os.WriteFile(path, []byte(builder.String()), 0o644)
 }
 
 // StartPipelineGUI initializes the pipeline Bubble Tea program and blocks until exit.
@@ -1726,3 +1525,6 @@ func makeCacheKey(stage int, hostURL, modelName, payload string) string {
 	hash.Write([]byte(payload))
 	return fmt.Sprintf("%x", hash.Sum64())
 }
+
+
+

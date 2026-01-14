@@ -22,8 +22,6 @@ func ShowConfig(out io.Writer, file string, cfg *Config, fallback Config) {
 		fmt.Fprintf(out, "  MCP Mode:        %v\n", fallback.MCPMode)
 		fmt.Fprintf(out, "  MCP Binary:      %s\n", fallback.MCPBinary)
 		fmt.Fprintf(out, "  MCP Init Timeout: %d seconds\n", fallback.MCPInitTimeout)
-		fmt.Fprintf(out, "  Export JSON:     %s\n", fallback.ExportPath)
-		fmt.Fprintf(out, "  Export Markdown: %s\n", fallback.ExportMarkdownPath)
 		return
 	}
 
@@ -35,8 +33,6 @@ func ShowConfig(out io.Writer, file string, cfg *Config, fallback Config) {
 	fmt.Fprintf(out, "  RAG Mode:        %v\n", cfg.RagMode)
 	fmt.Fprintf(out, "  MCP Binary:      %s\n", cfg.MCPBinaryPath())
 	fmt.Fprintf(out, "  MCP Init Timeout: %s\n", cfg.MCPInitTimeoutDuration())
-	fmt.Fprintf(out, "  Export JSON:     %s\n", cfg.ExportPath)
-	fmt.Fprintf(out, "  Export Markdown: %s\n", cfg.ExportMarkdownPath)
 	if cfg.RagMode {
 		fmt.Fprintf(out, "  RAG Corpus Path: %s\n", cfg.RagCorpusPath)
 		fmt.Fprintf(out, "  RAG Index Path:  %s\n", cfg.RagIndexPath)

@@ -42,7 +42,7 @@ func TestPersistentPreRunEUsesFlagValues(t *testing.T) {
 	})
 	t.Cleanup(func() { _ = logging.Close() })
 
-	for _, name := range []string{"debug", "multimodelMode", "pipelineMode", "jsonMode", "mcpMode", "mcpBinary", "mcpInitTimeout", "export", "exportMarkdown"} {
+	for _, name := range []string{"debug", "multimodelMode", "pipelineMode", "jsonMode", "mcpMode", "mcpBinary", "mcpInitTimeout"} {
 		resetFlag(name)
 	}
 	_ = rootCmd.PersistentFlags().Set("debug", "true")
@@ -50,8 +50,6 @@ func TestPersistentPreRunEUsesFlagValues(t *testing.T) {
 	_ = rootCmd.PersistentFlags().Set("mcpMode", "true")
 	_ = rootCmd.PersistentFlags().Set("mcpBinary", "custom-mcp")
 	_ = rootCmd.PersistentFlags().Set("mcpInitTimeout", "12")
-	_ = rootCmd.PersistentFlags().Set("export", "out.json")
-	_ = rootCmd.PersistentFlags().Set("exportMarkdown", "out.md")
 	_ = rootCmd.PersistentFlags().Set("logFile", logPath)
 
 	if err := rootCmd.PersistentPreRunE(rootCmd, []string{}); err != nil {

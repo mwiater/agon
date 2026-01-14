@@ -20,8 +20,6 @@ var showConfigCmd = &cobra.Command{
 			MCPMode:            viper.GetBool("mcpMode"),
 			MCPBinary:          viper.GetString("mcpBinary"),
 			MCPInitTimeout:     viper.GetInt("mcpInitTimeout"),
-			ExportPath:         viper.GetString("export"),
-			ExportMarkdownPath: viper.GetString("exportMarkdown"),
 		}
 		appconfig.ShowConfig(cmd.OutOrStdout(), viper.ConfigFileUsed(), GetConfig(), fallback)
 	},

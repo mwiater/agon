@@ -2,10 +2,9 @@ Commands and Subcommands:
   agon                          agon â€” terminal-first companion for multi-host llama.cpp workflows
     agon analyze                Analyze benchmark outputs
       agon analyze metrics      Generate metric analysis & report from benchmark JSON
-    agon benchmark              Group commands for running benchmarks
+      agon benchmark              Group commands for running benchmarks
       agon benchmark accuracy   Run accuracy batch workflows
       agon benchmark model      Run a single benchmark against a benchmark server endpoint
-      agon benchmark models     Run benchmarks for models defined in the config file
     agon chat                   Start a chat session
     agon delete                 Group commands for deleting resources
       agon delete models        Delete all models not in the configuration file
@@ -20,7 +19,6 @@ Commands and Subcommands:
     agon rag                    RAG utilities
       agon rag index            Build the RAG JSONL index
       agon rag preview          Preview RAG retrieval and context assembly
-    agon run                    Group commands for running workflows
     agon show                   Group commands for displaying resources
       agon show config          Show config settings
     agon sync                   Group commands for syncing resources
