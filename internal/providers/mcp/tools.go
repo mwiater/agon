@@ -104,6 +104,7 @@ func (p *Provider) callTool(ctx context.Context, host, model, name string, args 
 		"name":      name,
 		"arguments": args,
 	}
+	p.log("MCP tool call start: tool=%s host=%s model=%s", name, host, model)
 	meta := rpcMetadata{
 		host:   host,
 		model:  model,
@@ -112,9 +113,11 @@ func (p *Provider) callTool(ctx context.Context, host, model, name string, args 
 	}
 	resp, err := p.rpcCall(ctx, "tools/call", params, meta)
 	if err != nil {
+		p.log("MCP tool call failed: tool=%s host=%s model=%s err=%v", name, host, model, err)
 		return toolCallResponse{}, err
 	}
 	if len(resp.Result) == 0 {
+		p.log("MCP tool call success: tool=%s host=%s model=%s", name, host, model)
 		return toolCallResponse{}, nil
 	}
 	var payload struct {
@@ -124,8 +127,10 @@ func (p *Provider) callTool(ctx context.Context, host, model, name string, args 
 		} `json:"content"`
 	}
 	if err := json.Unmarshal(resp.Result, &payload); err != nil {
+		p.log("MCP tool call failed: tool=%s host=%s model=%s err=%v", name, host, model, err)
 		return toolCallResponse{}, err
 	}
+	p.log("MCP tool call success: tool=%s host=%s model=%s", name, host, model)
 
 	var (
 		jsonPart      string

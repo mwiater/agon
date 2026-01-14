@@ -159,6 +159,7 @@ func (p *Provider) Stream(ctx context.Context, req providers.StreamRequest, call
 	if !foundSystemPrompt {
 		forwardReq.History = append([]providers.ChatMessage{{Role: "system", Content: newSystemPrompt}}, forwardReq.History...)
 	}
+	forwardReq.SystemPrompt = ""
 
 	forwardReq.DisableStreaming = true
 	retryState := make(map[string]int)

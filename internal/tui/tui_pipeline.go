@@ -811,7 +811,8 @@ func (m *pipelineModel) assignmentView() string {
 
 	header := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("62")).Render("Pipeline Mode - Map hosts to stages")
 	builder.WriteString(header + "\n")
-	builder.WriteString(renderMCPBadge(m.mcpStatus) + "\n\n")
+	statusBadges := lipgloss.JoinHorizontal(lipgloss.Top, renderJSONBadge(m.config.JSONMode), renderMCPBadge(m.mcpStatus))
+	builder.WriteString(statusBadges + "\n\n")
 
 	for i, stage := range m.stages {
 		pointer := "  "
@@ -863,15 +864,16 @@ func (m *pipelineModel) pipelineView() string {
 	var parts []string
 
 	parts = append(parts, m.renderProgressLine())
+	parts = append(parts, lipgloss.JoinHorizontal(lipgloss.Top, renderJSONBadge(m.config.JSONMode), renderMCPBadge(m.mcpStatus)))
 	if m.statusBanner != "" {
 		parts = append(parts, bannerStyle.Render(m.statusBanner))
 	}
-	partsAbove := 1
+	partsAbove := 2
 	if m.statusBanner != "" {
 		partsAbove++
 	}
 	partsBelow := 2
-	separators := 3
+	separators := 4
 	if m.statusBanner != "" {
 		separators++
 	}
@@ -911,6 +913,8 @@ func (m *pipelineModel) expandedView() string {
 
 	header := fmt.Sprintf("Stage %d — %s • %s", stage.index+1, stage.host.Name, stage.selectedModel)
 	builder.WriteString(stageTitleStyle.Render(header) + "\n")
+	statusBadges := lipgloss.JoinHorizontal(lipgloss.Top, renderJSONBadge(m.config.JSONMode), renderMCPBadge(m.mcpStatus))
+	builder.WriteString(statusBadges + "\n")
 	builder.WriteString(stageStatusStyles[stage.status].Render(stage.statusMessage) + "\n\n")
 
 	switch stage.view {
@@ -965,13 +969,7 @@ func (m *pipelineModel) renderProgressLine() string {
 		}
 	}
 
-	jsonMode := "jsonMode: off"
-	if m.config.JSONMode {
-		jsonMode = "jsonMode: on"
-	}
-	mcpIndicator := formatMCPIndicator(m.mcpStatus)
-
-	return fmt.Sprintf("Pipeline: %s | %s | %s | %s | %s | %s", pipelinePath, stageStatus, speed, ttft, jsonMode, mcpIndicator)
+	return fmt.Sprintf("Pipeline: %s | %s | %s | %s", pipelinePath, stageStatus, speed, ttft)
 }
 
 // renderStageColumns renders the columns for each pipeline stage.
