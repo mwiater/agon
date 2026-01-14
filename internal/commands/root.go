@@ -48,6 +48,9 @@ var rootCmd = &cobra.Command{
 		if err := viper.Unmarshal(&cfg); err != nil {
 			return fmt.Errorf("unmarshal config: %w", err)
 		}
+		if err := appconfig.ApplyParameterTemplates(&cfg); err != nil {
+			return err
+		}
 		cfg.ConfigPath = cfgFile
 		if cfg.MultimodelMode && cfg.PipelineMode {
 			return fmt.Errorf("invalid configuration: only one of multimodelMode or pipelineMode can be enabled")

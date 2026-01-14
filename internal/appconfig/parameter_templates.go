@@ -136,6 +136,11 @@ func applyParameterTemplates(config *Config) error {
 	return nil
 }
 
+// ApplyParameterTemplates applies parameter profiles to every host.
+func ApplyParameterTemplates(config *Config) error {
+	return applyParameterTemplates(config)
+}
+
 func mergeParams(base LlamaParams, override LlamaParams) LlamaParams {
 	if override.Temperature != nil {
 		base.Temperature = override.Temperature

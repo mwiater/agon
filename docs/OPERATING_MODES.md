@@ -1,5 +1,30 @@
 ## Operating Modes
 
+## Mode Matrix Checklist (Manual Testing)
+
+This matrix covers the supported chat-mode combinations. `multimodelMode` and `pipelineMode` are mutually exclusive (Singlemodel is the default when both are false). `jsonMode` and `mcpMode` can be layered on top of any chat mode.
+
+| Chat Mode | jsonMode | mcpMode | Notes |
+| --- | --- | --- | --- |
+| Singlemodel | off | off | Default chat UI. |
+| Singlemodel | on | off | JSON output enforced. |
+| Singlemodel | off | on | Tool calls via MCP. |
+| Singlemodel | on | on | JSON + MCP together. |
+| Multimodel | off | off | 2-4 models side-by-side. |
+| Multimodel | on | off | JSON output enforced per model. |
+| Multimodel | off | on | Tool calls via MCP. |
+| Multimodel | on | on | JSON + MCP together. |
+| Pipeline | off | off | Sequential model chain. |
+| Pipeline | on | off | JSON output enforced per stage. |
+| Pipeline | off | on | Tool calls via MCP. |
+| Pipeline | on | on | JSON + MCP together. |
+
+RAG mode is not a chat UI mode; it affects the accuracy workflow and RAG utilities. For manual testing, use:
+-   `ragMode=false`: baseline accuracy run.
+-   `ragMode=true`: accuracy run with retrieval + context injection (requires corpus + index).
+-   `agon rag index`: build the RAG index.
+-   `agon rag preview`: preview retrieval output.
+
 ### Singlemodel Mode
 
 This is the standard, default mode for `agon`, providing a classic, one-on-one chat session with a single language model. It works by having you first select a host and then a model to interact with. The user interface is a clean, scrollable conversation history, focusing on a direct and uninterrupted dialogue. This mode differs from others by its simplicity and focus on a single line of conversation, whereas Multimodel mode orchestrates multiple models. It is most useful for direct, focused tasks, creative writing, or any scenario where you want a traditional chatbot experience without the complexity of multiple models. Single-Model mode can be combined with `JSONMode` to enforce structured output and `MCPMode` to enable tool use (see [MCPMODE.md](MCPMODE.md)).

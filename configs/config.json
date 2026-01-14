@@ -1,8 +1,8 @@
 {
   "hosts": [
     {
-      "name": "LlamaCpp01",
-      "url": "{LlamaCpp-api-endpoint-01}",
+      "name": "LLM01",
+      "url": "https://o-udoo01.0nezer0.com",
       "type": "llama.cpp",
       "models": [
         "gemma-3-4b-it-Q4_K_M",
@@ -13,13 +13,13 @@
         "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
         "internlm2_5-1_8b-chat-Q4_K_M"
       ],
-      "systemprompt": "You are a helpful and assistant",
+      "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point.",
       "parameterTemplate": "generic",
       "parameters": {}
     },
     {
-      "name": "LlamaCpp02",
-      "url": "{LlamaCpp-api-endpoint-02}",
+      "name": "LLM02",
+      "url": "https://o-udoo02.0nezer0.com",
       "type": "llama.cpp",
       "models": [
         "gemma-3-4b-it-Q4_K_M",
@@ -30,13 +30,13 @@
         "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
         "internlm2_5-1_8b-chat-Q4_K_M"
       ],
-      "systemprompt": "You are a helpful and assistant",
+      "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point.",
       "parameterTemplate": "generic",
       "parameters": {}
     },
     {
-      "name": "LlamaCpp03",
-      "url": "{LlamaCpp-api-endpoint-03}",
+      "name": "LLM03",
+      "url": "https://o-udoo03.0nezer0.com",
       "type": "llama.cpp",
       "models": [
         "gemma-3-4b-it-Q4_K_M",
@@ -47,13 +47,13 @@
         "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
         "internlm2_5-1_8b-chat-Q4_K_M"
       ],
-      "systemprompt": "You are a helpful and assistant",
+      "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point.",
       "parameterTemplate": "generic",
       "parameters": {}
     },
     {
-      "name": "LlamaCpp04",
-      "url": "{LlamaCpp-api-endpoint-04}",
+      "name": "LLM04",
+      "url": "https://o-udoo04.0nezer0.com",
       "type": "llama.cpp",
       "models": [
         "gemma-3-4b-it-Q4_K_M",
@@ -64,7 +64,7 @@
         "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
         "internlm2_5-1_8b-chat-Q4_K_M"
       ],
-      "systemprompt": "You are a helpful and assistant",
+      "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point.",
       "parameterTemplate": "generic",
       "parameters": {}
     }
@@ -75,7 +75,6 @@
   "pipelineMode": false,
   "jsonMode": false,
   "mcpMode": false,
-  "benchmarkCount": 10,
   "mcpBinary": "dist/agon-mcp_linux_amd64_v1/agon-mcp",
   "mcpInitTimeout": 10,
   "mcpRetryCount": 1,
