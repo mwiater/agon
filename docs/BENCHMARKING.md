@@ -38,5 +38,8 @@ agon benchmark models --config configs/config.benchmark.json
 ```
 
 ```bash
-agon benchmark model --model llama-3-2-1b-instruct-q8_0.gguf --gpu radeon-rx-570 --benchmark-endpoint http://localhost:9999/benchmark
+go run cmd/agon/main.go benchmark model \
+  --model OpenELM-1_1B.gguf \
+  --gpu pentium-n3710-1-60ghz \
+  --benchmark-endpoint http://192.168.0.91:9999/benchmark
 ```

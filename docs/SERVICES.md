@@ -240,14 +240,18 @@ It expects a fixed folder layout relative to the working directory.
 
 ```
 [Unit]
-Description=Agon Benchmark Service
-After=network-online.target
+Description=Agon Benchmark Server
+After=network.target
 
 [Service]
-ExecStart=/home/<you>/agon-benchmark/agon-benchmark
-User={user}
-Group={group}
-Restart=always
+Type=simple
+User=<you>
+Group=<you>
+WorkingDirectory=/home/<you>/projects/agon
+ExecStart=/home/<you>/projects/agon/dist/agon-benchmark_linux_amd64_v1/agon-benchmark
+Restart=on-failure
+RestartSec=5
+Environment=GODEBUG=madvdontneed=1
 
 [Install]
 WantedBy=multi-user.target
@@ -300,26 +304,38 @@ dist/agon-benchmark_linux_amd64_v1/agon-benchmark
 sudo nano /etc/systemd/system/agon-benchmark.service
 
 
-[Unit]
-Description=Agon Benchmark Service
-After=network-online.target
-
-[Service]
-ExecStart=/home/matt/projects/agon/dist/agon-benchmark_linux_amd64_v1/agon-benchmark
-User=matt
-Group=matt
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-
 sudo systemctl daemon-reload
-sudo systemctl enable agon-benchmark
 sudo systemctl stop agon-benchmark
 sudo systemctl start agon-benchmark
 sudo systemctl status agon-benchmark
 
-nano /home/matt/projects/agon/dist/agon-benchmark_linux_amd64_v1/benchmark.yml
+sudo journalctl -xeu agon-benchmark.service
+
+
+sudo nano /etc/systemd/system/agon-benchmark.service
+
+```
+[Unit]
+Description=Agon Benchmark Server
+After=network.target
+
+[Service]
+Type=simple
+User=matt
+Group=matt
+WorkingDirectory=/home/matt/projects/agon
+ExecStart=/home/matt/projects/agon/dist/agon-benchmark_linux_amd64_v1/agon-benchmark
+Restart=on-failure
+RestartSec=5
+Environment=GODEBUG=madvdontneed=1
+
+[Install]
+WantedBy=multi-user.target
+```
+
+nano /home/matt/projects/agon/servers/benchmark/agon-benchmark.yml
+
+
 
 # benchmarks server config
 host: 0.0.0.0
@@ -327,7 +343,7 @@ port: 9999
 type: "llama.cpp"
 api_base: https://o-udoo01.0nezer0.com
 models_path: /home/matt/projects/gollama/models
-timeout: 10800
+timeout: 3600
 
 # benchmarks server config
 host: 0.0.0.0
@@ -335,7 +351,7 @@ port: 9999
 type: "llama.cpp"
 api_base: https://o-udoo02.0nezer0.com
 models_path: /home/matt/projects/gollama/models
-timeout: 10800
+timeout: 3600
 
 # benchmarks server config
 host: 0.0.0.0
@@ -343,7 +359,7 @@ port: 9999
 type: "llama.cpp"
 api_base: https://o-udoo03.0nezer0.com
 models_path: /home/matt/projects/gollama/models
-timeout: 10800
+timeout: 3600
 
 # benchmarks server config
 host: 0.0.0.0
@@ -351,4 +367,4 @@ port: 9999
 type: "llama.cpp"
 api_base: https://o-udoo04.0nezer0.com
 models_path: /home/matt/projects/gollama/models
-timeout: 10800
+timeout: 3600
