@@ -1,0 +1,84 @@
+{
+  "hosts": [
+    {
+      "name": "LLM01",
+      "url": "https://o-udoo01.0nezer0.com",
+      "type": "llama.cpp",
+      "models": [
+        "gemma-3-4b-it-Q4_K_M",
+        "Falcon3-3B-Instruct-q5_k_m",
+        "gemma-2-2b-it-Q4_K_M",
+        "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M",
+        "qwen2.5-1.5b-instruct-q4_k_m",
+        "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
+        "internlm2_5-1_8b-chat-Q4_K_M"
+      ],
+      "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point.",
+      "parameterTemplate": "generic",
+      "parameters": {}
+    },
+    {
+      "name": "LLM02",
+      "url": "https://o-udoo02.0nezer0.com",
+      "type": "llama.cpp",
+      "models": [
+        "gemma-3-4b-it-Q4_K_M",
+        "Falcon3-3B-Instruct-q5_k_m",
+        "gemma-2-2b-it-Q4_K_M",
+        "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M",
+        "qwen2.5-1.5b-instruct-q4_k_m",
+        "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
+        "internlm2_5-1_8b-chat-Q4_K_M"
+      ],
+      "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point.",
+      "parameterTemplate": "generic",
+      "parameters": {}
+    },
+    {
+      "name": "LLM03",
+      "url": "https://o-udoo03.0nezer0.com",
+      "type": "llama.cpp",
+      "models": [
+        "gemma-3-4b-it-Q4_K_M",
+        "Falcon3-3B-Instruct-q5_k_m",
+        "gemma-2-2b-it-Q4_K_M",
+        "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M",
+        "qwen2.5-1.5b-instruct-q4_k_m",
+        "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
+        "internlm2_5-1_8b-chat-Q4_K_M"
+      ],
+      "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point.",
+      "parameterTemplate": "generic",
+      "parameters": {}
+    },
+    {
+      "name": "LLM04",
+      "url": "https://o-udoo04.0nezer0.com",
+      "type": "llama.cpp",
+      "models": [
+        "gemma-3-4b-it-Q4_K_M",
+        "Falcon3-3B-Instruct-q5_k_m",
+        "gemma-2-2b-it-Q4_K_M",
+        "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M",
+        "qwen2.5-1.5b-instruct-q4_k_m",
+        "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
+        "internlm2_5-1_8b-chat-Q4_K_M"
+      ],
+      "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point.",
+      "parameterTemplate": "generic",
+      "parameters": {}
+    }
+  ],
+  "timeout": 600,
+  "debug": true,
+  "multimodelMode": true,
+  "pipelineMode": false,
+  "jsonMode": true,
+  "mcpMode": false,
+  "mcpBinary": "dist/agon-mcp_linux_amd64_v1/agon-mcp",
+  "mcpInitTimeout": 10,
+  "mcpRetryCount": 1,
+  "export": "",
+  "exportMarkdown": "",
+  "metrics": true
+}

@@ -20,7 +20,6 @@ import (
 	"github.com/mwiater/agon/internal/models"
 	"github.com/mwiater/agon/internal/providerfactory"
 	"github.com/mwiater/agon/internal/providers"
-	"github.com/mwiater/agon/internal/providers/llamacpp"
 )
 
 // Config represents the shared application configuration for the CLI.
@@ -675,11 +674,9 @@ func StartGUI(ctx context.Context, cfg *appconfig.Config, cancel context.CancelF
 	provider, err := providerfactory.NewChatProvider(cfg)
 	if err != nil {
 		if cfg.MCPMode {
-			logging.LogEvent("MCP provider unavailable: %v — falling back to direct llama.cpp access", err)
-			provider = llamacpp.New(cfg)
-		} else {
-			log.Fatalf("Failed to initialize provider: %v", err)
+			log.Fatalf("MCP provider unavailable: %v", err)
 		}
+		log.Fatalf("Failed to initialize provider: %v", err)
 	}
 	defer func() {
 		if err := provider.Close(); err != nil {
