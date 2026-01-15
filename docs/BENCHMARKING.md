@@ -22,3 +22,19 @@ go run cmd/agon/main.go benchmark model \
   --gpu pentium-n3710-1-60ghz \
   --benchmark-endpoint http://192.168.0.91:9999/benchmark
 ```
+
+
+go run cmd/agon/main.go benchmark model \
+  --model Qwen3-0.6B-Q8_0.gguf \
+  --gpu pentium-n3710-1-60ghz \
+  --benchmark-endpoint http://192.168.0.92:9999/benchmark
+
+go run cmd/agon/main.go benchmark model \
+  --model Qwen3-1.7B-Q4_K_M.gguf \
+  --gpu pentium-n3710-1-60ghz \
+  --benchmark-endpoint http://192.168.0.93:9999/benchmark
+
+go run cmd/agon/main.go benchmark model \
+  --model granite-4.0-h-1b-DISTILL-glm-4.7-think-q5_k_m.gguf \
+  --gpu pentium-n3710-1-60ghz \
+  --benchmark-endpoint http://192.168.0.94:9999/benchmark
