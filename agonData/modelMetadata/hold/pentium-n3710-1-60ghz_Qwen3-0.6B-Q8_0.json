@@ -1,7 +1,7 @@
 {
   "type": "llama.cpp",
   "name": "Qwen3-0.6B-Q8_0",
-  "endpoint": "https://o-udoo02.0nezer0.com",
+  "endpoint": "http://192.168.0.91:9991",
   "gpu": "pentium-n3710-1-60ghz",
   "metadata": {
     "bos_token": "\u003c|endoftext|\u003e",

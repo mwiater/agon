@@ -65,12 +65,10 @@ func DefaultAccuracyParams() LlamaParams {
 		TopP:        ptrFloat(0.95), // Slightly wider for R1 stability
 		MinP:        ptrFloat(0.1),
 
-		// 512 is safe. Standard models will only use ~5 tokens.
-		// R1 models will use ~200 for thinking and then stop.
-		NPredict: ptrInt(512),
+		NPredict: ptrInt(1024),
 
 		RepeatPenalty: ptrFloat(1.0),
-		Seed:          ptrInt64(42),
+		Seed:          ptrInt64(-1),
 		//Stream:   ptrBool(false),
 	}
 }

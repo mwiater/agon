@@ -247,6 +247,12 @@ func (p *Provider) handleNonStreaming(ctx context.Context, resp *http.Response, 
 	content := parsed.Choices[0].Message.Content
 	role := parsed.Choices[0].Message.Role
 	toolCalls := parsed.Choices[0].Message.ToolCalls
+	if strings.TrimSpace(content) == "" {
+		reasoning := strings.TrimSpace(parsed.Choices[0].Message.ReasoningContent)
+		if reasoning != "" && len(reasoning) <= 20 {
+			content = reasoning
+		}
+	}
 	if len(toolCalls) > 0 {
 		toolOutput, err := executeToolCalls(ctx, req, toolCalls)
 		if err != nil {
@@ -414,9 +420,10 @@ type chatResponse struct {
 	} `json:"usage"`
 	Choices []struct {
 		Message struct {
-			Role      string     `json:"role"`
-			Content   string     `json:"content"`
-			ToolCalls []toolCall `json:"tool_calls,omitempty"`
+			Role             string     `json:"role"`
+			Content          string     `json:"content"`
+			ReasoningContent string     `json:"reasoning_content,omitempty"`
+			ToolCalls        []toolCall `json:"tool_calls,omitempty"`
 		} `json:"message"`
 		LogProbs json.RawMessage `json:"logprobs,omitempty"`
 	} `json:"choices"`

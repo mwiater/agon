@@ -23,18 +23,36 @@ go run cmd/agon/main.go benchmark model \
   --benchmark-endpoint http://192.168.0.91:9999/benchmark
 ```
 
+clear && go run cmd/agon/main.go fetch modelmetadata --endpoints http://192.168.0.91:9991 --gpu pentium-n3710-1-60ghz
 
 go run cmd/agon/main.go benchmark model \
-  --model Qwen3-0.6B-Q8_0.gguf \
+  --model Qwen3-0.6B-Q3_K_M.gguf \
+  --gpu pentium-n3710-1-60ghz \
+  --benchmark-endpoint http://192.168.0.91:9999/benchmark
+
+go run cmd/agon/main.go benchmark model \
+  --model Qwen3-0.6B-Q4_K_M.gguf \
   --gpu pentium-n3710-1-60ghz \
   --benchmark-endpoint http://192.168.0.92:9999/benchmark
 
 go run cmd/agon/main.go benchmark model \
-  --model Qwen3-1.7B-Q4_K_M.gguf \
+  --model Qwen3-0.6B-Q5_K_M.gguf \
   --gpu pentium-n3710-1-60ghz \
-  --benchmark-endpoint http://192.168.0.93:9999/benchmark
+  --benchmark-endpoint http://192.168.0.92:9999/benchmark
+
+dist/agon-benchmark_windows_amd64_v1/agon-benchmark.exe
 
 go run cmd/agon/main.go benchmark model \
-  --model granite-4.0-h-1b-DISTILL-glm-4.7-think-q5_k_m.gguf \
-  --gpu pentium-n3710-1-60ghz \
-  --benchmark-endpoint http://192.168.0.94:9999/benchmark
+  --model Qwen3-0.6B-Q3_K_M.gguf \
+  --gpu radeon-rx-570 \
+  --benchmark-endpoint http://192.168.0.33:9999/benchmark
+
+go run cmd/agon/main.go benchmark model \
+  --model Qwen3-0.6B-Q4_K_M.gguf \
+  --gpu radeon-rx-570 \
+  --benchmark-endpoint http://192.168.0.33:9999/benchmark
+
+go run cmd/agon/main.go benchmark model \
+  --model Qwen3-0.6B-Q5_K_M.gguf \
+  --gpu radeon-rx-570 \
+  --benchmark-endpoint http://192.168.0.33:9999/benchmark

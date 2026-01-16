@@ -1,7 +1,7 @@
 {
   "type": "llama.cpp",
   "name": "gemma-3-4b-it-Q4_K_M",
-  "endpoint": "https://o-udoo04.0nezer0.com",
+  "endpoint": "http://192.168.0.94:9994",
   "gpu": "pentium-n3710-1-60ghz",
   "metadata": {
     "bos_token": "\u003cbos\u003e",

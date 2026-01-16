@@ -1,7 +1,7 @@
 {
   "type": "llama.cpp",
   "name": "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M",
-  "endpoint": "https://o-udoo01.0nezer0.com",
+  "endpoint": "http://192.168.0.91:9991",
   "gpu": "pentium-n3710-1-60ghz",
   "metadata": {
     "bos_token": "\u003c｜begin▁of▁sentence｜\u003e",

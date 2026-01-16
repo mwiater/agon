@@ -1,7 +1,7 @@
 {
   "type": "llama.cpp",
   "name": "Falcon3-3B-Instruct-q5_k_m",
-  "endpoint": "https://o-udoo02.0nezer0.com",
+  "endpoint": "http://192.168.0.92:9992",
   "gpu": "pentium-n3710-1-60ghz",
   "metadata": {
     "bos_token": "\u003c|endoftext|\u003e",

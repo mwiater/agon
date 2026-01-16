@@ -26,6 +26,11 @@ const (
 	resultsDir      = "agonData/modelAccuracy"
 )
 
+const (
+	accuracyAnswerHint      = "Answer with a single integer only. No words, no punctuation."
+	accuracyFinalAnswerHint = "Final answer:"
+)
+
 // RunAccuracy executes the accuracy suite for each configured host/model pair.
 func RunAccuracy(cfg *appconfig.Config) error {
 	if cfg == nil {
@@ -102,7 +107,9 @@ func RunAccuracy(cfg *appconfig.Config) error {
 					continue
 				}
 
-				response, meta, err := runPrompt(r.provider, r.host, r.model, suite.SystemPrompt, t.Prompt)
+				systemPrompt := buildAccuracySystemPrompt(suite.SystemPrompt)
+				userPrompt := buildAccuracyUserPrompt(t.Prompt)
+				rawResponse, response, meta, err := runPrompt(r.provider, r.host, r.model, systemPrompt, userPrompt)
 				if err != nil {
 					deadlineExceeded := isDeadlineExceeded(err)
 					if deadlineExceeded {
@@ -142,6 +149,9 @@ func RunAccuracy(cfg *appconfig.Config) error {
 
 				correct := matchesExpected(response, t.ExpectedAnswer, t.MarginOfError)
 				fmt.Printf("[%d/%d] %s / %s - Result: correct=%t response=%q expected=%d\n", iteration, total, r.host.Name, r.model, correct, response, t.ExpectedAnswer)
+				if response == "" && normalizeResponse(response) == "" {
+					fmt.Printf("[%d/%d] %s / %s - Full response: %q\n", iteration, total, r.host.Name, r.model, rawResponse)
+				}
 
 				ttftMs, tokensPerSecond, inputTokens, outputTokens, totalDurationMs := accuracyMetrics(meta)
 				result := AccuracyResult{
@@ -181,7 +191,9 @@ func RunAccuracy(cfg *appconfig.Config) error {
 
 func runRagCompare(cfg *appconfig.Config, provider providers.ChatProvider, host appconfig.Host, modelName, systemPrompt string, test PromptTest, timeoutSeconds int) error {
 	// RAG OFF: baseline run (no context).
-	response, meta, err := runPrompt(provider, host, modelName, systemPrompt, test.Prompt)
+	systemPrompt = buildAccuracySystemPrompt(systemPrompt)
+	userPrompt := buildAccuracyUserPrompt(test.Prompt)
+	rawResponse, response, meta, err := runPrompt(provider, host, modelName, systemPrompt, userPrompt)
 	if err != nil {
 		if isDeadlineExceeded(err) {
 			ttftMs, tokensPerSecond, inputTokens, outputTokens, totalDurationMs := accuracyMetrics(meta)
@@ -217,6 +229,9 @@ func runRagCompare(cfg *appconfig.Config, provider providers.ChatProvider, host 
 	}
 	correct := matchesExpected(response, test.ExpectedAnswer, test.MarginOfError)
 	fmt.Printf("Full response (RAG off): %s\n", response)
+	if response == "" && normalizeResponse(response) == "" {
+		fmt.Printf("Full response (RAG off, raw): %q\n", rawResponse)
+	}
 	ttftMs, tokensPerSecond, inputTokens, outputTokens, totalDurationMs := accuracyMetrics(meta)
 	result := AccuracyResult{
 		Timestamp:          time.Now().Format(time.RFC3339),
@@ -252,13 +267,14 @@ func runRagCompare(cfg *appconfig.Config, provider providers.ChatProvider, host 
 		return err
 	}
 
-	ragSystemPrompt := buildRagSystemPrompt(systemPrompt)
+	ragSystemPrompt := buildRagSystemPrompt(buildAccuracySystemPrompt(systemPrompt))
 	promptWithContext := test.Prompt
 	if retrieval.Context != "" {
 		promptWithContext = retrieval.Context + "\n\n" + test.Prompt
 	}
 
-	response, meta, err = runPrompt(provider, host, modelName, ragSystemPrompt, promptWithContext)
+	userPrompt = buildAccuracyUserPrompt(promptWithContext)
+	rawResponse, response, meta, err = runPrompt(provider, host, modelName, ragSystemPrompt, userPrompt)
 	if err != nil {
 		if isDeadlineExceeded(err) {
 			ttftMs, tokensPerSecond, inputTokens, outputTokens, totalDurationMs := accuracyMetrics(meta)
@@ -298,6 +314,9 @@ func runRagCompare(cfg *appconfig.Config, provider providers.ChatProvider, host 
 	}
 	correct = matchesExpected(response, test.ExpectedAnswer, test.MarginOfError)
 	fmt.Printf("Full response (RAG on): %s\n", response)
+	if response == "" && normalizeResponse(response) == "" {
+		fmt.Printf("Full response (RAG on, raw): %q\n", rawResponse)
+	}
 	ttftMs, tokensPerSecond, inputTokens, outputTokens, totalDurationMs = accuracyMetrics(meta)
 	result = AccuracyResult{
 		Timestamp:          time.Now().Format(time.RFC3339),
@@ -347,7 +366,7 @@ func buildRagSystemPrompt(systemPrompt string) string {
 	return trimmed + "\n" + line
 }
 
-func runPrompt(provider providers.ChatProvider, host appconfig.Host, modelName, systemPrompt, prompt string) (string, providers.StreamMetadata, error) {
+func runPrompt(provider providers.ChatProvider, host appconfig.Host, modelName, systemPrompt, prompt string) (string, string, providers.StreamMetadata, error) {
 	var output strings.Builder
 	var meta providers.StreamMetadata
 
@@ -375,10 +394,11 @@ func runPrompt(provider providers.ChatProvider, host appconfig.Host, modelName, 
 	}
 
 	if err := provider.Stream(context.Background(), req, callbacks); err != nil {
-		return "", meta, err
+		return "", "", meta, err
 	}
 
-	return strings.TrimSpace(output.String()), meta, nil
+	raw := output.String()
+	return raw, strings.TrimSpace(raw), meta, nil
 }
 
 func loadPromptSuite(path string) (PromptSuite, error) {
@@ -509,7 +529,34 @@ func normalizeResponse(response string) string {
 		}
 		return r
 	}, trimmed)
+	trimmed = strings.ReplaceAll(trimmed, ",", "")
+	trimmed = strings.Trim(trimmed, " \t\"'`.,;:!?()[]{}<>")
 	return strings.TrimSpace(trimmed)
+}
+
+func buildAccuracySystemPrompt(systemPrompt string) string {
+	trimmed := strings.TrimSpace(systemPrompt)
+	if trimmed == "" {
+		return accuracyAnswerHint
+	}
+	if strings.Contains(trimmed, accuracyAnswerHint) {
+		return trimmed
+	}
+	return accuracyAnswerHint + "\n" + trimmed
+}
+
+func buildAccuracyUserPrompt(prompt string) string {
+	trimmed := strings.TrimSpace(prompt)
+	if trimmed == "" {
+		return accuracyAnswerHint + "\n" + accuracyFinalAnswerHint
+	}
+	if !strings.Contains(trimmed, accuracyAnswerHint) {
+		trimmed = accuracyAnswerHint + "\n" + trimmed
+	}
+	if !strings.Contains(trimmed, accuracyFinalAnswerHint) {
+		trimmed = trimmed + "\n" + accuracyFinalAnswerHint
+	}
+	return trimmed
 }
 
 func isDeadlineExceeded(err error) bool {

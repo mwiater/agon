@@ -1,8 +1,8 @@
 {
   "type": "llama.cpp",
-  "name": "Qwen3-1.7B-Q4_K_M",
-  "endpoint": "http://192.168.0.94:9994",
-  "gpu": "pentium-n3710-1-60ghz",
+  "name": "Qwen3-0.6B-Q8_0",
+  "endpoint": "http://192.168.0.33:8888",
+  "gpu": "radeon-rx-570",
   "metadata": {
     "bos_token": "\u003c|endoftext|\u003e",
     "build_info": "b7634-f1768d8f0",
@@ -73,10 +73,10 @@
       "audio": false,
       "vision": false
     },
-    "model_alias": "Qwen3-1.7B-Q4_K_M",
-    "model_path": "/home/matt/projects/gollama/models/Qwen3-1.7B-Q4_K_M.gguf",
+    "model_alias": "Qwen3-0.6B-Q8_0",
+    "model_path": "models\\Qwen3-0.6B-Q8_0.gguf",
     "total_slots": 4,
-    "webui": false,
+    "webui": true,
     "webui_settings": {}
   }
 }

@@ -172,7 +172,9 @@ func runAccuracyForModel(provider providers.ChatProvider, host appconfig.Host, m
 		iteration := i + 1
 		fmt.Printf("[%d/%d] %s / %s - Prompt: %s\n", iteration, totalPrompts, host.Name, model.Name, t.Prompt)
 
-		response, meta, err := runPrompt(provider, host, model.Name, suite.SystemPrompt, t.Prompt)
+		systemPrompt := buildAccuracySystemPrompt(suite.SystemPrompt)
+		userPrompt := buildAccuracyUserPrompt(t.Prompt)
+		rawResponse, response, meta, err := runPrompt(provider, host, model.Name, systemPrompt, userPrompt)
 		if err != nil {
 			deadlineExceeded := isDeadlineExceeded(err)
 			if deadlineExceeded {
@@ -213,6 +215,9 @@ func runAccuracyForModel(provider providers.ChatProvider, host appconfig.Host, m
 		correct := matchesExpected(response, t.ExpectedAnswer, t.MarginOfError)
 		evaluated := normalizeResponse(response)
 		fmt.Printf("[%d/%d] %s / %s - Result: correct=%t response=%q evaluated=%q expected=%d\n", iteration, totalPrompts, host.Name, model.Name, correct, response, evaluated, t.ExpectedAnswer)
+		if response == "" && evaluated == "" {
+			fmt.Printf("[%d/%d] %s / %s - Full response: %q\n", iteration, totalPrompts, host.Name, model.Name, rawResponse)
+		}
 
 		ttftMs, tokensPerSecond, inputTokens, outputTokens, totalDurationMs := accuracyMetrics(meta)
 		result := AccuracyResult{
