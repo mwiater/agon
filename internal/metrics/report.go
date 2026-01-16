@@ -204,6 +204,18 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
       position: relative;
       height: 420px;
     }
+    .chart-canvas--compact {
+      height: 350px;
+    }
+    .d3-chart {
+      position: relative;
+      height: 380px;
+      overflow-x: auto;
+    }
+    .d3-chart svg {
+      width: 100%;
+      height: 100%;
+    }
     .legend-container {
       display: flex;
       gap: 1.5rem;
@@ -439,6 +451,41 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
     <section class="mt-4">
       <div class="card shadow-sm chart-card">
         <div class="card-body">
+          <div class="chart-title">Processing Pipeline Waterfall</div>
+          <div class="chart-subtitle">Prompt processing, first token wait, and generation time per model.</div>
+          <div class="chart-canvas chart-canvas--compact">
+            <canvas id="processingPipelineChart" aria-label="Processing pipeline waterfall chart" role="img"></canvas>
+          </div>
+          <div id="processingPipelineEmpty" class="text-muted small mt-2"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mt-4">
+      <div class="card shadow-sm chart-card">
+        <div class="card-body">
+          <div class="chart-title">Model Similarity Dendrogram</div>
+          <div class="chart-subtitle">Hierarchical clustering across accuracy, throughput, latency, stability, and efficiency.</div>
+          <div id="dendrogramChart" class="d3-chart" aria-label="Model similarity dendrogram" role="img"></div>
+          <div id="dendrogramEmpty" class="text-muted small mt-2"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mt-4">
+      <div class="card shadow-sm chart-card">
+        <div class="card-body">
+          <div class="chart-title">Pareto Frontier Enhanced</div>
+          <div class="chart-subtitle">Accuracy vs throughput with Pareto-optimal models highlighted.</div>
+          <div id="paretoChart" class="d3-chart" aria-label="Pareto frontier chart" role="img"></div>
+          <div id="paretoEmpty" class="text-muted small mt-2"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mt-4">
+      <div class="card shadow-sm chart-card">
+        <div class="card-body">
           <div class="chart-title">Input Tokens vs Processing</div>
           <div class="chart-subtitle">Accuracy records reveal how input length affects TTFT and throughput.</div>
           <div class="filter-row">
@@ -478,6 +525,7 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
   <script>
     var metrics = {{ .MetricsJSON }};
   </script>
@@ -506,6 +554,25 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
         records.forEach(function(record) {
           var value = Number(record[field]);
           if (!isNaN(value) && value !== 0) {
+            sum += value;
+            count += 1;
+          }
+        });
+        if (!count) {
+          return null;
+        }
+        return sum / count;
+      }
+
+      function averageFieldAllowZero(records, field) {
+        if (!records || !records.length) {
+          return null;
+        }
+        var sum = 0;
+        var count = 0;
+        records.forEach(function(record) {
+          var value = Number(record[field]);
+          if (!isNaN(value)) {
             sum += value;
             count += 1;
           }
@@ -575,13 +642,14 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
         return $td;
       }
 
-      var sortingAttached = false;
-      var chartState = {
-        accuracyThroughput: null,
-        efficiency: null,
-        latencyPercentile: null,
-        correlation: null,
-        effectiveTps: null,
+        var sortingAttached = false;
+        var chartState = {
+          accuracyThroughput: null,
+          efficiency: null,
+          processingPipeline: null,
+          latencyPercentile: null,
+          correlation: null,
+          effectiveTps: null,
         avgLogprob: null,
         inputTtft: null,
         inputTps: null
@@ -1312,6 +1380,444 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
           }
         });
       }
+
+      function buildProcessingPipelineChart(models) {
+        var canvas = document.getElementById('processingPipelineChart');
+        if (!canvas) {
+          return;
+        }
+        var labels = [];
+        var promptValues = [];
+        var ttftValues = [];
+        var genValues = [];
+        models.forEach(function(model) {
+          var records = model.accuracy || [];
+          if (!records.length) {
+            return;
+          }
+          var avgPrompt = averageFieldAllowZero(records, 'prompt_ms');
+          var avgTtft = averageFieldAllowZero(records, 'time_to_first_token');
+          var avgGen = averageFieldAllowZero(records, 'predicted_ms');
+          if (avgPrompt === null && avgTtft === null && avgGen === null) {
+            return;
+          }
+          labels.push(modelLabel(model));
+          promptValues.push(avgPrompt || 0);
+          ttftValues.push(avgTtft || 0);
+          genValues.push(Math.max(0, avgGen || 0));
+        });
+        if (!labels.length) {
+          if (chartState.processingPipeline) {
+            chartState.processingPipeline.destroy();
+            chartState.processingPipeline = null;
+          }
+          $('#processingPipelineEmpty').text('No processing pipeline data available for this report.');
+          return;
+        }
+        if (chartState.processingPipeline) {
+          chartState.processingPipeline.destroy();
+        }
+        $('#processingPipelineEmpty').text('');
+        chartState.processingPipeline = new Chart(canvas, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: 'Prompt Processing',
+                data: promptValues,
+                backgroundColor: '#475569',
+                barThickness: 32
+              },
+              {
+                label: 'First Token Wait',
+                data: ttftValues,
+                backgroundColor: '#94a3b8',
+                barThickness: 32
+              },
+              {
+                label: 'Generation Time',
+                data: genValues,
+                backgroundColor: '#cbd5e1',
+                barThickness: 32
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            indexAxis: 'y',
+            scales: {
+              x: {
+                stacked: true,
+                title: { display: true, text: 'Milliseconds', color: '#64748B' },
+                grid: { color: '#f1f5f9' },
+                ticks: { color: '#64748B', font: { size: 10 } }
+              },
+              y: {
+                stacked: true,
+                grid: { display: false },
+                ticks: { color: '#64748B', font: { size: 11 } }
+              }
+            },
+            plugins: {
+              legend: {
+                position: 'top',
+                labels: { color: '#64748B', boxWidth: 12 }
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    return context.dataset.label + ': ' + formatNumber(context.raw, 0) + ' ms';
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+
+      function buildDendrogram(models) {
+        if (typeof d3 === 'undefined') {
+          return;
+        }
+        var container = d3.select('#dendrogramChart');
+        if (container.empty()) {
+          return;
+        }
+        container.selectAll('*').remove();
+        $('#dendrogramEmpty').text('');
+
+        var entries = models.map(function(model) {
+          var aggregates = model.aggregates || {};
+          var accuracy = aggregates.accuracy ? aggregates.accuracy.accuracy : null;
+          var tps = aggregates.throughput ? aggregates.throughput.avg_tokens_per_second : null;
+          var latency = aggregates.latency ? aggregates.latency.avg_total_ms : null;
+          var stability = aggregates.stability ? aggregates.stability.tokens_per_second_cv : null;
+          var efficiency = aggregates.efficiency ? aggregates.efficiency.accuracy_per_second : null;
+          return {
+            name: modelLabel(model),
+            accuracy: Number(accuracy),
+            tps: Number(tps),
+            latency: Number(latency),
+            stability: Number(stability),
+            efficiency: Number(efficiency)
+          };
+        }).filter(function(entry) {
+          return !isNaN(entry.accuracy) && !isNaN(entry.tps) && !isNaN(entry.latency)
+            && !isNaN(entry.stability) && !isNaN(entry.efficiency);
+        });
+
+        if (!entries.length) {
+          $('#dendrogramEmpty').text('No similarity data available for this report.');
+          return;
+        }
+
+        function normalize(values, invert) {
+          var min = Math.min.apply(null, values);
+          var max = Math.max.apply(null, values);
+          var range = max - min;
+          return values.map(function(value) {
+            if (!isFinite(value)) {
+              return 0;
+            }
+            if (range === 0) {
+              return 0.5;
+            }
+            var normalized = (value - min) / range;
+            if (invert) {
+              normalized = 1 - normalized;
+            }
+            return normalized;
+          });
+        }
+
+        var accNorm = normalize(entries.map(function(e) { return e.accuracy; }), false);
+        var tpsNorm = normalize(entries.map(function(e) { return e.tps; }), false);
+        var latNorm = normalize(entries.map(function(e) { return e.latency; }), true);
+        var stabNorm = normalize(entries.map(function(e) { return e.stability; }), true);
+        var effNorm = normalize(entries.map(function(e) { return e.efficiency; }), false);
+
+        entries.forEach(function(entry, index) {
+          entry.features = {
+            accuracy: accNorm[index],
+            tps: tpsNorm[index],
+            latency: latNorm[index],
+            stability: stabNorm[index],
+            efficiency: effNorm[index]
+          };
+        });
+
+        var distances = [];
+        for (var i = 0; i < entries.length; i += 1) {
+          distances[i] = [];
+          for (var j = 0; j < entries.length; j += 1) {
+            if (i === j) {
+              distances[i][j] = 0;
+              continue;
+            }
+            var diffAcc = entries[i].features.accuracy - entries[j].features.accuracy;
+            var diffTps = entries[i].features.tps - entries[j].features.tps;
+            var diffLat = entries[i].features.latency - entries[j].features.latency;
+            var diffStab = entries[i].features.stability - entries[j].features.stability;
+            var diffEff = entries[i].features.efficiency - entries[j].features.efficiency;
+            distances[i][j] = Math.sqrt(
+              diffAcc * diffAcc +
+              diffTps * diffTps +
+              diffLat * diffLat +
+              diffStab * diffStab +
+              diffEff * diffEff
+            );
+          }
+        }
+
+        function clusterDistance(a, b) {
+          var total = 0;
+          var count = 0;
+          a.members.forEach(function(i) {
+            b.members.forEach(function(j) {
+              total += distances[i][j];
+              count += 1;
+            });
+          });
+          return count ? total / count : 0;
+        }
+
+        var clusters = entries.map(function(entry, index) {
+          return {
+            id: index,
+            members: [index],
+            node: { name: entry.name }
+          };
+        });
+        var nextId = clusters.length;
+
+        while (clusters.length > 1) {
+          var minDistance = Infinity;
+          var minI = 0;
+          var minJ = 1;
+          for (var a = 0; a < clusters.length; a += 1) {
+            for (var b = a + 1; b < clusters.length; b += 1) {
+              var distance = clusterDistance(clusters[a], clusters[b]);
+              if (distance < minDistance) {
+                minDistance = distance;
+                minI = a;
+                minJ = b;
+              }
+            }
+          }
+          var left = clusters[minI];
+          var right = clusters[minJ];
+          var nodeName = clusters.length === 2 ? 'All Models' : 'Cluster ' + nextId;
+          var merged = {
+            id: nextId,
+            members: left.members.concat(right.members),
+            node: {
+              name: nodeName,
+              children: [left.node, right.node]
+            }
+          };
+          clusters.splice(minJ, 1);
+          clusters.splice(minI, 1);
+          clusters.push(merged);
+          nextId += 1;
+        }
+
+        var root = d3.hierarchy(clusters[0].node);
+        var width = Math.max(container.node().clientWidth || 700, 700);
+        var height = 360;
+        var margin = { top: 20, right: 180, bottom: 20, left: 40 };
+        var svg = container.append('svg')
+          .attr('viewBox', '0 0 ' + width + ' ' + height)
+          .attr('preserveAspectRatio', 'xMinYMin meet')
+          .style('min-width', width + 'px');
+
+        var cluster = d3.cluster()
+          .size([height - margin.top - margin.bottom, width - margin.left - margin.right]);
+
+        cluster(root);
+
+        var group = svg.append('g')
+          .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+
+        group.selectAll('.link')
+          .data(root.links())
+          .join('path')
+          .attr('class', 'link')
+          .attr('d', d3.linkHorizontal().x(function(d) { return d.y; }).y(function(d) { return d.x; }))
+          .attr('fill', 'none')
+          .attr('stroke', '#94a3b8')
+          .attr('stroke-width', 2);
+
+        group.selectAll('.node')
+          .data(root.descendants())
+          .join('circle')
+          .attr('class', 'node')
+          .attr('cx', function(d) { return d.y; })
+          .attr('cy', function(d) { return d.x; })
+          .attr('r', 6)
+          .attr('fill', function(d) { return d.children ? '#64748b' : '#3b82f6'; });
+
+        group.selectAll('.label')
+          .data(root.descendants())
+          .join('text')
+          .attr('class', 'label')
+          .attr('x', function(d) { return d.children ? d.y + 10 : d.y - 10; })
+          .attr('y', function(d) { return d.x; })
+          .attr('text-anchor', function(d) { return d.children ? 'start' : 'end'; })
+          .attr('dy', '0.32em')
+          .attr('fill', '#334155')
+          .attr('font-size', 12)
+          .text(function(d) { return d.data.name || ''; });
+      }
+
+      function buildParetoChart(models) {
+        if (typeof d3 === 'undefined') {
+          return;
+        }
+        var container = d3.select('#paretoChart');
+        if (container.empty()) {
+          return;
+        }
+        container.selectAll('*').remove();
+        $('#paretoEmpty').text('');
+
+        var points = models.map(function(model) {
+          var aggregates = model.aggregates || {};
+          var accuracy = aggregates.accuracy ? aggregates.accuracy.accuracy : null;
+          var tps = aggregates.throughput ? aggregates.throughput.avg_tokens_per_second : null;
+          return {
+            name: modelLabel(model),
+            accuracy: Number(accuracy) * 100,
+            tps: Number(tps)
+          };
+        }).filter(function(point) {
+          return !isNaN(point.accuracy) && !isNaN(point.tps);
+        });
+
+        if (!points.length) {
+          $('#paretoEmpty').text('No Pareto data available for this report.');
+          return;
+        }
+
+        function isParetoOptimal(point, allPoints) {
+          return !allPoints.some(function(other) {
+            var betterOrEqualAccuracy = other.accuracy >= point.accuracy;
+            var betterOrEqualTps = other.tps >= point.tps;
+            var strictlyBetter = other.accuracy > point.accuracy || other.tps > point.tps;
+            return betterOrEqualAccuracy && betterOrEqualTps && strictlyBetter;
+          });
+        }
+
+        points.forEach(function(point) {
+          point.pareto = isParetoOptimal(point, points);
+        });
+
+        var paretoPoints = points.filter(function(point) { return point.pareto; })
+          .sort(function(a, b) { return a.accuracy - b.accuracy; });
+
+        var width = Math.max(container.node().clientWidth || 600, 600);
+        var height = 380;
+        var margin = { top: 20, right: 40, bottom: 50, left: 60 };
+
+        var svg = container.append('svg')
+          .attr('viewBox', '0 0 ' + width + ' ' + height)
+          .attr('preserveAspectRatio', 'xMinYMin meet')
+          .style('min-width', width + 'px');
+
+        var xScale = d3.scaleLinear()
+          .domain([60, 90])
+          .range([margin.left, width - margin.right]);
+
+        var yScale = d3.scaleLinear()
+          .domain([0, 3.5])
+          .range([height - margin.bottom, margin.top]);
+
+        svg.append('g')
+          .attr('transform', 'translate(0,' + (height - margin.bottom) + ')')
+          .call(d3.axisBottom(xScale))
+          .call(function(g) { g.selectAll('text').attr('fill', '#64748B'); })
+          .call(function(g) { g.selectAll('path,line').attr('stroke', '#E2E8F0'); });
+
+        svg.append('g')
+          .attr('transform', 'translate(' + margin.left + ',0)')
+          .call(d3.axisLeft(yScale))
+          .call(function(g) { g.selectAll('text').attr('fill', '#64748B'); })
+          .call(function(g) { g.selectAll('path,line').attr('stroke', '#E2E8F0'); });
+
+        svg.append('g')
+          .attr('transform', 'translate(' + margin.left + ',0)')
+          .call(d3.axisLeft(yScale).tickSize(-(width - margin.left - margin.right)).tickFormat(''))
+          .call(function(g) { g.selectAll('line').attr('stroke', '#f1f5f9'); })
+          .call(function(g) { g.select('.domain').remove(); });
+
+        if (paretoPoints.length) {
+          var area = d3.area()
+            .x(function(d) { return xScale(d.accuracy); })
+            .y0(height - margin.bottom)
+            .y1(function(d) { return yScale(d.tps); });
+
+          svg.append('path')
+            .datum(paretoPoints)
+            .attr('d', area)
+            .attr('fill', '#10b981')
+            .attr('opacity', 0.1);
+
+          var line = d3.line()
+            .x(function(d) { return xScale(d.accuracy); })
+            .y(function(d) { return yScale(d.tps); });
+
+          svg.append('path')
+            .datum(paretoPoints)
+            .attr('d', line)
+            .attr('stroke', '#10b981')
+            .attr('stroke-width', 3)
+            .attr('stroke-dasharray', '5,5')
+            .attr('fill', 'none');
+        }
+
+        svg.selectAll('.point')
+          .data(points)
+          .join('circle')
+          .attr('class', 'point')
+          .attr('cx', function(d) { return xScale(d.accuracy); })
+          .attr('cy', function(d) { return yScale(d.tps); })
+          .attr('r', 8)
+          .attr('fill', function(d) { return d.pareto ? '#10b981' : '#94a3b8'; })
+          .attr('stroke', '#fff')
+          .attr('stroke-width', 2);
+
+        svg.selectAll('.point-label')
+          .data(points)
+          .join('text')
+          .attr('class', 'point-label')
+          .attr('x', function(d) { return xScale(d.accuracy) + 12; })
+          .attr('y', function(d) { return yScale(d.tps); })
+          .attr('dy', '0.32em')
+          .attr('fill', '#334155')
+          .attr('font-size', 11)
+          .attr('font-weight', function(d) { return d.pareto ? 700 : 400; })
+          .text(function(d) { return d.name; });
+
+        svg.append('text')
+          .attr('x', (width - margin.left - margin.right) / 2 + margin.left)
+          .attr('y', height - 12)
+          .attr('text-anchor', 'middle')
+          .attr('fill', '#64748B')
+          .attr('font-size', 12)
+          .text('Accuracy (%)');
+
+        svg.append('text')
+          .attr('transform', 'rotate(-90)')
+          .attr('x', -((height - margin.top - margin.bottom) / 2 + margin.top))
+          .attr('y', 16)
+          .attr('text-anchor', 'middle')
+          .attr('fill', '#64748B')
+          .attr('font-size', 12)
+          .text('Throughput (tokens/sec)');
+      }
+
       function buildInputTokenCharts(models) {
         var ttftCanvas = document.getElementById('inputTokensTtftChart');
         var tpsCanvas = document.getElementById('inputTokensTpsChart');
@@ -1602,6 +2108,9 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
         buildAvgLogprobChart(models);
         buildLatencyPercentileChart(models);
         buildCorrelationChart(models);
+        buildProcessingPipelineChart(models);
+        buildDendrogram(models);
+        buildParetoChart(models);
         buildInputTokenCharts(models);
         buildAccordion(models);
       }
