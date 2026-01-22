@@ -5,13 +5,10 @@
       "url": "{LlamaCpp-api-endpoint-04}",
       "type": "llama.cpp",
       "models": [
-        "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M",
         "Falcon3-3B-Instruct-q5_k_m",
         "gemma-2-2b-it-Q4_K_M",
         "gemma-3-4b-it-Q4_K_M",
-        "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
-        "internlm2_5-1_8b-chat-Q4_K_M",
-        "qwen2.5-1.5b-instruct-q4_k_m"
+        "Qwen3-0.6B-Q4_K_M"
       ],
       "systemprompt": "Take user input as subject; return valid JSON: {\"subject\":\"{subject}\"} only.",
       "parameterTemplate": "generic",
@@ -33,13 +30,10 @@
       "url": "{LlamaCpp-api-endpoint-04}",
       "type": "llama.cpp",
       "models": [
-        "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M",
         "Falcon3-3B-Instruct-q5_k_m",
         "gemma-2-2b-it-Q4_K_M",
         "gemma-3-4b-it-Q4_K_M",
-        "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
-        "internlm2_5-1_8b-chat-Q4_K_M",
-        "qwen2.5-1.5b-instruct-q4_k_m"
+        "Qwen3-0.6B-Q4_K_M"
       ],
       "systemprompt": "Return one measurable property/value as JSON: {\"subject\":\"{subject}\",\"{property}\":\"{value}\"}.",
       "parameterTemplate": "generic",
@@ -61,13 +55,10 @@
       "url": "{LlamaCpp-api-endpoint-04}",
       "type": "llama.cpp",
       "models": [
-        "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M",
         "Falcon3-3B-Instruct-q5_k_m",
         "gemma-2-2b-it-Q4_K_M",
         "gemma-3-4b-it-Q4_K_M",
-        "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
-        "internlm2_5-1_8b-chat-Q4_K_M",
-        "qwen2.5-1.5b-instruct-q4_k_m"
+        "Qwen3-0.6B-Q4_K_M"
       ],
       "systemprompt": "Ensure clean keys/values, no extras; return valid JSON: {\"subject\":\"{subject}\",\"{property}\":\"{value}\"}.",
       "parameterTemplate": "generic",
@@ -89,13 +80,10 @@
       "url": "{LlamaCpp-api-endpoint-04}",
       "type": "llama.cpp",
       "models": [
-        "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M",
         "Falcon3-3B-Instruct-q5_k_m",
         "gemma-2-2b-it-Q4_K_M",
         "gemma-3-4b-it-Q4_K_M",
-        "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
-        "internlm2_5-1_8b-chat-Q4_K_M",
-        "qwen2.5-1.5b-instruct-q4_k_m"
+        "Qwen3-0.6B-Q4_K_M"
       ],
       "systemprompt": "Validate fact; return full JSON with added key 'validated': true or false, nothing else.",
       "parameterTemplate": "generic",

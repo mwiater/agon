@@ -5,13 +5,10 @@
       "url": "https://o-udoo01.0nezer0.com",
       "type": "llama.cpp",
       "models": [
-        "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M",
         "Falcon3-3B-Instruct-q5_k_m",
         "gemma-2-2b-it-Q4_K_M",
         "gemma-3-4b-it-Q4_K_M",
-        "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
-        "internlm2_5-1_8b-chat-Q4_K_M",
-        "qwen2.5-1.5b-instruct-q4_k_m"
+        "Qwen3-0.6B-Q4_K_M"
       ],
       "systemprompt": "You are a helpful and concise assistant. Answer questions directly, and be brief and precise. Get straight to the point.",
       "parameterTemplate": "generic",
@@ -33,13 +30,10 @@
       "url": "https://o-udoo02.0nezer0.com",
       "type": "llama.cpp",
       "models": [
-        "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M",
         "Falcon3-3B-Instruct-q5_k_m",
         "gemma-2-2b-it-Q4_K_M",
         "gemma-3-4b-it-Q4_K_M",
-        "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
-        "internlm2_5-1_8b-chat-Q4_K_M",
-        "qwen2.5-1.5b-instruct-q4_k_m"
+        "Qwen3-0.6B-Q4_K_M"
       ],
       "systemprompt": "You are Hunter S. Thompson. Emulate his Gonzo style: frantic, subjective, political, and paranoid. Use vivid, often drug-fueled, and exaggerated language. Swearing is permitted.",
       "parameterTemplate": "generic",
@@ -61,13 +55,10 @@
       "url": "https://o-udoo03.0nezer0.com",
       "type": "llama.cpp",
       "models": [
-        "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M",
         "Falcon3-3B-Instruct-q5_k_m",
         "gemma-2-2b-it-Q4_K_M",
         "gemma-3-4b-it-Q4_K_M",
-        "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
-        "internlm2_5-1_8b-chat-Q4_K_M",
-        "qwen2.5-1.5b-instruct-q4_k_m"
+        "Qwen3-0.6B-Q4_K_M"
       ],
       "systemprompt": "You are David Sedaris. Write a humorous, first-person memoir. Be self-deprecating, witty, highly conversational, and focus on the absurdity of everyday human behavior.",
       "parameterTemplate": "generic",
@@ -89,13 +80,10 @@
       "url": "https://o-udoo04.0nezer0.com",
       "type": "llama.cpp",
       "models": [
-        "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M",
         "Falcon3-3B-Instruct-q5_k_m",
         "gemma-2-2b-it-Q4_K_M",
         "gemma-3-4b-it-Q4_K_M",
-        "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
-        "internlm2_5-1_8b-chat-Q4_K_M",
-        "qwen2.5-1.5b-instruct-q4_k_m"
+        "Qwen3-0.6B-Q4_K_M"
       ],
       "systemprompt": "You are Elmore Leonard. Write short, punchy prose. Focus on realistic, stylized dialogue and character interaction. Keep descriptive passages to a minimum. Never use a word other than 'said' for dialogue attribution.",
       "parameterTemplate": "generic",

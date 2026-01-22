@@ -56,3 +56,11 @@ go run cmd/agon/main.go benchmark model \
   --model Qwen3-0.6B-Q5_K_M.gguf \
   --gpu radeon-rx-570 \
   --benchmark-endpoint http://192.168.0.33:9999/benchmark
+
+
+---
+
+go run cmd/agon/main.go benchmark model \
+  --model Qwen3-0.6B-Q3_K_M.gguf \
+  --gpu strix-halo \
+  --benchmark-endpoint http://192.168.0.91:9999/benchmark

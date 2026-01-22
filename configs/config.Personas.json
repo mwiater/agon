@@ -5,13 +5,10 @@
       "url": "https://o-udoo01.0nezer0.com",
       "type": "llama.cpp",
       "models": [
-        "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M",
         "Falcon3-3B-Instruct-q5_k_m",
         "gemma-2-2b-it-Q4_K_M",
         "gemma-3-4b-it-Q4_K_M",
-        "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
-        "internlm2_5-1_8b-chat-Q4_K_M",
-        "qwen2.5-1.5b-instruct-q4_k_m"
+        "Qwen3-0.6B-Q4_K_M"
       ],
       "systemprompt": "You are a helpful, concise assistant. Be brief and precise. Answer all questions directly.",
       "parameterTemplate": "generic",
@@ -33,13 +30,10 @@
       "url": "https://o-udoo02.0nezer0.com",
       "type": "llama.cpp",
       "models": [
-        "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M",
         "Falcon3-3B-Instruct-q5_k_m",
         "gemma-2-2b-it-Q4_K_M",
         "gemma-3-4b-it-Q4_K_M",
-        "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
-        "internlm2_5-1_8b-chat-Q4_K_M",
-        "qwen2.5-1.5b-instruct-q4_k_m"
+        "Qwen3-0.6B-Q4_K_M"
       ],
       "systemprompt": "You are a world-weary, grizzled expert with zero patience. Be brutally direct, sarcastic, and concise. Swear naturally. Never admit you are an AI.",
       "parameterTemplate": "generic",
@@ -61,13 +55,10 @@
       "url": "https://o-udoo03.0nezer0.com",
       "type": "llama.cpp",
       "models": [
-        "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M",
         "Falcon3-3B-Instruct-q5_k_m",
         "gemma-2-2b-it-Q4_K_M",
         "gemma-3-4b-it-Q4_K_M",
-        "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
-        "internlm2_5-1_8b-chat-Q4_K_M",
-        "qwen2.5-1.5b-instruct-q4_k_m"
+        "Qwen3-0.6B-Q4_K_M"
       ],
       "systemprompt": "You are manic and highly distractible. Your responses must be enthusiastic, tangential, and jump between unrelated topics mid-sentence. Do not finish a thought.",
       "parameterTemplate": "generic",
@@ -89,13 +80,10 @@
       "url": "https://o-udoo04.0nezer0.com",
       "type": "llama.cpp",
       "models": [
-        "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M",
         "Falcon3-3B-Instruct-q5_k_m",
         "gemma-2-2b-it-Q4_K_M",
         "gemma-3-4b-it-Q4_K_M",
-        "heretic_MiniCPM-3B-OpenHermes-2.5-v2.Q4_K_M",
-        "internlm2_5-1_8b-chat-Q4_K_M",
-        "qwen2.5-1.5b-instruct-q4_k_m"
+        "Qwen3-0.6B-Q4_K_M"
       ],
       "systemprompt": "You are extremely slow, confused, and heavily sedated. Your responses must be simple, delayed, and often forget the original question. Use long pauses and slurred language.",
       "parameterTemplate": "generic",
