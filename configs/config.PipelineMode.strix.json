@@ -1,0 +1,70 @@
+{
+  "hosts": [
+    {
+      "name": "LlamaCpp01-Pro",
+      "url": "http://192.168.0.239:9998",
+      "type": "llama.cpp",
+      "models": [
+        "Qwen2.5-Coder-32B-Instruct-Q4_K_M",
+        "gpt-oss-20b-MXFP4",
+        "gemma-3-4b-it-Q4_K_M",
+        "Falcon3-3B-Instruct-q5_k_m"
+      ],
+      "systemprompt": "Take the user input as a controversial idea, proposal, or belief. Construct a persuasive argument IN FAVOR of it. Be confident and articulate. Return valid JSON only: {\"topic\":\"{user_input}\",\"stance\":\"pro\",\"argument\":{\"thesis\":\"...\",\"points\":[\"...\",\"...\",\"...\"],\"conclusion\":\"...\"}}",
+      "parameterTemplate": "generic",
+      "parameters": {}
+    },
+    {
+      "name": "LlamaCpp02-Con",
+      "url": "http://192.168.0.239:9998",
+      "type": "llama.cpp",
+      "models": [
+        "Qwen2.5-Coder-32B-Instruct-Q4_K_M",
+        "gpt-oss-20b-MXFP4",
+        "gemma-3-4b-it-Q4_K_M",
+        "Falcon3-3B-Instruct-q5_k_m"
+      ],
+      "systemprompt": "Input is JSON containing a 'topic' and a pro argument. Construct a persuasive argument AGAINST the topic. Be skeptical, critical, and rigorous. Return valid JSON only. Add key 'counter_argument' with structure: {\"thesis\":\"...\",\"points\":[\"...\",\"...\",\"...\"],\"conclusion\":\"...\"}. Preserve all existing fields.",
+      "parameterTemplate": "generic",
+      "parameters": {}
+    },
+    {
+      "name": "LlamaCpp03-Synthesis",
+      "url": "http://192.168.0.239:9998",
+      "type": "llama.cpp",
+      "models": [
+        "Qwen2.5-Coder-32B-Instruct-Q4_K_M",
+        "gpt-oss-20b-MXFP4",
+        "gemma-3-4b-it-Q4_K_M",
+        "Falcon3-3B-Instruct-q5_k_m"
+      ],
+      "systemprompt": "Input is JSON with both pro and counter arguments. Write a balanced, thoughtful article that synthesizes both perspectives. Add key 'article' with value: {\"title\":\"...\",\"introduction\":\"...\",\"body\":\"...\",\"resolution\":\"...\"}. Do not remove existing keys. Return full valid JSON only.",
+      "parameterTemplate": "generic",
+      "parameters": {}
+    },
+    {
+      "name": "LlamaCpp04-Refinement",
+      "url": "http://192.168.0.239:9998",
+      "type": "llama.cpp",
+      "models": [
+        "Qwen2.5-Coder-32B-Instruct-Q4_K_M",
+        "gpt-oss-20b-MXFP4",
+        "gemma-3-4b-it-Q4_K_M",
+        "Falcon3-3B-Instruct-q5_k_m"
+      ],
+      "systemprompt": "Input is JSON containing a synthesized article. Refine the article for clarity, flow, and intellectual honesty. Reduce redundancy, sharpen arguments, and improve the ending. Add key 'final_article' with the polished version as a single markdown-formatted string. Return full valid JSON only.",
+      "parameterTemplate": "generic",
+      "parameters": {}
+    }
+  ],
+  "timeout": 600,
+  "debug": true,
+  "multimodelMode": false,
+  "pipelineMode": true,
+  "jsonMode": true,
+  "mcpMode": false,
+  "mcpBinary": "dist/agon-mcp_windows_amd64_v1/agon-mcp.exe",
+  "mcpInitTimeout": 10,
+  "mcpRetryCount": 1,
+  "metrics": true
+}
