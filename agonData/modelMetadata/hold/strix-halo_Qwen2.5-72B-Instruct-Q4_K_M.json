@@ -64,7 +64,7 @@
         "xtc_threshold": 0.10000000149011612
       }
     },
-    "endpoint_metrics": false,
+    "endpoint_metrics": true,
     "endpoint_props": false,
     "endpoint_slots": true,
     "eos_token": "\u003c|im_end|\u003e",
@@ -76,7 +76,7 @@
     "model_alias": "Qwen2.5-72B-Instruct-Q4_K_M",
     "model_path": "C:\\ai\\models\\Qwen2.5-72B-Instruct-Q4_K_M.gguf",
     "total_slots": 4,
-    "webui": true,
+    "webui": false,
     "webui_settings": {}
   }
 }

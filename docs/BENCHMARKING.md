@@ -64,3 +64,6 @@ go run cmd/agon/main.go benchmark model \
   --model Qwen3-0.6B-Q3_K_M.gguf \
   --gpu strix-halo \
   --benchmark-endpoint http://192.168.0.91:9999/benchmark
+
+
+clear && go run cmd/agon/main.go fetch modelmetadata --endpoints http://192.168.0.239:9998 --gpu strix-halo

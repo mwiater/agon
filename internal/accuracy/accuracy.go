@@ -519,19 +519,32 @@ func normalizeResponse(response string) string {
 	if trimmed == "" {
 		return trimmed
 	}
-	const endTag = "</think>"
-	if end := strings.LastIndex(trimmed, endTag); end != -1 {
-		trimmed = trimmed[end+len(endTag):]
+	// Strip any <think> blocks but keep any surrounding content (some models append reasoning after the answer).
+	thinkBlock := regexp.MustCompile(`(?s)<think>.*?</think>`)
+	trimmed = thinkBlock.ReplaceAllString(trimmed, "")
+	if strings.Contains(trimmed, "<think>") {
+		trimmed = trimmed[:strings.Index(trimmed, "<think>")]
 	}
 	trimmed = strings.Map(func(r rune) rune {
 		if r == '\n' || r == '\r' {
-			return -1
+			return ' '
 		}
 		return r
 	}, trimmed)
+	trimmed = strings.Join(strings.Fields(trimmed), " ")
 	trimmed = strings.ReplaceAll(trimmed, ",", "")
 	trimmed = strings.Trim(trimmed, " \t\"'`.,;:!?()[]{}<>")
-	return strings.TrimSpace(trimmed)
+	trimmed = strings.TrimSpace(trimmed)
+	if trimmed == "" {
+		return trimmed
+	}
+
+	// If there are multiple numbers, prefer the last one (answers are typically at the end).
+	matches := regexp.MustCompile(`-?\d+`).FindAllString(trimmed, -1)
+	if len(matches) > 0 {
+		return matches[len(matches)-1]
+	}
+	return trimmed
 }
 
 func buildAccuracySystemPrompt(systemPrompt string) string {
