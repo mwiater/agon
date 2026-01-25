@@ -160,15 +160,6 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
       border-color: var(--border);
     }
     .sort-icon { font-size: 0.8rem; margin-left: 0.25rem; }
-    .accordion-button .badge { margin-left: 0.5rem; }
-    .accordion-button {
-      background-color: var(--light);
-      color: var(--text);
-    }
-    .accordion-button:not(.collapsed) {
-      background-color: var(--accent);
-      color: var(--background);
-    }
     .list-group-item {
       display: flex;
       align-items: center;
@@ -280,10 +271,6 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
     [data-theme="dark"] .chart-card {
       box-shadow: 0 10px 28px rgba(2, 6, 23, 0.6);
     }
-    [data-theme="dark"] .accordion-button:not(.collapsed) {
-      background-color: var(--accent);
-      color: #0B1220;
-    }
     [data-theme="dark"] .badge.bg-warning {
       color: #0B1220 !important;
     }
@@ -348,6 +335,17 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
     </section>
 
     <section class="mt-4">
+      <div class="card shadow-sm">
+        <div class="card-header bg-white">
+          <h5 class="mb-0">Per-Model Details</h5>
+        </div>
+        <div class="card-body">
+          <div class="row g-3" id="modelCards"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mt-4">
       <div class="card shadow-sm chart-card">
         <div class="card-body">
           <div class="chart-title">Accuracy vs Throughput</div>
@@ -406,7 +404,7 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
       </div>
     </section>
 
-    <section class="mt-4">
+    <section class="mt-4" style="display: none;">
       <div class="row g-3">
         <div class="col-xl-6">
           <div class="card shadow-sm chart-card">
@@ -435,7 +433,7 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
       </div>
     </section>
 
-    <section class="mt-4">
+    <section class="mt-4" style="display: none;">
       <div class="card shadow-sm chart-card">
         <div class="card-body">
           <div class="chart-title">Correlation Snapshot</div>
@@ -457,17 +455,6 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
             <canvas id="processingPipelineChart" aria-label="Processing pipeline waterfall chart" role="img"></canvas>
           </div>
           <div id="processingPipelineEmpty" class="text-muted small mt-2"></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="mt-4">
-      <div class="card shadow-sm chart-card">
-        <div class="card-body">
-          <div class="chart-title">Model Similarity Dendrogram</div>
-          <div class="chart-subtitle">Hierarchical clustering across accuracy, throughput, latency, stability, and efficiency.</div>
-          <div id="dendrogramChart" class="d3-chart" aria-label="Model similarity dendrogram" role="img"></div>
-          <div id="dendrogramEmpty" class="text-muted small mt-2"></div>
         </div>
       </div>
     </section>
@@ -510,16 +497,6 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
       </div>
     </section>
 
-    <section class="mt-4">
-      <div class="card shadow-sm">
-        <div class="card-header bg-white">
-          <h5 class="mb-0">Per-Model Details</h5>
-        </div>
-        <div class="card-body">
-          <div class="accordion" id="modelAccordion"></div>
-        </div>
-      </div>
-    </section>
   </main>
 
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
@@ -2025,50 +2002,31 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
         });
      }
 
-      function buildAccordion(models) {
-        var $accordion = $('#modelAccordion').empty();
+      function buildModelCards(models) {
+        var $cards = $('#modelCards').empty();
         if (!models.length) {
-          $accordion.append('<div class="text-muted">No model details available.</div>');
+          $cards.append('<div class="text-muted">No model details available.</div>');
           return;
         }
         models.forEach(function(model, index) {
           var bundleId = 'model_' + index;
-          var headerId = 'heading_' + index;
           var label = modelLabel(model);
           var accuracy = model.aggregates && model.aggregates.accuracy ? model.aggregates.accuracy : {};
           var latency = model.aggregates && model.aggregates.latency ? model.aggregates.latency : {};
           var throughput = model.aggregates && model.aggregates.throughput ? model.aggregates.throughput : {};
-          var benchmark = model.aggregates && model.aggregates.benchmark ? model.aggregates.benchmark : {};
-          var reliability = model.aggregates && model.aggregates.reliability ? model.aggregates.reliability : {};
           var efficiency = model.aggregates && model.aggregates.efficiency ? model.aggregates.efficiency : {};
-          var distributions = model.aggregates && model.aggregates.distributions ? model.aggregates.distributions : {};
-          var correlations = model.aggregates && model.aggregates.correlations ? model.aggregates.correlations : {};
-          var metadata = model.aggregates && model.aggregates.metadata ? model.aggregates.metadata : {};
-          var records = model.accuracy || [];
-          
-          // Averages for usage display
-          var avgPromptMs = averageField(records, 'prompt_ms');
-          var avgPredictedMs = averageField(records, 'predicted_ms');
-          var avgPromptPerTokenMs = averageField(records, 'prompt_per_token_ms');
-          var avgPredictedPerTokenMs = averageField(records, 'predicted_per_token_ms');
-          var avgPromptPerSecond = averageField(records, 'prompt_per_second');
-          var avgPredictedPerSecond = averageField(records, 'predicted_per_second');
-          var avgTotalTokens = averageField(records, 'total_tokens');
-          var avgCacheN = averageField(records, 'cache_n');
-          var avgPromptN = averageField(records, 'prompt_n');
-          var avgPredictedN = averageField(records, 'predicted_n');
 
           var bodyParts = [];
           bodyParts.push('<div class="row">');
           
           // Column 1: Performance Fingerprint (Radar Chart)
-          bodyParts.push('<div class="col-md-4">');
+          bodyParts.push('<div class="col-md-8">');
           bodyParts.push('<h6>Performance Fingerprint</h6>');
-          bodyParts.push('<div style="height: 320px;"><canvas id="radar_' + bundleId + '"></canvas></div>');
+          bodyParts.push('<div style="height: 400px;"><canvas id="radar_' + bundleId + '"></canvas></div>');
           bodyParts.push('</div>');
 
-          // Column 2: Accuracy, Latency, and Reliability
-          bodyParts.push('<div class="col-md-4">');
+          // Column 2: Accuracy and Latency
+          bodyParts.push('<div class="col-md-4" style="font-size: 0.75em;">');
           bodyParts.push('<h6>Accuracy</h6><ul class="list-unstyled mb-3">');
           bodyParts.push('<li><strong>Accuracy:</strong> ' + formatPercent(accuracy.accuracy, 1) + '</li>');
           bodyParts.push('<li><strong>Error rate:</strong> ' + formatPercent(accuracy.error_rate, 1) + '</li>');
@@ -2079,14 +2037,6 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
           bodyParts.push('<li><strong>TTFT P50/P90/P95:</strong> ' + formatNumber(latency.median_ttft_ms, 0) + ' / ' + formatNumber(latency.p90_ttft_ms, 0) + ' / ' + formatNumber(latency.p95_ttft_ms, 0) + ' ms</li>');
           bodyParts.push('<li><strong>Avg total:</strong> ' + formatNumber(latency.avg_total_ms, 0) + ' ms</li>');
           bodyParts.push('</ul>');
-          bodyParts.push('<h6>Reliability</h6><ul class="list-unstyled mb-3">');
-          bodyParts.push('<li><strong>Deadline rate:</strong> ' + formatPercent(reliability.deadline_exceeded_rate, 1) + '</li>');
-          bodyParts.push('<li><strong>Timeout rate:</strong> ' + formatPercent(reliability.timeout_rate, 1) + '</li>');
-          bodyParts.push('</ul>');
-          bodyParts.push('</div>');
-
-          // Column 3: Throughput, Efficiency, and Metadata
-          bodyParts.push('<div class="col-md-4">');
           bodyParts.push('<h6>Throughput &amp; Efficiency</h6><ul class="list-unstyled mb-3">');
           bodyParts.push('<li><strong>Avg TPS:</strong> ' + formatNumber(throughput.avg_tokens_per_second, 2) + '</li>');
           bodyParts.push('<li><strong>Effective TPS:</strong> ' + formatNumber(throughput.avg_effective_tps, 2) + '</li>');
@@ -2094,35 +2044,19 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
           bodyParts.push('<li><strong>TPS P90:</strong> ' + formatNumber(throughput.p90_tokens_per_second, 2) + '</li>');
           bodyParts.push('<li><strong>Accuracy per second:</strong> ' + formatNumber(efficiency.accuracy_per_second, 3) + '</li>');
           bodyParts.push('</ul>');
-          bodyParts.push('<h6>Metadata</h6><ul class="list-unstyled mb-3">');
-          bodyParts.push('<li><strong>Backend:</strong> ' + (metadata.backend || '-') + '</li>');
-          bodyParts.push('<li><strong>Model type:</strong> ' + (metadata.model_type || '-') + '</li>');
-          bodyParts.push('<li><strong>Context size:</strong> ' + formatNumber(metadata.context_size, 0) + '</li>');
-          bodyParts.push('</ul>');
-          bodyParts.push('<h6>Usage (avg)</h6><ul class="list-unstyled mb-0">');
-          bodyParts.push('<li><strong>Total tokens:</strong> ' + formatNumber(avgTotalTokens, 1) + '</li>');
-          bodyParts.push('<li><strong>Prompt n:</strong> ' + formatNumber(avgPromptN, 1) + '</li>');
-          bodyParts.push('<li><strong>Predicted n:</strong> ' + formatNumber(avgPredictedN, 1) + '</li>');
-          bodyParts.push('</ul>');
           bodyParts.push('</div>');
           bodyParts.push('</div>'); // End row
 
           var body = bodyParts.join('');
-          var $item = $('<div class="accordion-item"></div>');
-          var header = ''
-            + '<h2 class="accordion-header" id="' + headerId + '">' 
-            + '<button class="accordion-button collapsed" type="button" data-bs-toggle=\"collapse\" data-bs-target=\"#' + bundleId + '\" aria-expanded=\"false\" aria-controls=\"' + bundleId + '\">' 
-            + label
-            + '</button>'
-            + '</h2>';
-          var content = ''
-            + '<div id=\"' + bundleId + '\" class=\"accordion-collapse collapse\" aria-labelledby=\"' + headerId + '\" data-bs-parent=\"#modelAccordion\">'
-            + '<div class=\"accordion-body\">' + body + '</div>'
+          var card = ''
+            + '<div class="col-lg-4">'
+            + '<div class="card shadow-sm h-100">'
+            + '<div class="card-header bg-white"><h6 class="mb-0">' + label + '</h6></div>'
+            + '<div class="card-body">' + body + '</div>'
+            + '</div>'
             + '</div>';
-          
-          $item.append(header);
-          $item.append(content);
-          $accordion.append($item);
+
+          $cards.append(card);
 
           // Initialize the radar chart for this model immediately after appending to DOM
           buildModelRadar(model, 'radar_' + bundleId);
@@ -2144,7 +2078,7 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
         buildDendrogram(models);
         buildParetoChart(models);
         buildInputTokenCharts(models);
-        buildAccordion(models);
+        buildModelCards(models);
       }
 
       $(function() {
