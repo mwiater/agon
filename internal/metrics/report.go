@@ -1983,6 +1983,48 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
         renderCharts();
       }
 
+      function buildModelRadar(model, canvasId) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+
+        const aggregates = model.aggregates || {};
+        
+        // Data normalization helpers
+        const accuracy = (aggregates.accuracy?.accuracy || 0) * 100;
+        const logprob = Math.min(100, Math.max(0, (aggregates.throughput?.avg_logprob + 4) * 25)); // Normalized -4 to 0 range
+        const tps = Math.min(100, (aggregates.throughput?.avg_tokens_per_second || 0) * 10);
+        const responsiveness = Math.min(100, 1000 / (aggregates.latency?.avg_ttft_ms || 1000) * 10);
+        const stability = Math.min(100, (1 - (aggregates.stability?.tokens_per_second_cv || 0)) * 100);
+
+        new Chart(canvas, {
+            type: 'radar',
+            data: {
+                labels: ['Accuracy', 'Logprob (Certainty)', 'Throughput', 'Responsiveness', 'Stability'],
+                datasets: [{
+                    label: model.model,
+                    data: [accuracy, logprob, tps, responsiveness, stability],
+                    fill: true,
+                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                    borderColor: 'rgb(59, 130, 246)',
+                    pointBackgroundColor: 'rgb(59, 130, 246)',
+                    pointBorderColor: '#fff',
+                }]
+            },
+            options: {
+                elements: { line: { borderWidth: 3 } },
+                scales: {
+                    r: {
+                        angleLines: { display: true },
+                        suggestedMin: 0,
+                        suggestedMax: 100,
+                        ticks: { display: false }
+                    }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+     }
+
       function buildAccordion(models) {
         var $accordion = $('#modelAccordion').empty();
         if (!models.length) {
@@ -2003,6 +2045,8 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
           var correlations = model.aggregates && model.aggregates.correlations ? model.aggregates.correlations : {};
           var metadata = model.aggregates && model.aggregates.metadata ? model.aggregates.metadata : {};
           var records = model.accuracy || [];
+          
+          // Averages for usage display
           var avgPromptMs = averageField(records, 'prompt_ms');
           var avgPredictedMs = averageField(records, 'predicted_ms');
           var avgPromptPerTokenMs = averageField(records, 'prompt_per_token_ms');
@@ -2016,7 +2060,15 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
 
           var bodyParts = [];
           bodyParts.push('<div class="row">');
-          bodyParts.push('<div class="col-md-6">');
+          
+          // Column 1: Performance Fingerprint (Radar Chart)
+          bodyParts.push('<div class="col-md-4">');
+          bodyParts.push('<h6>Performance Fingerprint</h6>');
+          bodyParts.push('<div style="height: 320px;"><canvas id="radar_' + bundleId + '"></canvas></div>');
+          bodyParts.push('</div>');
+
+          // Column 2: Accuracy, Latency, and Reliability
+          bodyParts.push('<div class="col-md-4">');
           bodyParts.push('<h6>Accuracy</h6><ul class="list-unstyled mb-3">');
           bodyParts.push('<li><strong>Accuracy:</strong> ' + formatPercent(accuracy.accuracy, 1) + '</li>');
           bodyParts.push('<li><strong>Error rate:</strong> ' + formatPercent(accuracy.error_rate, 1) + '</li>');
@@ -2032,71 +2084,51 @@ const combinedReportTemplateHTML = `<!DOCTYPE html>
           bodyParts.push('<li><strong>Timeout rate:</strong> ' + formatPercent(reliability.timeout_rate, 1) + '</li>');
           bodyParts.push('</ul>');
           bodyParts.push('</div>');
-          bodyParts.push('<div class="col-md-6">');
+
+          // Column 3: Throughput, Efficiency, and Metadata
+          bodyParts.push('<div class="col-md-4">');
           bodyParts.push('<h6>Throughput &amp; Efficiency</h6><ul class="list-unstyled mb-3">');
           bodyParts.push('<li><strong>Avg TPS:</strong> ' + formatNumber(throughput.avg_tokens_per_second, 2) + '</li>');
           bodyParts.push('<li><strong>Effective TPS:</strong> ' + formatNumber(throughput.avg_effective_tps, 2) + '</li>');
           bodyParts.push('<li><strong>Avg logprob:</strong> ' + formatNumber(throughput.avg_logprob, 3) + '</li>');
           bodyParts.push('<li><strong>TPS P90:</strong> ' + formatNumber(throughput.p90_tokens_per_second, 2) + '</li>');
           bodyParts.push('<li><strong>Accuracy per second:</strong> ' + formatNumber(efficiency.accuracy_per_second, 3) + '</li>');
-          bodyParts.push('<li><strong>Tokens/sec per param:</strong> ' + formatNumber(efficiency.tokens_per_second_per_param, 6) + '</li>');
-          bodyParts.push('</ul>');
-          bodyParts.push('<h6>Benchmarks</h6><ul class="list-unstyled mb-3">');
-          bodyParts.push('<li><strong>Prompt TPS:</strong> ' + formatNumber(benchmark.prompt_tokens_per_second, 2) + '</li>');
-          bodyParts.push('<li><strong>Generation TPS:</strong> ' + formatNumber(benchmark.generation_tokens_per_second, 2) + '</li>');
-          bodyParts.push('<li><strong>Avg benchmark (ms):</strong> ' + formatNumber((benchmark.avg_benchmark_ns || 0) / 1000000, 2) + '</li>');
-          bodyParts.push('<li><strong>Run count:</strong> ' + formatNumber(benchmark.run_count, 0) + '</li>');
-          bodyParts.push('</ul>');
-          bodyParts.push('<h6>Usage &amp; Timings (avg)</h6><ul class="list-unstyled mb-3">');
-          bodyParts.push('<li><strong>Total tokens:</strong> ' + formatNumber(avgTotalTokens, 1) + '</li>');
-          bodyParts.push('<li><strong>Cache n:</strong> ' + formatNumber(avgCacheN, 1) + '</li>');
-          bodyParts.push('<li><strong>Prompt n:</strong> ' + formatNumber(avgPromptN, 1) + '</li>');
-          bodyParts.push('<li><strong>Predicted n:</strong> ' + formatNumber(avgPredictedN, 1) + '</li>');
-          bodyParts.push('<li><strong>Prompt ms:</strong> ' + formatNumber(avgPromptMs, 2) + '</li>');
-          bodyParts.push('<li><strong>Predicted ms:</strong> ' + formatNumber(avgPredictedMs, 2) + '</li>');
-          bodyParts.push('<li><strong>Prompt ms/token:</strong> ' + formatNumber(avgPromptPerTokenMs, 3) + '</li>');
-          bodyParts.push('<li><strong>Predicted ms/token:</strong> ' + formatNumber(avgPredictedPerTokenMs, 3) + '</li>');
-          bodyParts.push('<li><strong>Prompt tokens/sec:</strong> ' + formatNumber(avgPromptPerSecond, 2) + '</li>');
-          bodyParts.push('<li><strong>Predicted tokens/sec:</strong> ' + formatNumber(avgPredictedPerSecond, 2) + '</li>');
-          bodyParts.push('</ul>');
-          bodyParts.push('<h6>Correlations</h6><ul class="list-unstyled mb-3">');
-          bodyParts.push('<li><strong>Acc vs TPS:</strong> ' + formatNumber(correlations.accuracy_vs_throughput, 3) + '</li>');
-          bodyParts.push('<li><strong>Acc vs Total:</strong> ' + formatNumber(correlations.accuracy_vs_total_ms, 3) + '</li>');
-          bodyParts.push('<li><strong>TTFT vs Input:</strong> ' + formatNumber(correlations.ttft_vs_input_tokens, 3) + '</li>');
-          bodyParts.push('</ul>');
-          bodyParts.push('<h6>Distributions</h6><ul class="list-unstyled mb-3">');
-          if (distributions.ttft_ms) {
-            bodyParts.push('<li><strong>TTFT stddev:</strong> ' + formatNumber(distributions.ttft_ms.stddev, 2) + '</li>');
-          }
-          if (distributions.tokens_per_second) {
-            bodyParts.push('<li><strong>TPS stddev:</strong> ' + formatNumber(distributions.tokens_per_second.stddev, 2) + '</li>');
-          }
           bodyParts.push('</ul>');
           bodyParts.push('<h6>Metadata</h6><ul class="list-unstyled mb-3">');
           bodyParts.push('<li><strong>Backend:</strong> ' + (metadata.backend || '-') + '</li>');
           bodyParts.push('<li><strong>Model type:</strong> ' + (metadata.model_type || '-') + '</li>');
           bodyParts.push('<li><strong>Context size:</strong> ' + formatNumber(metadata.context_size, 0) + '</li>');
           bodyParts.push('</ul>');
+          bodyParts.push('<h6>Usage (avg)</h6><ul class="list-unstyled mb-0">');
+          bodyParts.push('<li><strong>Total tokens:</strong> ' + formatNumber(avgTotalTokens, 1) + '</li>');
+          bodyParts.push('<li><strong>Prompt n:</strong> ' + formatNumber(avgPromptN, 1) + '</li>');
+          bodyParts.push('<li><strong>Predicted n:</strong> ' + formatNumber(avgPredictedN, 1) + '</li>');
+          bodyParts.push('</ul>');
           bodyParts.push('</div>');
-          bodyParts.push('</div>');
-          var body = bodyParts.join('');
+          bodyParts.push('</div>'); // End row
 
+          var body = bodyParts.join('');
           var $item = $('<div class="accordion-item"></div>');
           var header = ''
             + '<h2 class="accordion-header" id="' + headerId + '">' 
-            + '<button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#' + bundleId + '" aria-expanded="false" aria-controls="' + bundleId + '">' 
+            + '<button class="accordion-button collapsed" type="button" data-bs-toggle=\"collapse\" data-bs-target=\"#' + bundleId + '\" aria-expanded=\"false\" aria-controls=\"' + bundleId + '\">' 
             + label
             + '</button>'
             + '</h2>';
           var content = ''
-            + '<div id="' + bundleId + '" class="accordion-collapse collapse" aria-labelledby="' + headerId + '" data-bs-parent="#modelAccordion">'
-            + '<div class="accordion-body">' + body + '</div>'
+            + '<div id=\"' + bundleId + '\" class=\"accordion-collapse collapse\" aria-labelledby=\"' + headerId + '\" data-bs-parent=\"#modelAccordion\">'
+            + '<div class=\"accordion-body\">' + body + '</div>'
             + '</div>';
+          
           $item.append(header);
           $item.append(content);
           $accordion.append($item);
+
+          // Initialize the radar chart for this model immediately after appending to DOM
+          buildModelRadar(model, 'radar_' + bundleId);
         });
       }
+
 
       function renderAll(models) {
         populateSummary(models);
